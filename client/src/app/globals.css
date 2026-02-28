@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@plugin "../../hero.ts";
+@source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+
+@theme {
+    --color-primary: #6C63FF;
+    --color-secondary: #F5A623;
+    --color-background: #FFFFFF;
+    --color-surface: #F9F9F9;
+    --color-text: #1A1A1A;
+    --color-muted: #6B7280;
+    --color-border: #E5E7EB;
+    --color-error: #EF4444;
+    --color-success: #22C55E;
+}
+
+[data-theme="dark"] {
+    --color-primary: #6C63FF;
+    --color-secondary: #F5A623;
+    --color-background: #0F0F0F;
+    --color-surface: #1A1A1A;
+    --color-text: #F9F9F9;
+    --color-muted: #9CA3AF;
+    --color-border: #2E2E2E;
+    --color-error: #EF4444;
+    --color-success: #22C55E;
+}
+
+button {
+    cursor: pointer;
+}

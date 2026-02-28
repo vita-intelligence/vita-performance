@@ -1,0 +1,248 @@
+# Adding a New Endpoint
+
+Step-by-step guide for adding a new endpoint across the Django + Next.js stack.
+
+---
+
+## 1. Django — Model (if needed)
+
+If your endpoint requires a new model, add it to the relevant app's `models.py`:
+
+```python
+from django.db import models
+
+class Workout(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workouts'
+```
+
+Then run migrations:
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## 2. Django — Serializer
+
+Create or add to the relevant serializer file inside the app's `serializers/` folder:
+
+```python
+# workout/serializers/workout.py
+from rest_framework import serializers
+from ..models import Workout
+
+class WorkoutSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Workout
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+```
+
+Export it from `serializers/__init__.py`:
+
+```python
+from .workout import WorkoutSerializer
+```
+
+---
+
+## 3. Django — View
+
+Create or add to the relevant view file inside the app's `views/` folder:
+
+```python
+# workout/views/workout.py
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from ..serializers import WorkoutSerializer
+
+class WorkoutListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        workouts = Workout.objects.filter(user=request.user)
+        serializer = WorkoutSerializer(workouts, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = WorkoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+```
+
+Export it from `views/__init__.py`:
+
+```python
+from .workout import WorkoutListView
+```
+
+---
+
+## 4. Django — URL
+
+Register the view in the app's `urls.py`:
+
+```python
+from django.urls import path
+from .views import WorkoutListView
+
+urlpatterns = [
+    path('workouts', WorkoutListView.as_view(), name='workout-list'),
+]
+```
+
+---
+
+## 5. Next.js — Type
+
+Add the response type to `src/types/`:
+
+```ts
+// src/types/workout.ts
+export interface Workout {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface CreateWorkoutPayload {
+  name: string;
+}
+```
+
+Export it from `src/types/index.ts` (create this if it doesn't exist):
+
+```ts
+export * from "./auth";
+export * from "./workout";
+```
+
+---
+
+## 6. Next.js — Config
+
+Add the new endpoint to `src/config/api.ts`:
+
+```ts
+endpoints: {
+  auth: { ... },
+  workout: {
+    list: "/api/workouts",
+  },
+},
+```
+
+---
+
+## 7. Next.js — Service
+
+Create `src/services/workout.service.ts`:
+
+```ts
+import api from "@/lib/api";
+import { API_CONFIG } from "@/config/api";
+import { Workout, CreateWorkoutPayload } from "@/types/workout";
+
+const { workout } = API_CONFIG.endpoints;
+
+export const workoutService = {
+  getAll: async (): Promise<Workout[]> => {
+    const { data } = await api.get<Workout[]>(workout.list);
+    return data;
+  },
+
+  create: async (payload: CreateWorkoutPayload): Promise<Workout> => {
+    const { data } = await api.post<Workout>(workout.list, payload);
+    return data;
+  },
+};
+```
+
+---
+
+## 8. Next.js — Hook
+
+Create `src/hooks/useWorkout.ts`:
+
+```ts
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { workoutService } from "@/services/workout.service";
+import { CreateWorkoutPayload } from "@/types/workout";
+
+const WORKOUT_KEY = ["workouts"];
+
+export const useWorkout = () => {
+  const queryClient = useQueryClient();
+
+  const { data: workouts, isLoading } = useQuery({
+    queryKey: WORKOUT_KEY,
+    queryFn: workoutService.getAll,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (payload: CreateWorkoutPayload) =>
+      workoutService.create(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKOUT_KEY }),
+  });
+
+  return {
+    workouts,
+    isLoading,
+    createWorkout: createMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    createError: createMutation.error,
+  };
+};
+```
+
+---
+
+## 9. Next.js — Component
+
+Use the hook in your page or component:
+
+```tsx
+"use client";
+
+import { useWorkout } from "@/hooks/useWorkout";
+
+export default function WorkoutsPage() {
+  const { workouts, isLoading, createWorkout } = useWorkout();
+
+  if (isLoading) return <p>Loading...</p>;
+
+  return (
+    <div>
+      {workouts?.map((workout) => (
+        <p key={workout.id}>{workout.name}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Summary Checklist
+
+| Step | Django            | Next.js         |
+| ---- | ----------------- | --------------- |
+| 1    | Model + migration | —               |
+| 2    | Serializer        | —               |
+| 3    | View (CBV)        | —               |
+| 4    | URL               | —               |
+| 5    | —                 | Type            |
+| 6    | —                 | Config endpoint |
+| 7    | —                 | Service         |
+| 8    | —                 | Hook            |
+| 9    | —                 | Component       |
