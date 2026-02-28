@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { authService } from "@/services/auth.service";
-import { useAuthStore } from "@/lib/stores";
+import { useAuthStore, useSettingsStore } from "@/lib/stores";
 import { LoginPayload, RegisterPayload } from "@/types/auth";
 import { usePathname } from "next/navigation";
 import { getErrorMessage } from "@/lib/utils";
@@ -14,6 +14,7 @@ export const useAuth = () => {
   const { user, setUser, clearUser } = useAuthStore();
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
+  const { clearSettings } = useSettingsStore();
 
   const { isLoading } = useQuery({
     queryKey: AUTH_KEY,
@@ -56,6 +57,7 @@ export const useAuth = () => {
     mutationFn: authService.logout,
     onSuccess: () => {
       clearUser();
+      clearSettings();
       queryClient.removeQueries({ queryKey: AUTH_KEY });
     },
     onError: (error) => {

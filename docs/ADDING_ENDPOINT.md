@@ -6,13 +6,14 @@ Step-by-step guide for adding a new endpoint across the Django + Next.js stack.
 
 ## 1. Django — Model (if needed)
 
-If your endpoint requires a new model, add it to the relevant app's `models.py`:
+If your endpoint requires a new model, add it to the relevant app's `models.py`. Use one line per field:
 
 ```python
 from django.db import models
+from django.conf import settings
 
 class Workout(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='workouts')
     name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -63,6 +64,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from ..models import Workout
 from ..serializers import WorkoutSerializer
 
 class WorkoutListView(APIView):
@@ -97,7 +99,17 @@ from django.urls import path
 from .views import WorkoutListView
 
 urlpatterns = [
-    path('workouts', WorkoutListView.as_view(), name='workout-list'),
+    path('workouts/', WorkoutListView.as_view(), name='workout-list'),
+]
+```
+
+Register the app in core `urls.py` under `api_patterns`:
+
+```python
+api_patterns = [
+    path('accounts/', include('accounts.urls')),
+    path('settings/', include('settings.urls')),
+    path('workouts/', include('workout.urls')),  # add here
 ]
 ```
 
@@ -120,13 +132,6 @@ export interface CreateWorkoutPayload {
 }
 ```
 
-Export it from `src/types/index.ts` (create this if it doesn't exist):
-
-```ts
-export * from "./auth";
-export * from "./workout";
-```
-
 ---
 
 ## 6. Next.js — Config
@@ -136,8 +141,9 @@ Add the new endpoint to `src/config/api.ts`:
 ```ts
 endpoints: {
   auth: { ... },
+  settings: { ... },
   workout: {
-    list: "/api/workouts",
+    list: "/api/workouts/",
   },
 },
 ```
@@ -170,14 +176,52 @@ export const workoutService = {
 
 ---
 
-## 8. Next.js — Hook
+## 8. Next.js — Store (if needed)
+
+Only create a store if the data needs to persist across page refreshes (like user or settings). For regular data like lists, Tanstack Query cache is enough.
+
+```ts
+// src/lib/stores/workout.store.ts
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { Workout } from "@/types/workout";
+
+interface WorkoutStore {
+  workouts: Workout[];
+  setWorkouts: (workouts: Workout[]) => void;
+  clearWorkouts: () => void;
+}
+
+export const useWorkoutStore = create<WorkoutStore>()(
+  persist(
+    (set) => ({
+      workouts: [],
+      setWorkouts: (workouts) => set({ workouts }),
+      clearWorkouts: () => set({ workouts: [] }),
+    }),
+    { name: "workout-storage" },
+  ),
+);
+```
+
+Export from `src/lib/stores/index.ts`:
+
+```ts
+export { useWorkoutStore } from "./workout.store";
+```
+
+---
+
+## 9. Next.js — Hook
 
 Create `src/hooks/useWorkout.ts`:
 
 ```ts
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { addToast } from "@heroui/react";
 import { workoutService } from "@/services/workout.service";
 import { CreateWorkoutPayload } from "@/types/workout";
+import { getErrorMessage } from "@/lib/utils";
 
 const WORKOUT_KEY = ["workouts"];
 
@@ -192,7 +236,18 @@ export const useWorkout = () => {
   const createMutation = useMutation({
     mutationFn: (payload: CreateWorkoutPayload) =>
       workoutService.create(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKOUT_KEY }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: WORKOUT_KEY });
+      addToast({ title: "Workout created", color: "success", timeout: 3000 });
+    },
+    onError: (error) => {
+      addToast({
+        title: "Failed to create workout",
+        description: getErrorMessage(error),
+        color: "danger",
+        timeout: 4000,
+      });
+    },
   });
 
   return {
@@ -200,14 +255,13 @@ export const useWorkout = () => {
     isLoading,
     createWorkout: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
-    createError: createMutation.error,
   };
 };
 ```
 
 ---
 
-## 9. Next.js — Component
+## 10. Next.js — Component
 
 Use the hook in your page or component:
 
@@ -217,7 +271,7 @@ Use the hook in your page or component:
 import { useWorkout } from "@/hooks/useWorkout";
 
 export default function WorkoutsPage() {
-  const { workouts, isLoading, createWorkout } = useWorkout();
+  const { workouts, isLoading } = useWorkout();
 
   if (isLoading) return <p>Loading...</p>;
 
@@ -235,14 +289,24 @@ export default function WorkoutsPage() {
 
 ## Summary Checklist
 
-| Step | Django            | Next.js         |
-| ---- | ----------------- | --------------- |
-| 1    | Model + migration | —               |
-| 2    | Serializer        | —               |
-| 3    | View (CBV)        | —               |
-| 4    | URL               | —               |
-| 5    | —                 | Type            |
-| 6    | —                 | Config endpoint |
-| 7    | —                 | Service         |
-| 8    | —                 | Hook            |
-| 9    | —                 | Component       |
+| Step | Django            | Next.js           |
+| ---- | ----------------- | ----------------- |
+| 1    | Model + migration | —                 |
+| 2    | Serializer        | —                 |
+| 3    | View (CBV)        | —                 |
+| 4    | URL               | —                 |
+| 5    | —                 | Type              |
+| 6    | —                 | Config endpoint   |
+| 7    | —                 | Service           |
+| 8    | —                 | Store (if needed) |
+| 9    | —                 | Hook              |
+| 10   | —                 | Component         |
+
+## When to create a Zustand store
+
+| Data                      | Store needed?                           |
+| ------------------------- | --------------------------------------- |
+| User profile              | ✅ Yes — needed instantly on every page |
+| User settings             | ✅ Yes — needed instantly on every page |
+| Lists (workouts, workers) | ❌ No — Tanstack Query cache is enough  |
+| Dashboard stats           | ❌ No — Tanstack Query cache is enough  |

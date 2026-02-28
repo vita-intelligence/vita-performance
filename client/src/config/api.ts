@@ -8,5 +8,8 @@ export const API_CONFIG = {
       refresh: "/api/accounts/refresh",
       user: "/api/accounts/user",
     },
+    settings: {
+      base: "/api/settings/",
+    },
   },
 } as const;
