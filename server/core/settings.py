@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     
     # Custom apps
     'accounts',
+    'settings',
 ]
 
 MIDDLEWARE = [

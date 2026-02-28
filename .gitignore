@@ -168,4 +168,5 @@ GitHub.sublime-settings
 # ========== OS ==========
 .DS_Store
 *.pem
+.vscode/
 # ========================
