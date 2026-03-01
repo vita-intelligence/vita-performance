@@ -33,5 +33,8 @@ export const API_CONFIG = {
       stop: (id: number) => `/api/sessions/${id}/stop/`,
       active: "/api/sessions/active/",
     },
+    dashboard: {
+      overview: "/api/dashboard/overview/",
+    },
   },
 } as const;
