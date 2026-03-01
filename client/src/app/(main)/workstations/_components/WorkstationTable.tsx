@@ -22,6 +22,7 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                     <tr className="border-b border-border bg-surface">
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Name</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Description</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Target Output</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Hours/Day</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Overtime</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
@@ -36,6 +37,12 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                         >
                             <td className="px-4 py-3 font-medium text-text">{workstation.name}</td>
                             <td className="px-4 py-3 text-muted">{workstation.description || "—"}</td>
+                            <td className="px-4 py-3 text-text">
+                                {workstation.target_quantity && workstation.target_duration
+                                    ? `${Number(workstation.target_quantity).toLocaleString()} units / ${workstation.target_duration}h`
+                                    : <span className="text-muted text-xs">—</span>
+                                }
+                            </td>
                             <td className="px-4 py-3 text-text">
                                 {workstation.working_hours_per_day
                                     ? `${workstation.working_hours_per_day}h`
@@ -52,8 +59,8 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                                 <button
                                     onClick={() => handleToggleActive(workstation)}
                                     className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border transition-colors ${workstation.is_active
-                                            ? "border-success text-success hover:bg-success hover:text-background"
-                                            : "border-error text-error hover:bg-error hover:text-background"
+                                        ? "border-success text-success hover:bg-success hover:text-background"
+                                        : "border-error text-error hover:bg-error hover:text-background"
                                         }`}
                                 >
                                     {workstation.is_active ? "Active" : "Inactive"}

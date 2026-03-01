@@ -29,6 +29,8 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
             reset({
                 name: workstation.name,
                 description: workstation.description || "",
+                target_quantity: workstation.target_quantity ?? undefined,
+                target_duration: workstation.target_duration ?? undefined,
                 working_hours_per_day: workstation.working_hours_per_day ?? undefined,
                 overtime_threshold: workstation.overtime_threshold ?? undefined,
                 overtime_multiplier: workstation.overtime_multiplier ?? undefined,
@@ -72,6 +74,36 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                 hint="A short description to help identify this workstation."
                 error={errors.description?.message}
                 {...register("description")}
+            />
+
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted whitespace-nowrap">
+                        Expected Output
+                    </p>
+                    <div className="h-px bg-border flex-1" />
+                </div>
+                <p className="text-xs text-muted">
+                    Standard baseline output for this workstation. Used to calculate performance.
+                </p>
+            </div>
+
+            <Input
+                label="Target Quantity"
+                type="number"
+                placeholder="e.g. 120000"
+                hint="How many units this workstation is expected to produce."
+                error={errors.target_quantity?.message}
+                {...register("target_quantity")}
+            />
+
+            <Input
+                label="Target Duration (hours)"
+                type="number"
+                placeholder="e.g. 5"
+                hint="How many hours it should take to reach the target quantity."
+                error={errors.target_duration?.message}
+                {...register("target_duration")}
             />
 
             <div className="flex flex-col gap-2">

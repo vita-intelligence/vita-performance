@@ -31,8 +31,8 @@ export default function WorkstationCards({ workstations, onEdit }: WorkstationCa
                         <button
                             onClick={() => handleToggleActive(workstation)}
                             className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border transition-colors shrink-0 ${workstation.is_active
-                                    ? "border-success text-success hover:bg-success hover:text-background"
-                                    : "border-error text-error hover:bg-error hover:text-background"
+                                ? "border-success text-success hover:bg-success hover:text-background"
+                                : "border-error text-error hover:bg-error hover:text-background"
                                 }`}
                         >
                             {workstation.is_active ? "Active" : "Inactive"}
@@ -47,6 +47,15 @@ export default function WorkstationCards({ workstations, onEdit }: WorkstationCa
                                 {workstation.working_hours_per_day
                                     ? `${workstation.working_hours_per_day}h`
                                     : <span className="text-muted text-xs">Global</span>
+                                }
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Target Output</p>
+                            <p className="text-sm text-text">
+                                {workstation.target_quantity && workstation.target_duration
+                                    ? `${Number(workstation.target_quantity).toLocaleString()} units / ${workstation.target_duration}h`
+                                    : <span className="text-muted text-xs">—</span>
                                 }
                             </p>
                         </div>
