@@ -1,0 +1,1 @@
+from .workstation import WorkstationListView, WorkstationDetailView

@@ -16,5 +16,9 @@ export const API_CONFIG = {
       languages: "/api/meta/languages/",
       timezones: "/api/meta/timezones/",
     },
+    workstations: {
+      base: "/api/workstations/",
+      detail: (id: number) => `/api/workstations/${id}/`,
+    },
   },
 } as const;

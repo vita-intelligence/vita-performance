@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'accounts',
     'settings',
     'meta',
+    'workstations',
 ]
 
 MIDDLEWARE = [
