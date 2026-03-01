@@ -7,7 +7,13 @@ from datetime import timedelta
 
 
 # ========== INITS ==========
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
+
+if DEBUG:
+    load_dotenv(BASE_DIR / '.env.dev')
+else:
+    load_dotenv(BASE_DIR / '.env.prod')
 # ===========================
 
 
@@ -17,9 +23,7 @@ PROJECT_NAME = os.getenv("DJANGO_PROJECT_NAME", "Configure name in env")
 
 
 # ========== MAIN SETTINGS ==========
-BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
-DEBUG = os.getenv("DJANGO_DEBUG", os.getenv("DJANGO-DEBUG", "true")).lower() == "true"
 HOSTS = os.getenv("DJANGO_HOSTS", "localhost,127.0.0.1").split(",")
 HOSTS_URLS = os.getenv("DJANGO_HOSTS_URLS","http://localhost:3000,http://127.0.0.1:3000").split(",")
 DB_URL = os.getenv("DJANGO_DB_URL")
@@ -51,6 +55,7 @@ INSTALLED_APPS = [
     # Custom apps
     'accounts',
     'settings',
+    'meta',
 ]
 
 MIDDLEWARE = [
@@ -139,6 +144,25 @@ REST_FRAMEWORK = {
     ),
 }
 # ====================================
+
+
+# ========== CACHE ==========
+if DEBUG:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "TIMEOUT": 60 * 60 * 24,  # 24 hours
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379"),
+            "TIMEOUT": 60 * 60 * 24,  # 24 hours
+        }
+    }
+# ===========================
 
 
 # ========== JWT SETTINGS ==========

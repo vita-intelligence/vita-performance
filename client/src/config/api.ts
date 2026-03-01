@@ -11,5 +11,10 @@ export const API_CONFIG = {
     settings: {
       base: "/api/settings/",
     },
+    meta: {
+      currencies: "/api/meta/currencies/",
+      languages: "/api/meta/languages/",
+      timezones: "/api/meta/timezones/",
+    },
   },
 } as const;
