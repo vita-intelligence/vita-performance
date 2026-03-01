@@ -1,5 +1,4 @@
-from work_sessions.models import WorkSession
-from workers.models import Worker
+import uuid
 
 
 def serialize_active_session(session):
@@ -40,7 +39,61 @@ def serialize_workstation_status(workstation, active_sessions):
     }
 
 
-def build_dashboard_payload(user):
+def build_alerts(user, active_sessions, today_sessions, workstations):
+    from django.utils import timezone
+    from settings.models import UserSettings
+    alerts = []
+    now = timezone.now()
+
+    try:
+        user_settings = UserSettings.objects.get(user=user)
+        working_hours = float(user_settings.working_hours_per_day)
+    except UserSettings.DoesNotExist:
+        working_hours = 8.0
+
+    work_start = 8
+    work_end = int(8 + working_hours)
+    is_working_hours = work_start <= now.hour < work_end
+
+    if is_working_hours and not active_sessions:
+        alerts.append({
+            "id": "state_no_active_sessions",
+            "type": "warning",
+            "code": "NO_ACTIVE_SESSIONS",
+            "data": {},
+        })
+
+    active_workstation_ids = {s.workstation_id for s in active_sessions}
+    for w in workstations:
+        if w.id not in active_workstation_ids:
+            completed = [s for s in today_sessions if s.workstation_id == w.id and s.end_time]
+            if completed:
+                last_session = max(completed, key=lambda s: s.end_time)
+                idle_hours = (now - last_session.end_time).total_seconds() / 3600
+                if idle_hours >= 2:
+                    alerts.append({
+                        "id": f"state_idle_{w.id}",
+                        "type": "warning",
+                        "code": "WORKSTATION_IDLE",
+                        "data": {
+                            "workstation_name": w.name,
+                            "hours": int(idle_hours),
+                        },
+                    })
+
+    count = len(today_sessions)
+    if count > 0 and count % 5 == 0:
+        alerts.append({
+            "id": f"state_milestone_{count}",
+            "type": "milestone",
+            "code": "TEAM_MILESTONE",
+            "data": {"count": count},
+        })
+
+    return alerts
+
+
+def build_dashboard_payload(user, event_alerts=None):
     from django.utils import timezone
     from workstations.models import Workstation
     from work_sessions.models import WorkSession
@@ -85,7 +138,6 @@ def build_dashboard_payload(user):
         reverse=True
     )[:10]
 
-    # Today summary
     performances = [
         s.performance_percentage
         for s in today_sessions
@@ -94,6 +146,10 @@ def build_dashboard_payload(user):
     avg_performance = round(
         sum(performances) / len(performances), 2
     ) if performances else None
+
+    # Combine event-based alerts with state-based alerts
+    state_alerts = build_alerts(user, active_sessions, today_sessions, workstations)
+    all_alerts = (event_alerts or []) + state_alerts
 
     return {
         'type': 'dashboard_update',
@@ -107,5 +163,6 @@ def build_dashboard_payload(user):
             'active_sessions_count': len(active_sessions),
             'completed_today': len(today_sessions),
             'avg_performance': avg_performance,
-        }
+        },
+        'alerts': all_alerts,
     }

@@ -32,6 +32,14 @@ export interface RealtimeDashboardData {
   workstation_statuses: WorkstationStatus[];
   leaderboard: LeaderboardEntry[];
   summary: RealtimeSummary;
+  alerts: RealtimeAlert[];
+}
+
+export interface RealtimeAlert {
+  id: string;
+  type: "info" | "success" | "warning" | "milestone";
+  code: string;
+  data: Record<string, string | number>;
 }
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";

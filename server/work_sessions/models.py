@@ -41,8 +41,12 @@ class WorkSession(models.Model):
             return None
         if not self.workstation.target_quantity or not self.workstation.target_duration:
             return None
+        if not self.duration_hours or self.duration_hours == 0:
+            return None
         target_rate = float(self.workstation.target_quantity) / float(self.workstation.target_duration)
         expected_quantity = target_rate * self.duration_hours
+        if expected_quantity == 0:
+            return None
         return round((float(self.quantity_produced) / expected_quantity) * 100, 2)
 
     @property

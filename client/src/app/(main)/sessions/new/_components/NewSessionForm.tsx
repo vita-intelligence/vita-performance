@@ -117,6 +117,7 @@ export default function NewSessionForm() {
                                 control={liveForm.control}
                                 render={({ field }) => (
                                     <Select
+                                        key="live-workstation"
                                         label="Workstation"
                                         options={workstationOptions}
                                         selectedKeys={field.value ? [String(field.value)] : []}
@@ -130,6 +131,7 @@ export default function NewSessionForm() {
                                 control={liveForm.control}
                                 render={({ field }) => (
                                     <Select
+                                        key="live-worker"
                                         label="Worker"
                                         options={workerOptions}
                                         selectedKeys={field.value ? [String(field.value)] : []}
@@ -142,6 +144,7 @@ export default function NewSessionForm() {
                     ) : (
                         <>
                             <Controller
+                                key="manual-workstation"
                                 name="workstation"
                                 control={manualForm.control}
                                 render={({ field }) => (
@@ -155,6 +158,7 @@ export default function NewSessionForm() {
                                 )}
                             />
                             <Controller
+                                key="manual-worker"
                                 name="worker"
                                 control={manualForm.control}
                                 render={({ field }) => (
