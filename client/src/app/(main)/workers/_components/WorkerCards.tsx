@@ -3,6 +3,7 @@
 import { Worker } from "@/types/worker";
 import { useWorkers } from "@/hooks/useWorkers";
 import { useSettings } from "@/hooks/useSettings";
+import { formatCurrency } from "@/lib/utils/number.utils";
 
 interface WorkerCardsProps {
     workers: Worker[];
@@ -31,8 +32,8 @@ export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
                         <button
                             onClick={() => handleToggleActive(worker)}
                             className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border transition-colors shrink-0 ${worker.is_active
-                                    ? "border-success text-success hover:bg-success hover:text-background"
-                                    : "border-error text-error hover:bg-error hover:text-background"
+                                ? "border-success text-success hover:bg-success hover:text-background"
+                                : "border-error text-error hover:bg-error hover:text-background"
                                 }`}
                         >
                             {worker.is_active ? "Active" : "Inactive"}
@@ -44,7 +45,7 @@ export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
                         <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Hourly Rate</p>
                             <p className="text-sm text-text">
-                                {settings?.currency_symbol}{Number(worker.hourly_rate).toFixed(2)}/hr
+                                {formatCurrency(Number(worker.hourly_rate), settings)}/hr
                             </p>
                         </div>
                     </div>

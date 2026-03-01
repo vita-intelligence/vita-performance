@@ -3,6 +3,8 @@
 import { WorkSession } from "@/types/session";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
+import { formatDate } from "@/lib/utils/date.utils";
+import { formatCurrency, formatNumber } from "@/lib/utils/number.utils";
 
 interface SessionTableProps {
     sessions: WorkSession[];
@@ -41,17 +43,17 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                             </td>
                             <td className="px-4 py-3 text-text">
                                 {session.quantity_produced
-                                    ? Number(session.quantity_produced).toLocaleString()
+                                    ? formatNumber(Number(session.quantity_produced), settings)
                                     : "—"
                                 }
                             </td>
                             <td className="px-4 py-3">
                                 {session.performance_percentage !== null ? (
                                     <span className={`text-xs font-semibold px-2 py-1 ${session.performance_percentage >= 100
-                                            ? "text-success"
-                                            : session.performance_percentage >= 75
-                                                ? "text-secondary"
-                                                : "text-error"
+                                        ? "text-success"
+                                        : session.performance_percentage >= 75
+                                            ? "text-secondary"
+                                            : "text-error"
                                         }`}>
                                         {session.performance_percentage}%
                                     </span>
@@ -59,12 +61,12 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                             </td>
                             <td className="px-4 py-3 text-text">
                                 {session.wage_cost
-                                    ? `${settings?.currency_symbol}${session.wage_cost.toFixed(2)}`
+                                    ? formatCurrency(session.wage_cost, settings)
                                     : "—"
                                 }
                             </td>
                             <td className="px-4 py-3 text-muted">
-                                {new Date(session.start_time).toLocaleDateString()}
+                                {formatDate(session.start_time, settings)}
                             </td>
                             <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">

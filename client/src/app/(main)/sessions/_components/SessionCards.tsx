@@ -3,6 +3,8 @@
 import { WorkSession } from "@/types/session";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
+import { formatDate } from "@/lib/utils/date.utils";
+import { formatCurrency, formatNumber } from "@/lib/utils/number.utils";
 
 interface SessionCardsProps {
     sessions: WorkSession[];
@@ -48,7 +50,7 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Quantity</p>
                             <p className="text-sm text-text">
                                 {session.quantity_produced
-                                    ? Number(session.quantity_produced).toLocaleString()
+                                    ? formatNumber(Number(session.quantity_produced), settings)
                                     : "—"
                                 }
                             </p>
@@ -57,7 +59,7 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</p>
                             <p className="text-sm text-text">
                                 {session.wage_cost
-                                    ? `${settings?.currency_symbol}${session.wage_cost.toFixed(2)}`
+                                    ? formatCurrency(session.wage_cost, settings)
                                     : "—"
                                 }
                             </p>
@@ -65,7 +67,7 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                         <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Date</p>
                             <p className="text-sm text-text">
-                                {new Date(session.start_time).toLocaleDateString()}
+                                {formatDate(session.start_time, settings)}
                             </p>
                         </div>
                         {session.notes && (

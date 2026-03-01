@@ -2,6 +2,8 @@
 
 import { Workstation } from "@/types/workstation";
 import { useWorkstations } from "@/hooks/useWorkstations";
+import { formatNumber } from "@/lib/utils/number.utils";
+import { useSettings } from "@/hooks/useSettings";
 
 interface WorkstationCardsProps {
     workstations: Workstation[];
@@ -10,6 +12,7 @@ interface WorkstationCardsProps {
 
 export default function WorkstationCards({ workstations, onEdit }: WorkstationCardsProps) {
     const { updateWorkstation, deleteWorkstation, isDeleting } = useWorkstations();
+    const { settings } = useSettings();
 
     const handleToggleActive = async (workstation: Workstation) => {
         await updateWorkstation({ id: workstation.id, payload: { is_active: !workstation.is_active } });
@@ -54,7 +57,7 @@ export default function WorkstationCards({ workstations, onEdit }: WorkstationCa
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Target Output</p>
                             <p className="text-sm text-text">
                                 {workstation.target_quantity && workstation.target_duration
-                                    ? `${Number(workstation.target_quantity).toLocaleString()} units / ${workstation.target_duration}h`
+                                    ? `${formatNumber(Number(workstation.target_quantity), settings)} units / ${workstation.target_duration}h`
                                     : <span className="text-muted text-xs">—</span>
                                 }
                             </p>

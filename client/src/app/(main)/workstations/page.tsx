@@ -30,7 +30,7 @@ export default function WorkstationsPage() {
     };
 
     return (
-        <main className="min-h-screen bg-background px-4 py-12 sm:px-8 lg:px-16">
+        <main className="bg-background px-4 py-12 sm:px-8 lg:px-16">
             <div className="max-w-6xl mx-auto flex flex-col gap-10">
                 <WorkstationsHeader onAdd={handleAdd} />
 

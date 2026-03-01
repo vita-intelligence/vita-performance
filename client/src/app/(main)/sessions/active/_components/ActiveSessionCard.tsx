@@ -2,6 +2,8 @@
 
 import { WorkSession } from "@/types/session";
 import SessionTimer from "./SessionTimer";
+import { formatTime } from "@/lib/utils/date.utils";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ActiveSessionCardProps {
     session: WorkSession;
@@ -9,6 +11,9 @@ interface ActiveSessionCardProps {
 }
 
 export default function ActiveSessionCard({ session, onStop }: ActiveSessionCardProps) {
+
+    const { settings } = useSettings();
+
     return (
         <div className="border border-border bg-background p-6 flex flex-col gap-6">
 
@@ -34,7 +39,7 @@ export default function ActiveSessionCard({ session, onStop }: ActiveSessionCard
                 <div className="flex flex-col gap-1">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Started At</p>
                     <p className="text-sm text-text">
-                        {new Date(session.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {formatTime(session.start_time, settings)}
                     </p>
                 </div>
             </div>

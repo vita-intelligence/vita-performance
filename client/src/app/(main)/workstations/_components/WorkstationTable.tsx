@@ -2,6 +2,8 @@
 
 import { Workstation } from "@/types/workstation";
 import { useWorkstations } from "@/hooks/useWorkstations";
+import { formatNumber } from "@/lib/utils/number.utils";
+import { useSettings } from "@/hooks/useSettings";
 
 interface WorkstationTableProps {
     workstations: Workstation[];
@@ -10,6 +12,7 @@ interface WorkstationTableProps {
 
 export default function WorkstationTable({ workstations, onEdit }: WorkstationTableProps) {
     const { updateWorkstation, deleteWorkstation, isDeleting } = useWorkstations();
+    const { settings } = useSettings();
 
     const handleToggleActive = async (workstation: Workstation) => {
         await updateWorkstation({ id: workstation.id, payload: { is_active: !workstation.is_active } });
@@ -39,7 +42,7 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                             <td className="px-4 py-3 text-muted">{workstation.description || "—"}</td>
                             <td className="px-4 py-3 text-text">
                                 {workstation.target_quantity && workstation.target_duration
-                                    ? `${Number(workstation.target_quantity).toLocaleString()} units / ${workstation.target_duration}h`
+                                    ? `${formatNumber(Number(workstation.target_quantity), settings)} units / ${workstation.target_duration}h`
                                     : <span className="text-muted text-xs">—</span>
                                 }
                             </td>
