@@ -1,13 +1,16 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import ProtectedNav from "@/components/shared/nav/ProtectedNav";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
+
+    const isFullscreen = pathname === "/dashboard/realtime";
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -16,6 +19,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }, [isAuthenticated, isLoading]);
 
     if (isLoading) return null;
+
+    if (isFullscreen) {
+        return (
+            <div className="min-h-screen bg-background overflow-hidden">
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-background overflow-hidden">

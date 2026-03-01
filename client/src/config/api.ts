@@ -1,5 +1,6 @@
 export const API_CONFIG = {
   baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+  wsBase: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000",
   endpoints: {
     auth: {
       register: "/api/accounts/register",
@@ -35,6 +36,8 @@ export const API_CONFIG = {
     },
     dashboard: {
       overview: "/api/dashboard/overview/",
+      wsToken: "/api/dashboard/ws-token/",
+      ws: "/ws/dashboard/",
     },
   },
 } as const;

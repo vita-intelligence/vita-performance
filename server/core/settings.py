@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'channels',
     
     # Custom apps
     'accounts',
@@ -92,6 +93,34 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 # ================================
+
+
+# ========== CHANNELS & ASGI ========== #
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
+print(f"REDIS_URL: {REDIS_URL}")
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
+
+ASGI_APPLICATION = "core.asgi.application"
+# =================================== #
+
+
+# ========== CACHE ==========
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "TIMEOUT": 60 * 60 * 24, # 24 hours
+    }
+}
+# ===========================
 
 
 # ========== DATABASE ==========
@@ -148,25 +177,6 @@ REST_FRAMEWORK = {
     ),
 }
 # ====================================
-
-
-# ========== CACHE ==========
-if DEBUG:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "TIMEOUT": 60 * 60 * 24,  # 24 hours
-        }
-    }
-else:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379"),
-            "TIMEOUT": 60 * 60 * 24,  # 24 hours
-        }
-    }
-# ===========================
 
 
 # ========== JWT SETTINGS ==========
