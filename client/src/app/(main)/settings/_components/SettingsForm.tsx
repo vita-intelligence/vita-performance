@@ -170,11 +170,19 @@ export default function SettingsForm() {
                         />
                     )}
                 />
-                <Input
-                    label="Currency Symbol"
-                    placeholder="£"
-                    error={errors.currency_symbol?.message}
-                    {...register("currency_symbol")}
+                <Controller
+                    name="currency_symbol"
+                    control={control}
+                    render={({ field }) => (
+                        <Input
+                            label="Currency Symbol"
+                            placeholder="£"
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            error={errors.currency_symbol?.message}
+                        />
+                    )}
                 />
                 <Controller
                     name="decimal_separator"
