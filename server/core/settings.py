@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'settings',
     'meta',
     'workstations',
+    'workers',
 ]
 
 MIDDLEWARE = [

@@ -20,5 +20,11 @@ export const API_CONFIG = {
       base: "/api/workstations/",
       detail: (id: number) => `/api/workstations/${id}/`,
     },
+    workers: {
+      base: "/api/workers/",
+      detail: (id: number) => `/api/workers/${id}/`,
+      groups: "/api/workers/groups/",
+      groupDetail: (id: number) => `/api/workers/groups/${id}/`,
+    },
   },
 } as const;

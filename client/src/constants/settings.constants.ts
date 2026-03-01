@@ -24,29 +24,3 @@ export const WEEK_STARTS = [
   { value: "monday", label: "Monday" },
   { value: "sunday", label: "Sunday" },
 ];
-
-// Generated from Intl API — no hardcoding needed
-export const getTimezones = (): { value: string; label: string }[] => {
-  return Intl.supportedValuesOf("timeZone").map((tz) => ({
-    value: tz,
-    label: tz.replace(/_/g, " "),
-  }));
-};
-
-export const getLanguages = (): { value: string; label: string }[] => {
-  const displayNames = new Intl.DisplayNames(["en"], { type: "language" });
-  const common = ["en", "fr", "de", "es", "it", "pt", "nl", "pl", "ru", "zh", "ja", "ar"];
-  return common.map((code) => ({
-    value: code,
-    label: displayNames.of(code) || code,
-  }));
-};
-
-export const getCurrencies = (): { value: string; label: string }[] => {
-  const displayNames = new Intl.DisplayNames(["en"], { type: "currency" });
-  const common = ["GBP", "USD", "EUR", "JPY", "CHF", "CAD", "AUD", "CNY", "AED", "SGD"];
-  return common.map((code) => ({
-    value: code,
-    label: `${code} - ${displayNames.of(code) || code}`,
-  }));
-};
