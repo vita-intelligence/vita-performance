@@ -6,6 +6,7 @@ api_patterns = [
     path('meta/', include('meta.urls')),
     path('workstations/', include('workstations.urls')),
     path('workers/', include('workers.urls')),
+    path('sessions/', include('work_sessions.urls')),
 ]
 
 urlpatterns = [
