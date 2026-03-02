@@ -7,14 +7,17 @@ import {
   CreateSessionPayload,
   UpdateSessionPayload,
 } from "@/types/session";
+import { PaginatedResponse } from "@/types/api";
 
 const { sessions } = API_CONFIG.endpoints;
 
 export const sessionService = {
-  getAll: async (): Promise<WorkSession[]> => {
-    const { data } = await api.get<WorkSession[]>(sessions.base);
-    return data;
-  },
+  getAll: async (page: number = 1): Promise<PaginatedResponse<WorkSession>> => {
+  const { data } = await api.get<PaginatedResponse<WorkSession>>(sessions.base, {
+    params: { page },
+  });
+  return data;
+},
 
   getOne: async (id: number): Promise<WorkSession> => {
     const { data } = await api.get<WorkSession>(sessions.detail(id));

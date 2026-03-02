@@ -1,12 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { sessionService } from "@/services/session.service";
 import {
+  WorkSession,
   StartSessionPayload,
   StopSessionPayload,
   CreateSessionPayload,
   UpdateSessionPayload,
 } from "@/types/session";
+import { PaginatedResponse } from "@/types/api";
 import { getErrorMessage } from "@/lib/utils";
 
 const SESSIONS_KEY = ["sessions"];
@@ -15,17 +17,31 @@ const ACTIVE_SESSIONS_KEY = ["sessions", "active"];
 export const useSessions = () => {
   const queryClient = useQueryClient();
 
-  const { data: sessions, isLoading: isSessionsLoading } = useQuery({
+  const {
+    data: sessionsData,
+    isLoading: isSessionsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: SESSIONS_KEY,
-    queryFn: sessionService.getAll,
+    queryFn: ({ pageParam = 1 }) => sessionService.getAll(pageParam),
+    getNextPageParam: (lastPage: PaginatedResponse<WorkSession>) => {
+      if (!lastPage.next) return undefined;
+      const url = new URL(lastPage.next);
+      return Number(url.searchParams.get("page"));
+    },
+    initialPageParam: 1,
     retry: false,
   });
+
+  const sessions = sessionsData?.pages.flatMap((page) => page?.results ?? []) ?? [];
 
   const { data: activeSessions, isLoading: isActiveSessionsLoading } = useQuery({
     queryKey: ACTIVE_SESSIONS_KEY,
     queryFn: sessionService.getActive,
     retry: false,
-    refetchInterval: 30000, // refetch every 30 seconds to keep active sessions fresh
+    refetchInterval: 30000,
   });
 
   const startMutation = useMutation({
@@ -117,6 +133,9 @@ export const useSessions = () => {
     activeSessions,
     isSessionsLoading,
     isActiveSessionsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     startSession: startMutation.mutateAsync,
     stopSession: stopMutation.mutateAsync,
     createSession: createMutation.mutateAsync,

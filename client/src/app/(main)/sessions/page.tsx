@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSessions } from "@/hooks/useSessions";
 import { WorkSession } from "@/types/session";
@@ -10,10 +10,42 @@ import EditSessionDrawer from "./_components/EditSessionDrawer";
 import SessionCards from "./_components/SessionCards";
 
 export default function SessionsPage() {
-    const { sessions, isSessionsLoading } = useSessions();
+    const {
+        sessions,
+        isSessionsLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useSessions();
+
     const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
     const completedSessions = sessions?.filter((s) => s.status === "completed") || [];
+
+    // Infinite Scroll Observer
+    useEffect(() => {
+        if (!hasNextPage) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1 }
+        );
+
+        if (loadMoreRef.current) {
+            observer.observe(loadMoreRef.current);
+        }
+
+        return () => {
+            if (loadMoreRef.current) {
+                observer.unobserve(loadMoreRef.current);
+            }
+        };
+    }, [fetchNextPage, hasNextPage]);
 
     return (
         <main className="bg-background px-4 py-12 sm:px-8 lg:px-16">
@@ -38,6 +70,15 @@ export default function SessionsPage() {
                     <>
                         <SessionTable sessions={completedSessions} onEdit={setSelectedSession} />
                         <SessionCards sessions={completedSessions} onEdit={setSelectedSession} />
+
+                        {/* Sentinel */}
+                        <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                            {isFetchingNextPage && (
+                                <p className="text-muted text-xs uppercase tracking-widest">
+                                    Loading more...
+                                </p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>

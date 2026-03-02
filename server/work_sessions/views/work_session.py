@@ -3,23 +3,23 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
+from rest_framework.generics import ListCreateAPIView
 from ..models import WorkSession
 from ..serializers import WorkSessionSerializer
 
 
-class WorkSessionListView(APIView):
+class WorkSessionListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = WorkSessionSerializer
 
-    def get(self, request):
-        sessions = WorkSession.objects.filter(user=request.user).select_related('worker', 'workstation')
-        serializer = WorkSessionSerializer(sessions, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        print(self.request.user)
+        return WorkSession.objects.filter(
+            user=self.request.user
+        ).select_related('worker', 'workstation')
 
-    def post(self, request):
-        serializer = WorkSessionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class WorkSessionDetailView(APIView):
