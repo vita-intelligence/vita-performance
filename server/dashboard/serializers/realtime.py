@@ -48,11 +48,12 @@ def build_alerts(user, active_sessions, today_sessions, workstations):
     try:
         user_settings = UserSettings.objects.get(user=user)
         working_hours = float(user_settings.working_hours_per_day)
+        work_start = user_settings.work_start_time.hour
     except UserSettings.DoesNotExist:
         working_hours = 8.0
+        work_start = 8
 
-    work_start = 8
-    work_end = int(8 + working_hours)
+    work_end = work_start + int(working_hours)
     is_working_hours = work_start <= now.hour < work_end
 
     if is_working_hours and not active_sessions:

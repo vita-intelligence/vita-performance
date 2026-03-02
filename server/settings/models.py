@@ -17,6 +17,7 @@ class UserSettings(models.Model):
     overtime_threshold = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
     overtime_multiplier = models.DecimalField(max_digits=3, decimal_places=2, default=1.50)
     week_starts_on = models.CharField(max_length=10, choices=[('monday', 'Monday'), ('sunday', 'Sunday')], default='monday')
+    work_start_time = models.TimeField(default='08:00')
 
     class Meta:
         db_table = 'user_settings'

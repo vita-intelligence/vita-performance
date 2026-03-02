@@ -72,6 +72,7 @@ export default function SettingsForm() {
                 overtime_threshold: settings.overtime_threshold,
                 overtime_multiplier: settings.overtime_multiplier,
                 week_starts_on: settings.week_starts_on,
+                work_start_time: settings.work_start_time?.slice(0, 5),
             });
         }
     }, [settings, reset]);
@@ -253,6 +254,12 @@ export default function SettingsForm() {
                             error={errors.week_starts_on?.message}
                         />
                     )}
+                />
+                <Input
+                    label="Work Start Time"
+                    type="time"
+                    error={errors.work_start_time?.message}
+                    {...register("work_start_time")}
                 />
             </Section>
 

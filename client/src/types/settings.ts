@@ -13,6 +13,7 @@ export interface UserSettings {
   overtime_threshold: number;
   overtime_multiplier: number;
   week_starts_on: 'monday' | 'sunday';
+  work_start_time: string;
 }
 
 export interface UpdateSettingsPayload extends Partial<Omit<UserSettings, 'id'>> {}

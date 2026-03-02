@@ -14,6 +14,7 @@ export const settingsSchema = z.object({
   overtime_threshold: z.coerce.number().min(1).max(24),
   overtime_multiplier: z.coerce.number().min(1).max(5),
   week_starts_on: z.enum(["monday", "sunday"]),
+  work_start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Must be in HH:MM format"),
 });
 
 export type SettingsFormData = z.infer<typeof settingsSchema>;

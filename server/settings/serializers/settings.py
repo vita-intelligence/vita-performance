@@ -9,6 +9,6 @@ class UserSettingsSerializer(serializers.ModelSerializer):
             'id', 'currency', 'currency_symbol', 'date_format', 'time_format',
             'timezone', 'language', 'decimal_separator', 'thousands_separator',
             'working_hours_per_day', 'working_days_per_week', 'overtime_threshold',
-            'overtime_multiplier', 'week_starts_on'
+            'overtime_multiplier', 'week_starts_on', 'work_start_time'
         )
         read_only_fields = ('id',)
