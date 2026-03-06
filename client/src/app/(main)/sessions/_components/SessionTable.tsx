@@ -36,7 +36,14 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                             key={session.id}
                             className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
                         >
-                            <td className="px-4 py-3 font-medium text-text">{session.worker_name}</td>
+                            <td className="px-4 py-3 font-medium text-text">{session.workers?.map((w) => (
+                                <span
+                                    key={w.id}
+                                    className="px-2 py-1 text-xs border border-border"
+                                >
+                                    {w.full_name}
+                                </span>
+                            ))}</td>
                             <td className="px-4 py-3 text-muted">{session.workstation_name}</td>
                             <td className="px-4 py-3 text-text">
                                 {session.duration_hours ? `${session.duration_hours}h` : "—"}

@@ -46,24 +46,32 @@ export default function NewSessionForm() {
 
     const onLiveSubmit = async (data: LiveSessionFormData) => {
         try {
-            await startSession({ workstation: data.workstation, worker: data.worker });
+            await startSession({
+                workstation: data.workstation,
+                worker_ids: data.worker_ids,
+            });
+
             router.push("/sessions/active");
         } catch {
-            // errors handled by useSessions via addToast
+            // handled by hook
         }
     };
 
     const onManualSubmit = async (data: ManualSessionFormData) => {
         try {
             await createSession({
-                ...data,
+                workstation: data.workstation,
+                worker_ids: data.worker_ids,
                 status: "completed",
                 start_time: new Date(data.start_time).toISOString(),
                 end_time: new Date(data.end_time).toISOString(),
+                quantity_produced: data.quantity_produced,
+                notes: data.notes,
             });
+
             router.push("/sessions");
         } catch {
-            // errors handled by useSessions via addToast
+            // handled by hook
         }
     };
 
@@ -127,16 +135,21 @@ export default function NewSessionForm() {
                                 )}
                             />
                             <Controller
-                                name="worker"
+                                name="worker_ids"
                                 control={liveForm.control}
                                 render={({ field }) => (
                                     <Select
                                         key="live-worker"
-                                        label="Worker"
+                                        label="Workers"
+                                        selectionMode="multiple"
                                         options={workerOptions}
-                                        selectedKeys={field.value ? [String(field.value)] : []}
-                                        onSelectionChange={(keys) => field.onChange(Number(Array.from(keys)[0]))}
-                                        error={liveForm.formState.errors.worker?.message}
+                                        selectedKeys={field.value?.map(String) ?? []}
+                                        onSelectionChange={(keys) =>
+                                            field.onChange(
+                                                Array.from(keys).map((key) => Number(key))
+                                            )
+                                        }
+                                        error={liveForm.formState.errors.worker_ids?.message}
                                     />
                                 )}
                             />
@@ -159,15 +172,20 @@ export default function NewSessionForm() {
                             />
                             <Controller
                                 key="manual-worker"
-                                name="worker"
+                                name="worker_ids"
                                 control={manualForm.control}
                                 render={({ field }) => (
                                     <Select
-                                        label="Worker"
+                                        label="Workers"
+                                        selectionMode="multiple"
                                         options={workerOptions}
-                                        selectedKeys={field.value ? [String(field.value)] : []}
-                                        onSelectionChange={(keys) => field.onChange(Number(Array.from(keys)[0]))}
-                                        error={manualForm.formState.errors.worker?.message}
+                                        selectedKeys={field.value?.map(String) ?? []}
+                                        onSelectionChange={(keys) =>
+                                            field.onChange(
+                                                Array.from(keys).map((key) => Number(key))
+                                            )
+                                        }
+                                        error={manualForm.formState.errors.worker_ids?.message}
                                     />
                                 )}
                             />

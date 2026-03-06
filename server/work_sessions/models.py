@@ -11,8 +11,8 @@ class WorkSession(models.Model):
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_sessions')
+    workers = models.ManyToManyField(Worker, through='SessionWorker', related_name='work_sessions')
     workstation = models.ForeignKey(Workstation, on_delete=models.CASCADE, related_name='sessions')
-    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name='sessions')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
@@ -26,7 +26,8 @@ class WorkSession(models.Model):
         ordering = ['-start_time']
 
     def __str__(self):
-        return f'{self.worker.full_name} @ {self.workstation.name} ({self.start_time})'
+        worker_names = ", ".join(w.full_name for w in self.workers.all())
+        return f'{worker_names} @ {self.workstation.name} ({self.start_time})'
 
     @property
     def duration_hours(self):
@@ -43,10 +44,15 @@ class WorkSession(models.Model):
             return None
         if not self.duration_hours or self.duration_hours == 0:
             return None
+        
+        worker_count = self.workers.count()
+        worker_count = max(worker_count, 1)
+        
         target_rate = float(self.workstation.target_quantity) / float(self.workstation.target_duration)
-        expected_quantity = target_rate * self.duration_hours
+        expected_quantity = target_rate * self.duration_hours * worker_count
         if expected_quantity == 0:
             return None
+        
         return round((float(self.quantity_produced) / expected_quantity) * 100, 2)
 
     @property
@@ -65,5 +71,20 @@ class WorkSession(models.Model):
         regular_hours = min(self.duration_hours, float(effective['overtime_threshold']))
         overtime_hours = self.overtime_hours or 0
         multiplier = float(effective['overtime_multiplier'])
-        hourly_rate = float(self.worker.hourly_rate)
-        return round((regular_hours * hourly_rate) + (overtime_hours * hourly_rate * multiplier), 2)
+        total = 0
+        for worker in self.workers.all():
+            hourly_rate = float(worker.hourly_rate)
+            total += (regular_hours * hourly_rate) + (overtime_hours * hourly_rate * multiplier)
+        return round(total, 2)
+
+
+class SessionWorker(models.Model):
+    session = models.ForeignKey(WorkSession, on_delete=models.CASCADE, related_name='session_workers')
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name='worker_sessions')
+
+    class Meta:
+        db_table = 'session_workers'
+        unique_together = ('session', 'worker')
+
+    def __str__(self):
+        return f'{self.worker.full_name} in session {self.session.id}'

@@ -13,6 +13,7 @@ def session_changed(sender, instance, created, **kwargs):
     if not channel_layer:
         return
 
+    worker_names = ", ".join(w.full_name for w in instance.workers.all())
     event_alerts = []
 
     if created and instance.status == 'active':
@@ -21,7 +22,7 @@ def session_changed(sender, instance, created, **kwargs):
             "type": "info",
             "code": "SESSION_STARTED",
             "data": {
-                "worker_name": instance.worker.full_name,
+                "worker_name": worker_names,
                 "workstation_name": instance.workstation.name,
             },
         })
@@ -34,7 +35,7 @@ def session_changed(sender, instance, created, **kwargs):
             "type": "info",
             "code": "SESSION_COMPLETED",
             "data": {
-                "worker_name": instance.worker.full_name,
+                "worker_name": worker_names,
                 "performance": perf or 0,
             },
         })
@@ -46,7 +47,7 @@ def session_changed(sender, instance, created, **kwargs):
                     "type": "success",
                     "code": "PERFORMANCE_HIGH",
                     "data": {
-                        "worker_name": instance.worker.full_name,
+                        "worker_name": worker_names,
                         "performance": perf,
                     },
                 })
@@ -56,7 +57,7 @@ def session_changed(sender, instance, created, **kwargs):
                     "type": "warning",
                     "code": "PERFORMANCE_LOW",
                     "data": {
-                        "worker_name": instance.worker.full_name,
+                        "worker_name": worker_names,
                         "performance": perf,
                     },
                 })
@@ -75,7 +76,7 @@ def session_changed(sender, instance, created, **kwargs):
                 "type": "milestone",
                 "code": "FIRST_SESSION_TODAY",
                 "data": {
-                    "worker_name": instance.worker.full_name,
+                    "worker_name": worker_names,
                 },
             })
 

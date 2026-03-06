@@ -22,12 +22,12 @@ export interface DashboardOverview {
     } | null;
   };
   recent_sessions: {
-    id: number;
-    worker_name: string;
-    workstation_name: string;
-    duration_hours: number | null;
-    performance_percentage: number | null;
-    wage_cost: number | null;
-    start_time: string;
+      id: number;
+      worker_names: string[];
+      workstation_name: string;
+      duration_hours: number | null;
+      performance_percentage: number | null;
+      wage_cost: number | null;
+      start_time: string;
   }[];
 }

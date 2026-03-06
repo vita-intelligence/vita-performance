@@ -2,7 +2,6 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import Avg, Sum, Count, Q
 from workstations.models import Workstation
 from workers.models import Worker
 from work_sessions.models import WorkSession
@@ -30,10 +29,12 @@ class DashboardOverviewView(APIView):
         active_sessions = sessions.filter(status='active').count()
 
         # Today's completed sessions
-        today_sessions = sessions.filter(
-            status='completed',
-            start_time__date=today
-        ).select_related('worker', 'workstation')
+        today_sessions = list(
+            sessions.filter(
+                status='completed',
+                start_time__date=today
+            ).select_related('workstation').prefetch_related('workers')
+        )
 
         # Today's wage cost
         today_wage_cost = sum(
@@ -73,17 +74,17 @@ class DashboardOverviewView(APIView):
                 )
             }
 
-        # Best performing worker today
+        # Best performing worker today (across all workers in each session)
         worker_performance = {}
         for s in today_sessions:
             if s.performance_percentage is not None:
-                wid = s.worker_id
-                if wid not in worker_performance:
-                    worker_performance[wid] = {
-                        'name': s.worker.full_name,
-                        'performances': []
-                    }
-                worker_performance[wid]['performances'].append(s.performance_percentage)
+                for worker in s.workers.all():
+                    if worker.id not in worker_performance:
+                        worker_performance[worker.id] = {
+                            'name': worker.full_name,
+                            'performances': []
+                        }
+                    worker_performance[worker.id]['performances'].append(s.performance_percentage)
 
         best_worker = None
         if worker_performance:
@@ -99,14 +100,17 @@ class DashboardOverviewView(APIView):
             }
 
         # Recent sessions
-        recent_sessions = sessions.filter(
-            status='completed'
-        ).select_related('worker', 'workstation').order_by('-start_time')[:5]
+        recent_sessions = list(
+            sessions.filter(status='completed')
+            .select_related('workstation')
+            .prefetch_related('workers')
+            .order_by('-start_time')[:5]
+        )
 
         recent = [
             {
                 'id': s.id,
-                'worker_name': s.worker.full_name,
+                'worker_names': [w.full_name for w in s.workers.all()],
                 'workstation_name': s.workstation.name,
                 'duration_hours': s.duration_hours,
                 'performance_percentage': s.performance_percentage,
@@ -129,7 +133,7 @@ class DashboardOverviewView(APIView):
             'today': {
                 'wage_cost': today_wage_cost,
                 'avg_performance': avg_performance,
-                'sessions_count': today_sessions.count(),
+                'sessions_count': len(today_sessions),
                 'best_workstation': best_workstation,
                 'best_worker': best_worker,
             },

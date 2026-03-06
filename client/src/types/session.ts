@@ -1,10 +1,11 @@
+import { Worker } from "@/types/worker";
+
 export interface WorkSession {
   id: number;
   workstation: number;
   workstation_name: string;
-  worker: number;
-  worker_name: string;
-  status: 'active' | 'completed';
+  workers: Worker[];
+  status: "active" | "completed";
   start_time: string;
   end_time: string | null;
   quantity_produced: number | null;
@@ -19,7 +20,7 @@ export interface WorkSession {
 
 export interface StartSessionPayload {
   workstation: number;
-  worker: number;
+  worker_ids: number[];
 }
 
 export interface StopSessionPayload {
@@ -29,12 +30,12 @@ export interface StopSessionPayload {
 
 export interface CreateSessionPayload {
   workstation: number;
-  worker: number;
+  worker_ids: number[];
   start_time: string;
   end_time: string;
   quantity_produced: number;
   notes?: string;
-  status: 'completed';
+  status: "completed";
 }
 
 export interface UpdateSessionPayload {

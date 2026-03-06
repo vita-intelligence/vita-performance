@@ -38,7 +38,7 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
         if (session) {
             reset({
                 workstation: session.workstation,
-                worker: session.worker,
+                worker_ids: session.workers?.map(w => w.id) || [],
                 start_time: toDatetimeLocal(session.start_time),
                 end_time: session.end_time ? toDatetimeLocal(session.end_time) : "",
                 quantity_produced: session.quantity_produced ?? undefined,
@@ -91,15 +91,18 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                         )}
                     />
                     <Controller
-                        name="worker"
+                        name="worker_ids"
                         control={control}
                         render={({ field }) => (
                             <Select
-                                label="Worker"
+                                label="Workers"
+                                selectionMode="multiple"
                                 options={workerOptions}
-                                selectedKeys={field.value ? [String(field.value)] : []}
-                                onSelectionChange={(keys) => field.onChange(Number(Array.from(keys)[0]))}
-                                error={errors.worker?.message}
+                                selectedKeys={field.value?.map(String) || []}
+                                onSelectionChange={(keys) =>
+                                    field.onChange(Array.from(keys).map(Number))
+                                }
+                                error={errors.worker_ids?.message}
                             />
                         )}
                     />

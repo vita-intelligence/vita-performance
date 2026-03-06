@@ -43,8 +43,14 @@ export default function StopSessionDrawer({ session, onClose }: StopSessionDrawe
                 {session && (
                     <div className="flex flex-col gap-3 p-4 border border-border bg-surface">
                         <div className="flex flex-col gap-1">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Worker</p>
-                            <p className="text-sm text-text">{session.worker_name}</p>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                                Workers
+                            </p>
+                            <p className="text-sm font-medium text-text">
+                                {session.workers?.length
+                                    ? session.workers.map((w) => w.full_name).join(", ")
+                                    : "—"}
+                            </p>
                         </div>
                         <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>

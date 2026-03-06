@@ -1,21 +1,33 @@
 import { z } from "zod";
 
 export const stopSessionSchema = z.object({
-  quantity_produced: z.coerce.number({ required_error: "Quantity is required" }).min(0.01, "Must be greater than 0"),
+  quantity_produced: z
+    .coerce.number({ required_error: "Quantity is required" })
+    .min(0.01, "Must be greater than 0"),
   notes: z.string().max(500).optional(),
 });
 
 export const liveSessionSchema = z.object({
-  workstation: z.coerce.number({ required_error: "Workstation is required" }),
-  worker: z.coerce.number({ required_error: "Worker is required" }),
+  workstation: z.coerce.number({
+    required_error: "Workstation is required",
+  }),
+  worker_ids: z
+    .array(z.coerce.number())
+    .min(1, "At least one worker is required"),
 });
 
 export const manualSessionSchema = z.object({
-  workstation: z.coerce.number({ required_error: "Workstation is required" }),
-  worker: z.coerce.number({ required_error: "Worker is required" }),
+  workstation: z.coerce.number({
+    required_error: "Workstation is required",
+  }),
+  worker_ids: z
+    .array(z.coerce.number())
+    .min(1, "At least one worker is required"),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
-  quantity_produced: z.coerce.number({ required_error: "Quantity is required" }).min(0.01, "Must be greater than 0"),
+  quantity_produced: z
+    .coerce.number({ required_error: "Quantity is required" })
+    .min(0.01, "Must be greater than 0"),
   notes: z.string().max(500).optional(),
 });
 

@@ -2,9 +2,10 @@ import uuid
 
 
 def serialize_active_session(session):
+    worker_names = ", ".join(w.full_name for w in session.workers.all())
     return {
         'id': session.id,
-        'worker_name': session.worker.full_name,
+        'worker_name': worker_names,
         'workstation_name': session.workstation.name,
         'start_time': session.start_time.isoformat(),
         'status': session.status,
@@ -105,7 +106,7 @@ def build_dashboard_payload(user, event_alerts=None):
         WorkSession.objects.filter(
             user=user,
             status='active'
-        ).select_related('worker', 'workstation')
+        ).select_related('workstation').prefetch_related('workers')
     )
 
     today_sessions = list(
@@ -113,22 +114,23 @@ def build_dashboard_payload(user, event_alerts=None):
             user=user,
             status='completed',
             start_time__date=today
-        ).select_related('worker', 'workstation')
+        ).select_related('workstation').prefetch_related('workers')
     )
 
     workstations = list(
         Workstation.objects.filter(user=user, is_active=True)
     )
 
-    # Leaderboard
+    # Leaderboard — aggregate per worker across all sessions
     worker_sessions = {}
     for s in today_sessions:
-        if s.worker_id not in worker_sessions:
-            worker_sessions[s.worker_id] = {
-                'worker': s.worker,
-                'sessions': []
-            }
-        worker_sessions[s.worker_id]['sessions'].append(s)
+        for worker in s.workers.all():
+            if worker.id not in worker_sessions:
+                worker_sessions[worker.id] = {
+                    'worker': worker,
+                    'sessions': []
+                }
+            worker_sessions[worker.id]['sessions'].append(s)
 
     leaderboard = sorted(
         [
@@ -148,7 +150,6 @@ def build_dashboard_payload(user, event_alerts=None):
         sum(performances) / len(performances), 2
     ) if performances else None
 
-    # Combine event-based alerts with state-based alerts
     state_alerts = build_alerts(user, active_sessions, today_sessions, workstations)
     all_alerts = (event_alerts or []) + state_alerts
 

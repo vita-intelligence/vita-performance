@@ -29,8 +29,14 @@ export default function ActiveSessionCard({ session, onStop }: ActiveSessionCard
             {/* Details */}
             <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
                 <div className="flex flex-col gap-1">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted">Worker</p>
-                    <p className="text-sm font-medium text-text">{session.worker_name}</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                        Workers
+                    </p>
+                    <p className="text-sm font-medium text-text">
+                        {session.workers?.length
+                            ? session.workers.map((w) => w.full_name).join(", ")
+                            : "—"}
+                    </p>
                 </div>
                 <div className="flex flex-col gap-1">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>

@@ -53,7 +53,7 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                         key={session.id}
                                         className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
                                     >
-                                        <td className="px-4 py-3 font-medium text-text">{session.worker_name}</td>
+                                        <td className="px-4 py-3 font-medium text-text">{session.worker_names.join(", ")}</td>
                                         <td className="px-4 py-3 text-muted">{session.workstation_name}</td>
                                         <td className="px-4 py-3 text-text">
                                             {session.duration_hours ? `${session.duration_hours}h` : "—"}
@@ -61,10 +61,10 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                         <td className="px-4 py-3">
                                             {session.performance_percentage !== null ? (
                                                 <span className={`text-xs font-semibold ${session.performance_percentage >= 100
-                                                        ? "text-success"
-                                                        : session.performance_percentage >= 75
-                                                            ? "text-secondary"
-                                                            : "text-error"
+                                                    ? "text-success"
+                                                    : session.performance_percentage >= 75
+                                                        ? "text-secondary"
+                                                        : "text-error"
                                                     }`}>
                                                     {session.performance_percentage}%
                                                 </span>
@@ -88,15 +88,15 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                             <div key={session.id} className="border border-border bg-background p-4 flex flex-col gap-3">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex flex-col gap-1">
-                                        <p className="font-semibold text-text text-sm">{session.worker_name}</p>
+                                        <p className="font-semibold text-text text-sm">{session.worker_names.join(", ")}</p>
                                         <p className="text-xs text-muted">{session.workstation_name}</p>
                                     </div>
                                     {session.performance_percentage !== null && (
                                         <span className={`text-xs font-semibold px-2 py-1 border shrink-0 ${session.performance_percentage >= 100
-                                                ? "border-success text-success"
-                                                : session.performance_percentage >= 75
-                                                    ? "border-secondary text-secondary"
-                                                    : "border-error text-error"
+                                            ? "border-success text-success"
+                                            : session.performance_percentage >= 75
+                                                ? "border-secondary text-secondary"
+                                                : "border-error text-error"
                                             }`}>
                                             {session.performance_percentage}%
                                         </span>

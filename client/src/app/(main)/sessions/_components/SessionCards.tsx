@@ -23,7 +23,16 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex flex-col gap-1">
-                            <p className="font-semibold text-text">{session.worker_name}</p>
+                            <div className="flex flex-wrap gap-2">
+                                {session.workers?.map((w) => (
+                                    <span
+                                        key={w.id}
+                                        className="px-2 py-1 text-xs border border-border"
+                                    >
+                                        {w.full_name}
+                                    </span>
+                                ))}
+                            </div>
                             <p className="text-xs text-muted">{session.workstation_name}</p>
                         </div>
                         {session.performance_percentage !== null && (
