@@ -7,6 +7,20 @@ export interface WorkerGroup {
   updated_at: string;
 }
 
+export interface WorkerLeaderboardEntry {
+    id: number;
+    name: string;
+    hourly_rate: number;
+    sessions_count: number;
+    avg_performance: number | null;
+    total_quantity: number | null;
+}
+
+export interface WorkerLeaderboard {
+    range: string;
+    results: WorkerLeaderboardEntry[];
+}
+
 export interface Worker {
   id: number;
   full_name: string;

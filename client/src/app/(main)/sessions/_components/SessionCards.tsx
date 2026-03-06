@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { WorkSession } from "@/types/session";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { formatDate } from "@/lib/utils/date.utils";
 import { formatCurrency, formatNumber } from "@/lib/utils/number.utils";
+import WorkerTags from "@/components/shared/WorkerTags";
 
 interface SessionCardsProps {
     sessions: WorkSession[];
@@ -23,16 +25,7 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex flex-col gap-1">
-                            <div className="flex flex-wrap gap-2">
-                                {session.workers?.map((w) => (
-                                    <span
-                                        key={w.id}
-                                        className="px-2 py-1 text-xs border border-border"
-                                    >
-                                        {w.full_name}
-                                    </span>
-                                ))}
-                            </div>
+                            <WorkerTags workers={session.workers} />
                             <p className="text-xs text-muted">{session.workstation_name}</p>
                         </div>
                         {session.performance_percentage !== null && (

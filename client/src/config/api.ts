@@ -26,6 +26,7 @@ export const API_CONFIG = {
       detail: (id: number) => `/api/workers/${id}/`,
       groups: "/api/workers/groups/",
       groupDetail: (id: number) => `/api/workers/groups/${id}/`,
+      leaderboard: '/api/workers/leaderboard/',
     },
     sessions: {
       base: "/api/sessions/",

@@ -6,7 +6,6 @@ from workers.models import Worker
 
 class WorkSessionSerializer(serializers.ModelSerializer):
     duration_hours = serializers.ReadOnlyField()
-    performance_percentage = serializers.ReadOnlyField()
     overtime_hours = serializers.ReadOnlyField()
     wage_cost = serializers.ReadOnlyField()
 
@@ -46,6 +45,7 @@ class WorkSessionSerializer(serializers.ModelSerializer):
         worker_ids = validated_data.pop('worker_ids', [])
         session = WorkSession.objects.create(**validated_data)
         session.workers.set(worker_ids)
+        session.save_performance()
         return WorkSession.objects.prefetch_related('workers').get(pk=session.pk)
 
     def update(self, instance, validated_data):
@@ -55,4 +55,5 @@ class WorkSessionSerializer(serializers.ModelSerializer):
         instance.save()
         if worker_ids is not None:
             instance.workers.set(worker_ids)
+        instance.save_performance()
         return WorkSession.objects.prefetch_related('workers').get(pk=instance.pk)

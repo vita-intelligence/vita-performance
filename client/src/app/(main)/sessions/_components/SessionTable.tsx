@@ -5,6 +5,7 @@ import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { formatDate } from "@/lib/utils/date.utils";
 import { formatCurrency, formatNumber } from "@/lib/utils/number.utils";
+import WorkerTags from "@/components/shared/WorkerTags";
 
 interface SessionTableProps {
     sessions: WorkSession[];
@@ -36,14 +37,9 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                             key={session.id}
                             className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
                         >
-                            <td className="px-4 py-3 font-medium text-text">{session.workers?.map((w) => (
-                                <span
-                                    key={w.id}
-                                    className="px-2 py-1 text-xs border border-border"
-                                >
-                                    {w.full_name}
-                                </span>
-                            ))}</td>
+                            <td className="px-4 py-3">
+                                <WorkerTags workers={session.workers ?? []} />
+                            </td>
                             <td className="px-4 py-3 text-muted">{session.workstation_name}</td>
                             <td className="px-4 py-3 text-text">
                                 {session.duration_hours ? `${session.duration_hours}h` : "—"}

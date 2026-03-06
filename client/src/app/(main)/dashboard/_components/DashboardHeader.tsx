@@ -4,8 +4,7 @@ import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
-import { Radio } from "lucide-react";
+import { Radio, Trophy } from "lucide-react";
 
 export default function DashboardHeader() {
     const ref = useRef<HTMLDivElement>(null);
@@ -34,21 +33,28 @@ export default function DashboardHeader() {
                 </h1>
                 <p className="text-muted text-sm hidden sm:block">Here's what's happening today.</p>
             </div>
-            <Button
-                onPress={() => router.push("/dashboard/realtime")}
-                variant="bordered"
-                className="rounded-none border-text text-text text-xs font-semibold uppercase tracking-widest px-4 sm:px-6 shrink-0 group transition-all hover:bg-text hover:text-background"
-            >
-                <span className="flex items-center gap-2">
+
+            {/* Button group */}
+            <div className="flex border border-text shrink-0">
+                <button
+                    onClick={() => router.push("/dashboard/leaderboard")}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-text hover:bg-text hover:text-background transition-colors border-r border-text"
+                >
+                    <Trophy size={14} className="shrink-0" />
+                    <span className="hidden sm:inline">Leaderboard</span>
+                </button>
+                <button
+                    onClick={() => router.push("/dashboard/realtime")}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-text hover:bg-text hover:text-background transition-colors group"
+                >
                     <span className="relative flex items-center justify-center">
                         <Radio size={14} className="shrink-0 group-hover:opacity-0 transition-opacity" />
                         <span className="absolute w-2 h-2 rounded-full bg-current opacity-0 group-hover:opacity-100 animate-ping transition-opacity" />
                         <span className="absolute w-2 h-2 rounded-full bg-current opacity-0 group-hover:opacity-100 transition-opacity" />
                     </span>
-                    <span className="sm:hidden">Live</span>
-                    <span className="hidden sm:inline">Live Dashboard</span>
-                </span>
-            </Button>
+                    <span className="hidden sm:inline">Live</span>
+                </button>
+            </div>
         </div>
     );
 }

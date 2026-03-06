@@ -136,13 +136,14 @@ class WorkSessionStopView(APIView):
         session.end_time = timezone.now()
         session.status = 'completed'
         session.quantity_produced = quantity_produced
-
         if notes:
             session.notes = notes
-
         session.save()
+        session.save_performance()  # compute after save so duration_hours is available
 
-        serializer = WorkSessionSerializer(session)
+        serializer = WorkSessionSerializer(
+            WorkSession.objects.prefetch_related('workers').get(pk=session.pk)
+        )
         return Response(serializer.data)
 
 

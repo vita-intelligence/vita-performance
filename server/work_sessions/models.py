@@ -16,6 +16,7 @@ class WorkSession(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
+    performance_percentage = models.FloatField(null=True, blank=True)
     quantity_produced = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,31 +30,35 @@ class WorkSession(models.Model):
         worker_names = ", ".join(w.full_name for w in self.workers.all())
         return f'{worker_names} @ {self.workstation.name} ({self.start_time})'
 
+    def compute_performance(self):
+        if not self.end_time or not self.quantity_produced:
+            return None
+        if not self.workstation.target_quantity or not self.workstation.target_duration:
+            return None
+        duration = self.duration_hours
+        if not duration or duration == 0:
+            return None
+        worker_count = self.workers.count()
+        if worker_count == 0:
+            return None
+        target_rate = float(self.workstation.target_quantity) / float(self.workstation.target_duration)
+        expected = target_rate * duration * worker_count
+        if expected == 0:
+            return None
+        return round((float(self.quantity_produced) / expected) * 100, 2)
+
+    def save_performance(self):
+        self.performance_percentage = self.compute_performance()
+        WorkSession.objects.filter(pk=self.pk).update(
+            performance_percentage=self.performance_percentage
+        )
+
     @property
     def duration_hours(self):
         if not self.end_time:
             return None
         delta = self.end_time - self.start_time
         return round(delta.total_seconds() / 3600, 2)
-
-    @property
-    def performance_percentage(self):
-        if not self.end_time or not self.quantity_produced:
-            return None
-        if not self.workstation.target_quantity or not self.workstation.target_duration:
-            return None
-        if not self.duration_hours or self.duration_hours == 0:
-            return None
-        
-        worker_count = self.workers.count()
-        worker_count = max(worker_count, 1)
-        
-        target_rate = float(self.workstation.target_quantity) / float(self.workstation.target_duration)
-        expected_quantity = target_rate * self.duration_hours * worker_count
-        if expected_quantity == 0:
-            return None
-        
-        return round((float(self.quantity_produced) / expected_quantity) * 100, 2)
 
     @property
     def overtime_hours(self):
