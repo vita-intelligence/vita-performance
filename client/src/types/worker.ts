@@ -7,6 +7,47 @@ export interface WorkerGroup {
   updated_at: string;
 }
 
+export interface WorkerStatsSummary {
+    sessions_count: number;
+    avg_performance: number | null;
+    best_performance: number | null;
+    total_quantity: number;
+    total_hours: number;
+    total_wage_cost: number;
+}
+
+export interface WorkerStatsChartPoint {
+    date: string;
+    avg_performance: number | null;
+    sessions_count: number;
+    total_quantity: number;
+}
+
+export interface WorkerStatsSession {
+    id: number;
+    workstation_name: string;
+    date: string;
+    duration_hours: number | null;
+    quantity_produced: number | null;
+    performance_percentage: number | null;
+    wage_cost: number | null;
+    worker_count: number;
+}
+
+export interface WorkerStats {
+    worker: {
+        id: number;
+        name: string;
+        hourly_rate: number;
+        is_active: boolean;
+    };
+    summary: WorkerStatsSummary;
+    chart: WorkerStatsChartPoint[];
+    sessions: WorkerStatsSession[];
+    range: string;
+    grouping: 'hour' | 'day' | 'week';
+}
+
 export interface WorkerLeaderboardEntry {
     id: number;
     name: string;

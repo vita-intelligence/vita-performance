@@ -3,6 +3,7 @@
 import { Worker } from "@/types/worker";
 import { useWorkers } from "@/hooks/useWorkers";
 import { useSettings } from "@/hooks/useSettings";
+import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils/number.utils";
 
 interface WorkerTableProps {
@@ -12,6 +13,7 @@ interface WorkerTableProps {
 
 export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
     const { updateWorker, deleteWorker, isDeletingWorker } = useWorkers();
+    const router = useRouter();
     const { settings } = useSettings();
 
     const handleToggleActive = async (worker: Worker) => {
@@ -54,6 +56,12 @@ export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
                             </td>
                             <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => router.push(`/workers/${worker.id}`)}
+                                        className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"
+                                    >
+                                        Stats
+                                    </button>
                                     <button
                                         onClick={() => onEdit(worker)}
                                         className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"

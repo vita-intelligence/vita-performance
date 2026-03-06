@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import DashboardOverviewView, WebSocketTokenView
+from .views import DashboardOverviewView, WebSocketTokenView, WorkerStatsView
 
 urlpatterns = [
     path('overview/', DashboardOverviewView.as_view(), name='dashboard-overview'),
     path('ws-token/', WebSocketTokenView.as_view(), name='dashboard-ws-token'),
+    path('workers/<int:pk>/stats/', WorkerStatsView.as_view(), name='worker-stats'),
 ]

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { WorkerLeaderboardEntry } from "@/types/worker";
+import { useRouter } from "next/navigation";
 
 interface LeaderboardRowProps {
     entry: WorkerLeaderboardEntry;
@@ -16,6 +17,8 @@ export default function LeaderboardRow({ entry, rank, delay }: LeaderboardRowPro
 
     const performance = entry.avg_performance ?? 0;
     const barWidth = Math.min(performance, 100);
+
+    const router = useRouter();
 
     const perfColor =
         performance >= 100 ? "bg-success" :
@@ -50,8 +53,11 @@ export default function LeaderboardRow({ entry, rank, delay }: LeaderboardRowPro
                         }`}>
                         #{rank}
                     </span>
-                    <p className={`font-black text-sm uppercase tracking-wide ${rank === 1 ? "text-success" : "text-text"
-                        }`}>
+                    <p
+                        onClick={() => router.push(`/workers/${entry.id}`)}
+                        className={`font-black text-sm uppercase tracking-wide cursor-pointer hover:underline ${rank === 1 ? "text-success" : "text-text"
+                            }`}
+                    >
                         {entry.name}
                     </p>
                 </div>

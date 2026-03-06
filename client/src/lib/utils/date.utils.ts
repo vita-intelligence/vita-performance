@@ -1,7 +1,15 @@
 import { UserSettings } from "@/types/settings";
 
 export const formatDate = (date: string | Date, settings?: UserSettings | null): string => {
-  const d = new Date(date);
+  let d: Date;
+  
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
+
   if (!settings) return d.toLocaleDateString();
 
   const day = String(d.getDate()).padStart(2, "0");

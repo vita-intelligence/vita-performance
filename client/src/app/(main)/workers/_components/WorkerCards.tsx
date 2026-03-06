@@ -4,6 +4,7 @@ import { Worker } from "@/types/worker";
 import { useWorkers } from "@/hooks/useWorkers";
 import { useSettings } from "@/hooks/useSettings";
 import { formatCurrency } from "@/lib/utils/number.utils";
+import { useRouter } from "next/navigation";
 
 interface WorkerCardsProps {
     workers: Worker[];
@@ -13,6 +14,7 @@ interface WorkerCardsProps {
 export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
     const { updateWorker, deleteWorker, isDeletingWorker } = useWorkers();
     const { settings } = useSettings();
+    const router = useRouter();
 
     const handleToggleActive = async (worker: Worker) => {
         await updateWorker({ id: worker.id, payload: { is_active: !worker.is_active } });
@@ -52,6 +54,12 @@ export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
 
                     {/* Actions */}
                     <div className="flex gap-3 border-t border-border pt-4">
+                        <button
+                            onClick={() => router.push(`/workers/${worker.id}`)}
+                            className="flex-1 text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors py-2 border border-border hover:border-text"
+                        >
+                            Stats
+                        </button>
                         <button
                             onClick={() => onEdit(worker)}
                             className="flex-1 text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors py-2 border border-border hover:border-text"

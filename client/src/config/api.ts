@@ -36,9 +36,10 @@ export const API_CONFIG = {
       active: "/api/sessions/active/",
     },
     dashboard: {
-      overview: "/api/dashboard/overview/",
-      wsToken: "/api/dashboard/ws-token/",
-      ws: "/ws/dashboard/",
+        overview: "/api/dashboard/overview/",
+        wsToken: "/api/dashboard/ws-token/",
+        ws: "/ws/dashboard/",
+        workerStats: (id: number) => `/api/dashboard/workers/${id}/stats/`,
     },
   },
 } as const;

@@ -8,14 +8,22 @@ import {
   CreateWorkerGroupPayload,
   UpdateWorkerGroupPayload,
   WorkerLeaderboard,
+  WorkerStats,
 } from "@/types/worker";
 
-const { workers } = API_CONFIG.endpoints;
+const { workers, dashboard } = API_CONFIG.endpoints;
 
 export const workerService = {
   getAll: async (): Promise<Worker[]> => {
     const { data } = await api.get<Worker[]>(workers.base);
     return data;
+  },
+
+  getStats: async (id: number, range: string = 'month'): Promise<WorkerStats> => {
+      const { data } = await api.get<WorkerStats>(dashboard.workerStats(id), {
+          params: { range },
+      });
+      return data;
   },
 
   getLeaderboard: async (range: string = 'today'): Promise<WorkerLeaderboard> => {
