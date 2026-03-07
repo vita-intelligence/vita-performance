@@ -29,6 +29,7 @@ export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Group</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Hourly Rate</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">PIN</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">QC</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Actions</th>
                     </tr>
@@ -48,6 +49,11 @@ export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
                                 <span className={`text-xs font-semibold uppercase tracking-widest ${worker.has_pin ? "text-success" : "text-error"}`}>
                                     {worker.has_pin ? "Set" : "No PIN"}
                                 </span>
+                            </td>
+                            <td className="px-4 py-3">
+                                {worker.is_qa && (
+                                    <span className="text-xs font-semibold uppercase tracking-widest text-accent">QC</span>
+                                )}
                             </td>
                             <td className="px-4 py-3">
                                 <button

@@ -25,10 +25,10 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workstation</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Item</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Duration</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Quantity</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Qty / Rejected</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Date</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Actions</th>
                     </tr>
                 </thead>
@@ -46,32 +46,43 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                             <td className="px-4 py-3 text-text">
                                 {session.duration_hours ? `${session.duration_hours}h` : "—"}
                             </td>
-                            <td className="px-4 py-3 text-text">
-                                {session.quantity_produced
-                                    ? formatNumber(Number(session.quantity_produced), settings)
-                                    : "—"
-                                }
+                            <td className="px-4 py-3">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-text">
+                                        {session.quantity_produced
+                                            ? formatNumber(Number(session.quantity_produced), settings)
+                                            : "—"
+                                        }
+                                    </span>
+                                    {session.quantity_rejected !== null && session.quantity_rejected !== undefined && (
+                                        <span className="text-xs text-error">
+                                            -{formatNumber(Number(session.quantity_rejected), settings)} rejected
+                                        </span>
+                                    )}
+                                </div>
                             </td>
                             <td className="px-4 py-3">
                                 {session.performance_percentage !== null ? (
                                     <span className={`text-xs font-semibold px-2 py-1 ${session.performance_percentage >= 100
-                                        ? "text-success"
-                                        : session.performance_percentage >= 75
-                                            ? "text-secondary"
-                                            : "text-error"
+                                            ? "text-success"
+                                            : session.performance_percentage >= 75
+                                                ? "text-secondary"
+                                                : "text-error"
                                         }`}>
                                         {session.performance_percentage}%
                                     </span>
                                 ) : "—"}
                             </td>
-                            <td className="px-4 py-3 text-text">
-                                {session.wage_cost
-                                    ? formatCurrency(session.wage_cost, settings)
-                                    : "—"
-                                }
-                            </td>
                             <td className="px-4 py-3 text-muted">
                                 {formatDate(session.start_time, settings)}
+                            </td>
+                            <td className="px-4 py-3">
+                                <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                        ? "border-success text-success"
+                                        : "border-warning text-warning"
+                                    }`}>
+                                    {session.status === "verified" ? "Verified" : "QC Pending"}
+                                </span>
                             </td>
                             <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">

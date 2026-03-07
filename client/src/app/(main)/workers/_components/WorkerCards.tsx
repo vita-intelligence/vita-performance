@@ -56,6 +56,12 @@ export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
                                 {worker.has_pin ? "Set" : "Not set"}
                             </p>
                         </div>
+                        {worker.is_qa && (
+                            <div className="flex flex-col gap-1">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-muted">Role</p>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-accent">QC Officer</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions */}

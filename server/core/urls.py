@@ -10,6 +10,7 @@ api_patterns = [
     path('dashboard/', include('dashboard.urls')),
     path('items/', include('items.urls')),
     path('kiosk/', include('kiosk.urls')),
+    path('qc/', include('qc.urls')),
 ]
 
 urlpatterns = [

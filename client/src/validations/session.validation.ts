@@ -30,6 +30,7 @@ export const manualSessionSchema = z.object({
   quantity_produced: z
     .coerce.number({ required_error: "Quantity is required" })
     .min(0.01, "Must be greater than 0"),
+  quantity_rejected: z.coerce.number().min(0).optional().nullable(),
   notes: z.string().max(500).optional(),
 });
 

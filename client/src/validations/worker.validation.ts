@@ -5,6 +5,7 @@ export const workerSchema = z.object({
   hourly_rate: z.coerce.number().min(0.01, "Hourly rate is required"),
   group: z.coerce.number().optional(),
   pin: z.string().length(4, "PIN must be exactly 4 digits").regex(/^\d{4}$/, "PIN must be 4 digits").optional().or(z.literal("")),
+  is_qa: z.boolean().optional(),
 });
 
 export const groupSchema = z.object({

@@ -36,6 +36,7 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workers</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -84,6 +85,14 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                                             ? `${session.worker_count} workers`
                                             : "Solo"
                                         }
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                                ? "border-success text-success"
+                                                : "border-warning text-warning"
+                                            }`}>
+                                            {session.status === "verified" ? "Verified" : "QC Pending"}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}

@@ -113,7 +113,7 @@ def build_dashboard_payload(user, event_alerts=None):
     today_sessions = list(
         WorkSession.objects.filter(
             user=user,
-            status='completed',
+            status__in=['completed', 'verified'],
             start_time__date=today
         ).select_related('workstation').prefetch_related('workers')
     )

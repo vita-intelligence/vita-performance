@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'dashboard',
     'items',
     'kiosk',
+    'qc',
 ]
 
 MIDDLEWARE = [

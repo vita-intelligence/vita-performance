@@ -56,7 +56,7 @@ class WorkerStatsView(APIView):
         base_filter = Q(
             workers=worker,
             user=request.user,
-            status='completed',
+            status__in=['completed', 'verified'],
         )
         if since:
             base_filter &= Q(start_time__gte=since)
@@ -98,6 +98,7 @@ class WorkerStatsView(APIView):
                 'wage_cost': s.wage_cost,
                 'item_name': s.item.name if s.item else None,
                 'worker_count': len(s.workers.all()),  # prefetched, no DB hit
+                'status': s.status,
             }
             for s in reversed(sessions[-20:])
         ]

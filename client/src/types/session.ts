@@ -5,12 +5,13 @@ export interface WorkSession {
   workstation: number;
   workstation_name: string;
   workers: Worker[];
-  status: "active" | "completed";
+  status: "active" | "completed" | "verified";
   start_time: string;
   item?: number | null;
   item_name?: string | null;
   end_time: string | null;
   quantity_produced: number | null;
+  quantity_rejected: number | null;
   notes: string | null;
   duration_hours: number | null;
   performance_percentage: number | null;
@@ -46,6 +47,7 @@ export interface UpdateSessionPayload {
   start_time?: string;
   end_time?: string;
   quantity_produced?: number;
+  quantity_rejected?: number | null;
   item?: number | null;
   notes?: string;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { WorkSession } from "@/types/session";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
@@ -28,16 +27,24 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                             <WorkerTags workers={session.workers} />
                             <p className="text-xs text-muted">{session.workstation_name}</p>
                         </div>
-                        {session.performance_percentage !== null && (
-                            <span className={`text-xs font-semibold px-2 py-1 border shrink-0 ${session.performance_percentage >= 100
-                                ? "border-success text-success"
-                                : session.performance_percentage >= 75
-                                    ? "border-secondary text-secondary"
-                                    : "border-error text-error"
+                        <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                    ? "border-success text-success"
+                                    : "border-warning text-warning"
                                 }`}>
-                                {session.performance_percentage}%
+                                {session.status === "verified" ? "Verified" : "QC Pending"}
                             </span>
-                        )}
+                            {session.performance_percentage !== null && (
+                                <span className={`text-xs font-semibold px-2 py-1 border shrink-0 ${session.performance_percentage >= 100
+                                        ? "border-success text-success"
+                                        : session.performance_percentage >= 75
+                                            ? "border-secondary text-secondary"
+                                            : "border-error text-error"
+                                    }`}>
+                                    {session.performance_percentage}%
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Details */}
@@ -61,6 +68,14 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                                 }
                             </p>
                         </div>
+                        {session.quantity_rejected !== null && session.quantity_rejected !== undefined && (
+                            <div className="flex flex-col gap-1">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-muted">Rejected</p>
+                                <p className="text-sm text-error">
+                                    {formatNumber(Number(session.quantity_rejected), settings)}
+                                </p>
+                            </div>
+                        )}
                         <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</p>
                             <p className="text-sm text-text">

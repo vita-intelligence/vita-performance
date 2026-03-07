@@ -21,7 +21,7 @@ export default function SessionsPage() {
     const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-    const completedSessions = sessions?.filter((s) => s.status === "completed") || [];
+    const completedSessions = sessions?.filter((s) => s.status === "completed" || s.status === "verified") || [];
 
     // Infinite Scroll Observer
     useEffect(() => {

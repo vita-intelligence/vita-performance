@@ -45,6 +45,7 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Date</th>
+                                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -61,10 +62,10 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                         <td className="px-4 py-3">
                                             {session.performance_percentage !== null ? (
                                                 <span className={`text-xs font-semibold ${session.performance_percentage >= 100
-                                                    ? "text-success"
-                                                    : session.performance_percentage >= 75
-                                                        ? "text-secondary"
-                                                        : "text-error"
+                                                        ? "text-success"
+                                                        : session.performance_percentage >= 75
+                                                            ? "text-secondary"
+                                                            : "text-error"
                                                     }`}>
                                                     {session.performance_percentage}%
                                                 </span>
@@ -75,6 +76,16 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                         </td>
                                         <td className="px-4 py-3 text-muted">
                                             {formatDate(session.start_time, settings)} {formatTime(session.start_time, settings)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                                    ? "border-success text-success"
+                                                    : session.status === "completed"
+                                                        ? "border-warning text-warning"
+                                                        : "border-border text-muted"
+                                                }`}>
+                                                {session.status === "verified" ? "Verified" : session.status === "completed" ? "QC Pending" : session.status}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
@@ -91,16 +102,26 @@ export default function RecentSessions({ overview }: RecentSessionsProps) {
                                         <p className="font-semibold text-text text-sm">{session.worker_names.join(", ")}</p>
                                         <p className="text-xs text-muted">{session.workstation_name}</p>
                                     </div>
-                                    {session.performance_percentage !== null && (
-                                        <span className={`text-xs font-semibold px-2 py-1 border shrink-0 ${session.performance_percentage >= 100
-                                            ? "border-success text-success"
-                                            : session.performance_percentage >= 75
-                                                ? "border-secondary text-secondary"
-                                                : "border-error text-error"
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                                ? "border-success text-success"
+                                                : session.status === "completed"
+                                                    ? "border-warning text-warning"
+                                                    : "border-border text-muted"
                                             }`}>
-                                            {session.performance_percentage}%
+                                            {session.status === "verified" ? "Verified" : "QC Pending"}
                                         </span>
-                                    )}
+                                        {session.performance_percentage !== null && (
+                                            <span className={`text-xs font-semibold px-2 py-1 border shrink-0 ${session.performance_percentage >= 100
+                                                    ? "border-success text-success"
+                                                    : session.performance_percentage >= 75
+                                                        ? "border-secondary text-secondary"
+                                                        : "border-error text-error"
+                                                }`}>
+                                                {session.performance_percentage}%
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
                                     <div className="flex flex-col gap-1">

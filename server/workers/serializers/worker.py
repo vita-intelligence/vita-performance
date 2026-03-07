@@ -8,7 +8,7 @@ class WorkerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Worker
-        fields = ('id', 'full_name', 'hourly_rate', 'is_active', 'group', 'group_name', 'has_pin', 'created_at', 'updated_at', 'pin')
+        fields = ('id', 'full_name', 'hourly_rate', 'is_active', 'is_qa', 'group', 'group_name', 'has_pin', 'created_at', 'updated_at', 'pin')
         read_only_fields = ('id', 'created_at', 'updated_at', 'group_name', 'has_pin')
 
     def get_group_name(self, obj):

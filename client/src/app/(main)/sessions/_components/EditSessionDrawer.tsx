@@ -45,6 +45,7 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                 quantity_produced: session.quantity_produced ?? undefined,
                 notes: session.notes || "",
                 item: session.item ?? null,
+                quantity_rejected: session.quantity_rejected ?? undefined,
             });
         }
     }, [session, reset]);
@@ -63,6 +64,7 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                     quantity_produced: data.quantity_produced,
                     notes: data.notes,
                     item: data.item ?? null,
+                    quantity_rejected: data.quantity_rejected ?? null,
                 },
             });
             onClose();
@@ -162,6 +164,22 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                             />
                         )}
                     />
+                    {session?.status === "verified" && (
+                        <Controller
+                            name="quantity_rejected"
+                            control={control}
+                            render={({ field }) => (
+                                <Input
+                                    label="Quantity Rejected"
+                                    type="number"
+                                    placeholder="e.g. 500"
+                                    value={field.value ? String(field.value) : ""}
+                                    onChange={field.onChange}
+                                    error={errors.quantity_rejected?.message}
+                                />
+                            )}
+                        />
+                    )}
                     <Controller
                         name="notes"
                         control={control}

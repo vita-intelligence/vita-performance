@@ -31,7 +31,7 @@ class DashboardOverviewView(APIView):
         # Today's completed sessions
         today_sessions = list(
             sessions.filter(
-                status='completed',
+                status__in=['completed', 'verified'],
                 start_time__date=today
             ).select_related('workstation').prefetch_related('workers')
         )
@@ -101,7 +101,7 @@ class DashboardOverviewView(APIView):
 
         # Recent sessions
         recent_sessions = list(
-            sessions.filter(status='completed')
+            sessions.filter(status__in=['completed', 'verified'])
             .select_related('workstation')
             .prefetch_related('workers')
             .order_by('-start_time')[:5]
@@ -116,6 +116,7 @@ class DashboardOverviewView(APIView):
                 'performance_percentage': s.performance_percentage,
                 'wage_cost': s.wage_cost,
                 'start_time': s.start_time,
+                'status': s.status,
             }
             for s in recent_sessions
         ]

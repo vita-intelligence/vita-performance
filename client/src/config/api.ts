@@ -55,5 +55,13 @@ export const API_CONFIG = {
         stop: (token: string) => `/api/kiosk/${token}/stop/`,
         searchItems: (token: string) => `/api/kiosk/${token}/items/`,
     },
+    qc: {
+        token: "/api/qc/token/",
+        workers: (token: string) => `/api/qc/${token}/workers/`,
+        verifyPin: (token: string) => `/api/qc/${token}/verify-pin/`,
+        workstations: (token: string) => `/api/qc/${token}/workstations/`,
+        sessions: (token: string, workstationId: number) => `/api/qc/${token}/workstations/${workstationId}/sessions/`,
+        verifySession: (token: string, sessionId: number) => `/api/qc/${token}/sessions/${sessionId}/verify/`,
+    },
   },
 } as const;

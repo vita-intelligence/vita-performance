@@ -32,6 +32,7 @@ class WorkSessionSerializer(serializers.ModelSerializer):
             'start_time',
             'end_time',
             'quantity_produced',
+            'quantity_rejected',
             'notes',
             'item',
             'item_name',

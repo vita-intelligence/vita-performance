@@ -9,6 +9,7 @@ import { Worker } from "@/types/worker";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import { Switch } from "@heroui/react";
 
 interface WorkerFormProps {
     worker?: Worker;
@@ -29,6 +30,7 @@ export default function WorkerForm({ worker, onClose }: WorkerFormProps) {
                 full_name: worker.full_name,
                 hourly_rate: worker.hourly_rate,
                 group: worker.group ?? undefined,
+                is_qa: worker.is_qa ?? false,
             });
         } else {
             reset({});
@@ -86,6 +88,23 @@ export default function WorkerForm({ worker, onClose }: WorkerFormProps) {
                     </div>
                 )}
             </div>
+
+            <Controller
+                name="is_qa"
+                control={control}
+                render={({ field }) => (
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-semibold text-text">QC Officer</p>
+                            <p className="text-xs text-muted">Can access the Quality Control kiosk.</p>
+                        </div>
+                        <Switch
+                            isSelected={field.value ?? false}
+                            onValueChange={field.onChange}
+                        />
+                    </div>
+                )}
+            />
 
             <div className="flex flex-col gap-1">
                 <Controller

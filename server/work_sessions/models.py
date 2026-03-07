@@ -9,6 +9,7 @@ class WorkSession(models.Model):
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('completed', 'Completed'),
+        ('verified', 'Verified'),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_sessions')
@@ -20,6 +21,7 @@ class WorkSession(models.Model):
     performance_percentage = models.FloatField(null=True, blank=True)
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True, related_name='sessions')
     quantity_produced = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    quantity_rejected = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -33,21 +35,27 @@ class WorkSession(models.Model):
         return f'{worker_names} @ {self.workstation.name} ({self.start_time})'
 
     def compute_performance(self):
-        if not self.end_time or not self.quantity_produced:
+        if not self.quantity_produced or not self.workstation:
             return None
-        if not self.workstation.target_quantity or not self.workstation.target_duration:
+
+        settings = self.workstation.get_effective_settings()
+        target_qty = self.workstation.target_quantity
+        target_dur = self.workstation.target_duration
+
+        if not target_qty or not target_dur:
             return None
-        duration = self.duration_hours
-        if not duration or duration == 0:
+
+        quantity_accepted = float(self.quantity_produced) - float(self.quantity_rejected or 0)
+        duration = self.duration_hours or 0
+
+        if duration <= 0:
             return None
-        worker_count = self.workers.count()
-        if worker_count == 0:
+
+        expected_qty = (duration / float(target_dur)) * float(target_qty)
+        if expected_qty <= 0:
             return None
-        target_rate = float(self.workstation.target_quantity) / float(self.workstation.target_duration)
-        expected = target_rate * duration * worker_count
-        if expected == 0:
-            return None
-        return round((float(self.quantity_produced) / expected) * 100, 2)
+
+        return round((quantity_accepted / expected_qty) * 100, 2)
 
     def save_performance(self):
         self.performance_percentage = self.compute_performance()
