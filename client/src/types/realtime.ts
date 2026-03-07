@@ -2,6 +2,7 @@ export interface RealtimeSession {
   id: number;
   worker_name: string;
   workstation_name: string;
+  item_name?: string | null;
   start_time: string;
   status: string;
 }

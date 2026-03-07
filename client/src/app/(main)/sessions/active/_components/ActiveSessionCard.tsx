@@ -42,6 +42,12 @@ export default function ActiveSessionCard({ session, onStop }: ActiveSessionCard
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
                     <p className="text-sm font-medium text-text">{session.workstation_name}</p>
                 </div>
+                {session.item_name && (
+                    <div className="flex flex-col gap-1">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted">Item</p>
+                        <p className="text-sm font-medium text-text">{session.item_name}</p>
+                    </div>
+                )}
                 <div className="flex flex-col gap-1">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Started At</p>
                     <p className="text-sm text-text">

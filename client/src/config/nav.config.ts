@@ -8,6 +8,7 @@ import {
   CirclePlay,
   History,
   Plus,
+  Package,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -40,6 +41,11 @@ export const NAV_ITEMS = [
     label: "Groups",
     href: "/groups",
     icon: UsersRound,
+  },
+  {
+    label: "Items",
+    href: "/items",
+    icon: Package,
   },
   {
     label: "Settings",

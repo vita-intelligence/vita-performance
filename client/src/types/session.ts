@@ -7,6 +7,8 @@ export interface WorkSession {
   workers: Worker[];
   status: "active" | "completed";
   start_time: string;
+  item?: number | null;
+  item_name?: string | null;
   end_time: string | null;
   quantity_produced: number | null;
   notes: string | null;
@@ -21,6 +23,7 @@ export interface WorkSession {
 export interface StartSessionPayload {
   workstation: number;
   worker_ids: number[];
+  item?: number | null;
 }
 
 export interface StopSessionPayload {
@@ -34,6 +37,7 @@ export interface CreateSessionPayload {
   start_time: string;
   end_time: string;
   quantity_produced: number;
+  item?: number | null;
   notes?: string;
   status: "completed";
 }

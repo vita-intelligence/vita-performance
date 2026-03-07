@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'workers',
     'work_sessions',
     'dashboard',
+    'items',
 ]
 
 MIDDLEWARE = [

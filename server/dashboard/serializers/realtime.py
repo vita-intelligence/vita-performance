@@ -7,6 +7,7 @@ def serialize_active_session(session):
         'id': session.id,
         'worker_name': worker_names,
         'workstation_name': session.workstation.name,
+        'item_name': session.item.name if session.item else None,
         'start_time': session.start_time.isoformat(),
         'status': session.status,
     }

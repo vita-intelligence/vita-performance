@@ -8,6 +8,7 @@ api_patterns = [
     path('workers/', include('workers.urls')),
     path('sessions/', include('work_sessions.urls')),
     path('dashboard/', include('dashboard.urls')),
+    path('items/', include('items.urls')),
 ]
 
 urlpatterns = [

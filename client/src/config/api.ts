@@ -41,5 +41,10 @@ export const API_CONFIG = {
         ws: "/ws/dashboard/",
         workerStats: (id: number) => `/api/dashboard/workers/${id}/stats/`,
     },
+    items: {
+        base: "/api/items/",
+        detail: (id: number) => `/api/items/${id}/`,
+        search: "/api/items/search/",
+    },
   },
 } as const;

@@ -8,6 +8,7 @@ class WorkSessionSerializer(serializers.ModelSerializer):
     duration_hours = serializers.ReadOnlyField()
     overtime_hours = serializers.ReadOnlyField()
     wage_cost = serializers.ReadOnlyField()
+    item_name = serializers.CharField(source='item.name', read_only=True, allow_null=True)
 
     workers = WorkerSerializer(many=True, read_only=True)
 
@@ -32,6 +33,8 @@ class WorkSessionSerializer(serializers.ModelSerializer):
             'end_time',
             'quantity_produced',
             'notes',
+            'item',
+            'item_name',
             'duration_hours',
             'performance_percentage',
             'overtime_hours',

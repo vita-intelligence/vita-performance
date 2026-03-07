@@ -86,6 +86,7 @@ class WorkSessionStartView(APIView):
     def post(self, request):
         workstation_id = request.data.get('workstation')
         worker_ids = request.data.get('worker_ids')
+        item_id = request.data.get('item')
 
         if not workstation_id or not worker_ids:
             return Response(
@@ -98,6 +99,7 @@ class WorkSessionStartView(APIView):
             user=request.user,
             workstation_id=workstation_id,
             status='active',
+            item_id=item_id,
             start_time=timezone.now(),
         )
 

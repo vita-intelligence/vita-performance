@@ -30,6 +30,7 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                             <tr className="border-b border-border bg-surface">
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Date</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workstation</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Item</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Duration</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Quantity</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
@@ -50,6 +51,7 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                                     <td className="px-4 py-3 text-text font-medium">
                                         {session.workstation_name}
                                     </td>
+                                    <td className="px-4 py-3 text-muted">{session.item_name || "—"}</td>
                                     <td className="px-4 py-3 text-text">
                                         {session.duration_hours ? `${session.duration_hours}h` : "—"}
                                     </td>

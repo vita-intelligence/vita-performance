@@ -86,27 +86,6 @@ export default function RealtimeDashboardPage() {
                     </Link>
                     <VPLogo />
                 </div>
-                {process.env.NODE_ENV === "development" && (
-                    <button
-                        onClick={() => {
-                            setTestAlerts([
-                                { type: "success", code: "PERFORMANCE_HIGH", data: { worker_name: "John", performance: 115 } },
-                            ]);
-                            setTimeout(() => setTestAlerts([
-                                { type: "warning", code: "WORKSTATION_IDLE", data: { workstation_name: "Station A", hours: 2 } },
-                            ]), 10000);
-                            setTimeout(() => setTestAlerts([
-                                { type: "milestone", code: "TEAM_MILESTONE", data: { count: 25 } },
-                            ]), 20000);
-                            setTimeout(() => setTestAlerts([
-                                { type: "info", code: "SESSION_STARTED", data: { worker_name: "John", workstation_name: "Station A" } },
-                            ]), 30000);
-                        }}
-                        className="fixed bottom-4 right-4 z-50 bg-text text-background px-4 py-2 text-xs font-semibold uppercase tracking-widest"
-                    >
-                        Test Alerts
-                    </button>
-                )}
                 <div className="flex items-center gap-6">
                     <SceneIndicator total={TOTAL_SCENES} current={currentScene} />
                     <ConnectionStatus status={status} />

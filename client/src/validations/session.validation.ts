@@ -14,6 +14,7 @@ export const liveSessionSchema = z.object({
   worker_ids: z
     .array(z.coerce.number())
     .min(1, "At least one worker is required"),
+  item: z.coerce.number().optional().nullable(),
 });
 
 export const manualSessionSchema = z.object({
@@ -23,6 +24,7 @@ export const manualSessionSchema = z.object({
   worker_ids: z
     .array(z.coerce.number())
     .min(1, "At least one worker is required"),
+  item: z.coerce.number().optional().nullable(),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
   quantity_produced: z

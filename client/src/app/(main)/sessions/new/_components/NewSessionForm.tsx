@@ -17,6 +17,7 @@ import { useWorkers } from "@/hooks/useWorkers";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import ItemSearch from "@/components/shared/ItemSearch";
 
 export default function NewSessionForm() {
     const router = useRouter();
@@ -49,6 +50,7 @@ export default function NewSessionForm() {
             await startSession({
                 workstation: data.workstation,
                 worker_ids: data.worker_ids,
+                item: data.item ?? null,
             });
 
             router.push("/sessions/active");
@@ -66,6 +68,7 @@ export default function NewSessionForm() {
                 start_time: new Date(data.start_time).toISOString(),
                 end_time: new Date(data.end_time).toISOString(),
                 quantity_produced: data.quantity_produced,
+                item: data.item ?? null,
                 notes: data.notes,
             });
 
@@ -135,6 +138,18 @@ export default function NewSessionForm() {
                                 )}
                             />
                             <Controller
+                                name="item"
+                                control={liveForm.control}
+                                render={({ field }) => (
+                                    <ItemSearch
+                                        key="live-item"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        error={liveForm.formState.errors.item?.message}
+                                    />
+                                )}
+                            />
+                            <Controller
                                 name="worker_ids"
                                 control={liveForm.control}
                                 render={({ field }) => (
@@ -167,6 +182,18 @@ export default function NewSessionForm() {
                                         selectedKeys={field.value ? [String(field.value)] : []}
                                         onSelectionChange={(keys) => field.onChange(Number(Array.from(keys)[0]))}
                                         error={manualForm.formState.errors.workstation?.message}
+                                    />
+                                )}
+                            />
+                            <Controller
+                                name="item"
+                                control={manualForm.control}
+                                render={({ field }) => (
+                                    <ItemSearch
+                                        key="manual-item"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        error={manualForm.formState.errors.item?.message}
                                     />
                                 )}
                             />

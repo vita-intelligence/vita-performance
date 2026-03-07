@@ -73,7 +73,7 @@ class WorkerStatsView(APIView):
         sessions = list(
             WorkSession.objects
             .filter(base_filter)
-            .select_related('workstation')
+            .select_related('workstation', 'item')
             .prefetch_related('workers')
             .order_by('start_time')
         )
@@ -96,6 +96,7 @@ class WorkerStatsView(APIView):
                 'quantity_produced': float(s.quantity_produced) if s.quantity_produced else None,
                 'performance_percentage': s.performance_percentage,
                 'wage_cost': s.wage_cost,
+                'item_name': s.item.name if s.item else None,
                 'worker_count': len(s.workers.all()),  # prefetched, no DB hit
             }
             for s in reversed(sessions[-20:])

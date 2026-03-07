@@ -30,6 +30,7 @@ export interface WorkerStatsSession {
     duration_hours: number | null;
     quantity_produced: number | null;
     performance_percentage: number | null;
+    item_name?: string | null;
     wage_cost: number | null;
     worker_count: number;
 }

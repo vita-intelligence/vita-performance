@@ -49,6 +49,10 @@ export default function SessionCards({ sessions, onEdit }: SessionCardsProps) {
                             </p>
                         </div>
                         <div className="flex flex-col gap-1">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Item</p>
+                            <p className="text-sm text-text">{session.item_name || "—"}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Quantity</p>
                             <p className="text-sm text-text">
                                 {session.quantity_produced

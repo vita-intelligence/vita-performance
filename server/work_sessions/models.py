@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from workstations.models import Workstation
 from workers.models import Worker
+from items.models import Item
 
 
 class WorkSession(models.Model):
@@ -17,6 +18,7 @@ class WorkSession(models.Model):
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
     performance_percentage = models.FloatField(null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True, related_name='sessions')
     quantity_produced = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
