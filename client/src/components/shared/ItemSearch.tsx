@@ -10,12 +10,18 @@ interface ItemSearchProps {
     value?: number | null;
     onChange: (id: number | null) => void;
     error?: string;
+    label?: string;
+    defaultLabel?: string;
 }
 
-export default function ItemSearch({ value, onChange, error }: ItemSearchProps) {
-    const [query, setQuery] = useState("");
+export default function ItemSearch({ value, onChange, error, label = "Item", defaultLabel }: ItemSearchProps) {
+    const [query, setQuery] = useState(defaultLabel || "");
     const [results, setResults] = useState<Item[]>([]);
     const debouncedQuery = useDebounce(query, 300);
+
+    useEffect(() => {
+        setQuery(defaultLabel || "");
+    }, [defaultLabel]);
 
     useEffect(() => {
         itemService.search(debouncedQuery).then(setResults);
@@ -23,7 +29,7 @@ export default function ItemSearch({ value, onChange, error }: ItemSearchProps) 
 
     return (
         <Autocomplete
-            label="Item"
+            label={label}
             placeholder="Search items..."
             isInvalid={!!error}
             errorMessage={error}

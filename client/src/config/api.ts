@@ -46,5 +46,14 @@ export const API_CONFIG = {
         detail: (id: number) => `/api/items/${id}/`,
         search: "/api/items/search/",
     },
+    kiosk: {
+        base: (token: string) => `/api/kiosk/${token}/`,
+        workers: (token: string) => `/api/kiosk/${token}/workers/`,
+        verifyPin: (token: string) => `/api/kiosk/${token}/verify-pin/`,
+        start: (token: string) => `/api/kiosk/${token}/start/`,
+        active: (token: string) => `/api/kiosk/${token}/active/`,
+        stop: (token: string) => `/api/kiosk/${token}/stop/`,
+        searchItems: (token: string) => `/api/kiosk/${token}/items/`,
+    },
   },
 } as const;

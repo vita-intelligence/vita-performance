@@ -70,6 +70,24 @@ export default function WorkerForm({ worker, onClose }: WorkerFormProps) {
             />
 
             <div className="flex flex-col gap-1">
+                <Input
+                    label={worker?.has_pin ? "Change PIN" : "Set PIN"}
+                    type="password"
+                    placeholder="4-digit PIN"
+                    hint={worker?.has_pin ? "Leave blank to keep existing PIN." : "Required for kiosk access."}
+                    maxLength={4}
+                    error={errors.pin?.message}
+                    {...register("pin")}
+                />
+                {worker?.has_pin && (
+                    <div className="flex items-center gap-2 px-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                        <p className="text-xs text-success">PIN is set</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-1">
                 <Controller
                     name="group"
                     control={control}

@@ -12,6 +12,7 @@ import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import { ManualSessionFormData, manualSessionSchema } from "@/validations/session.validation";
+import ItemSearch from "@/components/shared/ItemSearch";
 
 interface EditSessionDrawerProps {
     session: WorkSession | null;
@@ -43,6 +44,7 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                 end_time: session.end_time ? toDatetimeLocal(session.end_time) : "",
                 quantity_produced: session.quantity_produced ?? undefined,
                 notes: session.notes || "",
+                item: session.item ?? null,
             });
         }
     }, [session, reset]);
@@ -60,6 +62,7 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                     end_time: new Date(data.end_time).toISOString(),
                     quantity_produced: data.quantity_produced,
                     notes: data.notes,
+                    item: data.item ?? null,
                 },
             });
             onClose();
@@ -103,6 +106,19 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
                                     field.onChange(Array.from(keys).map(Number))
                                 }
                                 error={errors.worker_ids?.message}
+                            />
+                        )}
+                    />
+                    <Controller
+                        name="item"
+                        control={control}
+                        render={({ field }) => (
+                            <ItemSearch
+                                key="edit-item"
+                                label="Item"
+                                value={field.value ?? null}
+                                onChange={field.onChange}
+                                defaultLabel={session?.item_name ?? undefined}
                             />
                         )}
                     />

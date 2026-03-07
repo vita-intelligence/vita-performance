@@ -11,9 +11,9 @@ class WorkstationSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'is_active', 'created_at', 'updated_at',
             'target_quantity', 'target_duration',
             'working_hours_per_day', 'overtime_threshold', 'overtime_multiplier',
-            'week_starts_on', 'effective_settings'
+            'week_starts_on', 'effective_settings', 'kiosk_token',
         )
-        read_only_fields = ('id', 'created_at', 'updated_at', 'effective_settings')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'effective_settings', 'kiosk_token')
 
     def get_effective_settings(self, obj):
         return obj.get_effective_settings()

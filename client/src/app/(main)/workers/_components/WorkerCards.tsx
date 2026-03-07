@@ -43,11 +43,17 @@ export default function WorkerCards({ workers, onEdit }: WorkerCardsProps) {
                     </div>
 
                     {/* Details */}
-                    <div className="border-t border-border pt-4">
+                    <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
                         <div className="flex flex-col gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Hourly Rate</p>
                             <p className="text-sm text-text">
                                 {formatCurrency(Number(worker.hourly_rate), settings)}/hr
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Kiosk PIN</p>
+                            <p className={`text-sm font-semibold ${worker.has_pin ? "text-success" : "text-error"}`}>
+                                {worker.has_pin ? "Set" : "Not set"}
                             </p>
                         </div>
                     </div>

@@ -4,6 +4,7 @@ import { Workstation } from "@/types/workstation";
 import { useWorkstations } from "@/hooks/useWorkstations";
 import { formatNumber } from "@/lib/utils/number.utils";
 import { useSettings } from "@/hooks/useSettings";
+import KioskLink from "@/components/shared/KioskLink";
 
 interface WorkstationCardsProps {
     workstations: Workstation[];
@@ -81,6 +82,7 @@ export default function WorkstationCards({ workstations, onEdit }: WorkstationCa
 
                     {/* Actions */}
                     <div className="flex gap-3 border-t border-border pt-4">
+                        <KioskLink token={workstation.kiosk_token} />
                         <button
                             onClick={() => onEdit(workstation)}
                             className="flex-1 text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors py-2 border border-border hover:border-text"

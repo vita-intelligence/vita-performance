@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import uuid
 
 
 class Workstation(models.Model):
@@ -11,6 +12,8 @@ class Workstation(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    kiosk_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
 
     # nullable overrides — null means use global settings
     working_hours_per_day = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)

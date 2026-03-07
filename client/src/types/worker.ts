@@ -68,6 +68,7 @@ export interface Worker {
   full_name: string;
   hourly_rate: number;
   is_active: boolean;
+  has_pin: boolean;
   group: number | null;
   group_name: string | null;
   created_at: string;

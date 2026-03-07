@@ -46,5 +46,6 @@ export interface UpdateSessionPayload {
   start_time?: string;
   end_time?: string;
   quantity_produced?: number;
+  item?: number | null;
   notes?: string;
 }

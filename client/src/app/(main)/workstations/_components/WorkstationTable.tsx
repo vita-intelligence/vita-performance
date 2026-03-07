@@ -4,6 +4,7 @@ import { Workstation } from "@/types/workstation";
 import { useWorkstations } from "@/hooks/useWorkstations";
 import { formatNumber } from "@/lib/utils/number.utils";
 import { useSettings } from "@/hooks/useSettings";
+import KioskLink from "@/components/shared/KioskLink";
 
 interface WorkstationTableProps {
     workstations: Workstation[];
@@ -71,6 +72,7 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                             </td>
                             <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
+                                    <KioskLink token={workstation.kiosk_token} />
                                     <button
                                         onClick={() => onEdit(workstation)}
                                         className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"
