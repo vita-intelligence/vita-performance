@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import ProtectedNav from "@/components/shared/nav/ProtectedNav";
+import SubscriptionBanner from "@/components/shared/SubscriptionBanner";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
@@ -31,8 +32,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return (
         <div className="flex h-screen bg-background overflow-hidden">
             <ProtectedNav />
-            <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
-                {children}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <SubscriptionBanner />
+                <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
+                    {children}
+                </div>
             </div>
         </div>
     );

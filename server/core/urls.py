@@ -1,4 +1,5 @@
 from django.urls import path, include
+from django.contrib import admin
 
 api_patterns = [
     path('accounts/', include('accounts.urls')),
@@ -11,8 +12,10 @@ api_patterns = [
     path('items/', include('items.urls')),
     path('kiosk/', include('kiosk.urls')),
     path('qc/', include('qc.urls')),
+    path('subscription/', include('subscription.urls')),
 ]
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('api/', include(api_patterns)),
 ]

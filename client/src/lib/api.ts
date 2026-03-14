@@ -22,6 +22,14 @@ api.interceptors.response.use(
     const original = error.config;
     const shouldSkip = SKIP_REFRESH_URLS.some(url => original.url.includes(url));
 
+    // Subscription expired — redirect to billing
+    if (error.response?.status === 402) {
+      if (typeof window !== "undefined" && window.location.pathname !== "/billing") {
+        window.location.href = "/billing";
+      }
+      return Promise.reject(error);
+    }
+
     if (
       error.response?.status === 401 &&
       !original._retry &&

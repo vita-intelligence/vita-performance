@@ -63,5 +63,8 @@ export const API_CONFIG = {
         sessions: (token: string, workstationId: number) => `/api/qc/${token}/workstations/${workstationId}/sessions/`,
         verifySession: (token: string, sessionId: number) => `/api/qc/${token}/sessions/${sessionId}/verify/`,
     },
+    subscription: {
+        base: "/api/subscription/",
+    },
   },
 } as const;

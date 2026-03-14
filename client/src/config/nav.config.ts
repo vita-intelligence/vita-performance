@@ -9,6 +9,7 @@ import {
   History,
   Plus,
   Package,
+  CreditCard,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -46,6 +47,11 @@ export const NAV_ITEMS = [
     label: "Items",
     href: "/items",
     icon: Package,
+  },
+  {
+    label: "Billing",
+    href: "/billing",
+    icon: CreditCard,
   },
   {
     label: "Settings",
