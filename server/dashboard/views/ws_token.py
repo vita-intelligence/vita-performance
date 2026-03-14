@@ -3,10 +3,11 @@ from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from subscription.permissions import HasRealtimeAccess
 
 
 class WebSocketTokenView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRealtimeAccess]
 
     def post(self, request):
         token = str(uuid.uuid4())

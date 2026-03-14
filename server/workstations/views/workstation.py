@@ -4,10 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ..models import Workstation
 from ..serializers import WorkstationSerializer
+from subscription.permissions import WithinWorkstationLimit
 
 
 class WorkstationListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, WithinWorkstationLimit]
 
     def get(self, request):
         workstations = Workstation.objects.filter(user=request.user)

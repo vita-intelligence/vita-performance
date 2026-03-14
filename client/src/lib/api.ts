@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_CONFIG } from "@/config/api";
+import { addToast } from "@heroui/react";
 
 const PUBLIC_PATHS = ["/login", "/register"];
 const SKIP_REFRESH_URLS = [
@@ -29,6 +30,31 @@ api.interceptors.response.use(
       }
       return Promise.reject(error);
     }
+
+    // Plan limit or feature not available — show toast
+    if (error.response?.status === 403) {
+      const data = error.response?.data;
+      const detail = typeof data?.detail === 'object' ? data.detail.detail : data?.detail;
+      const code = typeof data?.detail === 'object' ? data.detail.code : data?.code;
+
+      const isPlanError = [
+          'worker_limit_reached',
+          'workstation_limit_reached',
+          'kiosk_not_available',
+          'qc_not_available',
+          'realtime_not_available',
+      ].includes(code);
+
+      if (isPlanError && detail) {
+          addToast({
+              title: "Plan limit reached",
+              description: detail,
+              color: "danger",
+              timeout: 5000,
+          });
+      }
+      return Promise.reject(error);
+  }
 
     if (
       error.response?.status === 401 &&

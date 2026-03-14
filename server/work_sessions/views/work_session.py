@@ -4,6 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from django.utils import timezone
+from datetime import timedelta
+from subscription.plans import get_limit
 
 from ..models import WorkSession
 from ..serializers import WorkSessionSerializer
@@ -14,12 +16,21 @@ class WorkSessionListView(ListCreateAPIView):
     serializer_class = WorkSessionSerializer
 
     def get_queryset(self):
-        return (
+        try:
+            history_days = get_limit(self.request.user.subscription.plan, 'session_history_days')
+        except Exception:
+            history_days = 90
+
+        qs = (
             WorkSession.objects
             .filter(user=self.request.user)
             .select_related('workstation')
             .prefetch_related('workers')
         )
+        if history_days is not None:
+            cutoff = timezone.now() - timedelta(days=history_days)
+            qs = qs.filter(start_time__gte=cutoff)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

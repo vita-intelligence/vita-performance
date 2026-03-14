@@ -18,5 +18,12 @@ export const useSubscription = () => {
         isExpired: subscription?.is_expired ?? false,
         isPastDue: subscription?.is_past_due ?? false,
         daysRemaining: subscription?.days_remaining ?? 0,
+        hasKiosk: subscription?.has_kiosk ?? false,
+        hasQC: subscription?.has_qc ?? false,
+        hasRealtime: subscription?.has_realtime ?? false,
+        workerLimit: subscription?.worker_limit ?? null,
+        workstationLimit: subscription?.workstation_limit ?? null,
+        plan: subscription?.plan ?? null,
+        planDetails: subscription?.plan_details ?? null,
     };
 };

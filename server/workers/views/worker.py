@@ -6,6 +6,7 @@ from ..models import Worker
 from ..serializers import WorkerSerializer
 from django.db.models import Avg, Count, Sum, Q
 from core.utils.date_utils import get_date_range
+from subscription.permissions import WithinWorkerLimit
 
 
 class WorkerLeaderboardView(APIView):
@@ -54,7 +55,7 @@ class WorkerLeaderboardView(APIView):
 
 
 class WorkerListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, WithinWorkerLimit]
 
     def get(self, request):
         workers = Worker.objects.filter(user=request.user)

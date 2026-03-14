@@ -9,6 +9,12 @@ from work_sessions.models import WorkSession
 from items.models import Item
 
 
+def check_kiosk_access(workstation):
+    try:
+        return workstation.user.subscription.has_kiosk
+    except Exception:
+        return False
+
 def get_workstation_by_token(token):
     try:
         return Workstation.objects.select_related('user').get(
@@ -27,6 +33,11 @@ class KioskWorkstationView(APIView):
         workstation = get_workstation_by_token(token)
         if not workstation:
             return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        if not check_kiosk_access(workstation):
+            return Response({
+                'detail': 'Kiosk access is not available on this plan.',
+                'code': 'kiosk_not_available',
+            }, status=status.HTTP_403_FORBIDDEN)
 
         active_session = WorkSession.objects.filter(
             workstation=workstation,

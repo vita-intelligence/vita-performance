@@ -9,6 +9,12 @@ from work_sessions.models import WorkSession
 from ..models import QCToken
 
 
+def check_qc_access(qc_token):
+    try:
+        return qc_token.user.subscription.has_qc
+    except Exception:
+        return False
+
 def get_qc_token(token):
     try:
         return QCToken.objects.select_related('user').get(token=token)
@@ -40,6 +46,11 @@ class QCWorkersView(APIView):
         qc = get_qc_token(token)
         if not qc:
             return Response({'detail': 'Invalid QC link.'}, status=status.HTTP_404_NOT_FOUND)
+        if not check_qc_access(qc):
+            return Response({
+                'detail': 'QC access is not available on this plan.',
+                'code': 'qc_not_available',
+            }, status=status.HTTP_403_FORBIDDEN)
 
         workers = Worker.objects.filter(
             user=qc.user,

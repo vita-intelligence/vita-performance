@@ -1,8 +1,8 @@
-import uuid
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from .plans import get_limit, has_feature
 
 
 class Subscription(models.Model):
@@ -20,6 +20,20 @@ class Subscription(models.Model):
         (STATUS_CANCELED, 'Canceled'),
     ]
 
+    PLAN_TRIAL = 'trial'
+    PLAN_STARTER = 'starter'
+    PLAN_GROWTH = 'growth'
+    PLAN_PRO = 'pro'
+    PLAN_ENTERPRISE = 'enterprise'
+
+    PLAN_CHOICES = [
+        (PLAN_TRIAL, 'Trial'),
+        (PLAN_STARTER, 'Starter'),
+        (PLAN_GROWTH, 'Growth'),
+        (PLAN_PRO, 'Pro'),
+        (PLAN_ENTERPRISE, 'Enterprise'),
+    ]
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -27,6 +41,7 @@ class Subscription(models.Model):
     )
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_TRIALING)
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default=PLAN_TRIAL)
 
     # Trial
     trial_ends_at = models.DateTimeField()
@@ -87,11 +102,36 @@ class Subscription(models.Model):
         if self.is_past_due:
             return max(0, (self.grace_period_ends_at - timezone.now()).days)
         return 0
+    
+    @property
+    def worker_limit(self):
+        return get_limit(self.plan, 'workers')
+
+    @property
+    def workstation_limit(self):
+        return get_limit(self.plan, 'workstations')
+
+    @property
+    def session_history_days(self):
+        return get_limit(self.plan, 'session_history_days')
+
+    @property
+    def has_kiosk(self):
+        return has_feature(self.plan, 'kiosk')
+
+    @property
+    def has_qc(self):
+        return has_feature(self.plan, 'qc')
+
+    @property
+    def has_realtime(self):
+        return has_feature(self.plan, 'realtime')
 
     @classmethod
     def create_for_user(cls, user):
         return cls.objects.create(
             user=user,
             status=cls.STATUS_TRIALING,
+            plan=cls.PLAN_TRIAL,
             trial_ends_at=timezone.now() + timedelta(days=30),
         )
