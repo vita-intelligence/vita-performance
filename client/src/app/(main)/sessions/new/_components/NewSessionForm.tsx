@@ -238,6 +238,8 @@ export default function NewSessionForm() {
                                 <Input
                                     label="Start Time"
                                     type="datetime-local"
+                                    labelPlacement="outside"
+                                    placeholder=" "
                                     value={field.value || ""}
                                     onChange={field.onChange}
                                     error={manualForm.formState.errors.start_time?.message}
@@ -251,6 +253,8 @@ export default function NewSessionForm() {
                                 <Input
                                     label="End Time"
                                     type="datetime-local"
+                                    labelPlacement="outside"
+                                    placeholder=" "
                                     value={field.value || ""}
                                     onChange={field.onChange}
                                     error={manualForm.formState.errors.end_time?.message}

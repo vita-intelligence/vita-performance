@@ -42,9 +42,30 @@ export default function ItemSearch({ value, onChange, error, label = "Item", def
                 if (found) setQuery(found.name);
             }}
             items={results}
+            classNames={{
+                base: "!bg-transparent",
+                listboxWrapper: "!bg-surface !rounded-none !border !border-border",
+                popoverContent: "!bg-surface !rounded-none !border !border-border",
+                listbox: "!bg-surface",
+                clearButton: "!text-muted hover:!text-text",
+                selectorButton: "!text-muted hover:!text-text",
+            }}
+            inputProps={{
+                classNames: {
+                    inputWrapper: "!bg-surface !border-border hover:!border-text focus-within:!border-text !rounded-none !shadow-none",
+                    input: "!text-text !bg-transparent placeholder:!text-muted",
+                    label: "!text-muted",
+                    errorMessage: "!text-error",
+                }
+            }}
         >
             {(item) => (
-                <AutocompleteItem key={String(item.id)}>
+                <AutocompleteItem
+                    key={String(item.id)}
+                    classNames={{
+                        base: "!rounded-none !text-text data-[hover=true]:!bg-background data-[selected=true]:!bg-background",
+                    }}
+                >
                     {item.name}
                 </AutocompleteItem>
             )}

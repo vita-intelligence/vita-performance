@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
 import { Users, MonitorCheck, Clock, Tablet, ShieldCheck, Radio, Check, X } from "lucide-react";
 
 interface Plan {
@@ -24,61 +23,48 @@ interface PlanComparisonTableProps {
 
 export default function PlanComparisonTable({ plans, currentPlan }: PlanComparisonTableProps) {
     return (
-        <div className="hidden md:block w-full overflow-x-auto">
-            <Table
-                aria-label="Available plans"
-                classNames={{
-                    wrapper: "rounded-none border border-border shadow-none p-0",
-                    th: "text-xs font-semibold uppercase tracking-widest text-muted bg-surface rounded-none",
-                    td: "py-4 text-sm",
-                    tr: "border-b border-border",
-                }}
-            >
-                <TableHeader>
-                    <TableColumn>Plan</TableColumn>
-                    <TableColumn>Price</TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <Users size={12} /> Workers
-                        </div>
-                    </TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <MonitorCheck size={12} /> Workstations
-                        </div>
-                    </TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <Clock size={12} /> History
-                        </div>
-                    </TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <Tablet size={12} /> Kiosk
-                        </div>
-                    </TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <ShieldCheck size={12} /> QC
-                        </div>
-                    </TableColumn>
-                    <TableColumn>
-                        <div className="flex items-center gap-1.5">
-                            <Radio size={12} /> Realtime
-                        </div>
-                    </TableColumn>
-                    <TableColumn> </TableColumn>
-                </TableHeader>
-                <TableBody>
-                    {plans.map((p) => {
+        <div className="hidden md:block w-full overflow-x-auto border border-border">
+            <table className="w-full text-sm min-w-[700px]">
+                <thead>
+                    <tr className="border-b border-border bg-surface">
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Plan</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Price</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><Users size={12} /> Workers</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><MonitorCheck size={12} /> Workstations</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><Clock size={12} /> History</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><Tablet size={12} /> Kiosk</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><ShieldCheck size={12} /> QC</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                            <div className="flex items-center gap-1.5"><Radio size={12} /> Realtime</div>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {plans.map((p, index) => {
                         const isCurrent = currentPlan === p.key;
                         return (
-                            <TableRow
+                            <tr
                                 key={p.key}
-                                className={isCurrent ? "bg-success/5" : ""}
+                                className={`border-b border-border transition-colors ${isCurrent
+                                        ? "bg-success/5"
+                                        : index % 2 === 0
+                                            ? "bg-background"
+                                            : "bg-surface/50"
+                                    }`}
                             >
-                                <TableCell className="font-black text-text uppercase">
-                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                <td className="px-4 py-4 font-black text-text uppercase whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
                                         {p.name}
                                         {isCurrent && (
                                             <span className="text-xs font-semibold uppercase tracking-widest text-success border border-success px-2 py-0.5">
@@ -86,35 +72,35 @@ export default function PlanComparisonTable({ plans, currentPlan }: PlanComparis
                                             </span>
                                         )}
                                     </div>
-                                </TableCell>
-                                <TableCell className="font-black text-text whitespace-nowrap">
+                                </td>
+                                <td className="px-4 py-4 font-black text-text whitespace-nowrap">
                                     {p.price}
                                     {p.price !== "Custom" && (
                                         <span className="text-muted font-normal text-xs">/mo</span>
                                     )}
-                                </TableCell>
-                                <TableCell className="font-semibold text-text">{p.workers}</TableCell>
-                                <TableCell className="font-semibold text-text">{p.workstations}</TableCell>
-                                <TableCell className="font-semibold text-text whitespace-nowrap">{p.history}</TableCell>
-                                <TableCell>
+                                </td>
+                                <td className="px-4 py-4 font-semibold text-text">{p.workers}</td>
+                                <td className="px-4 py-4 font-semibold text-text">{p.workstations}</td>
+                                <td className="px-4 py-4 font-semibold text-text whitespace-nowrap">{p.history}</td>
+                                <td className="px-4 py-4">
                                     {p.kiosk
                                         ? <Check size={16} className="text-success" />
                                         : <X size={16} className="text-muted opacity-40" />
                                     }
-                                </TableCell>
-                                <TableCell>
+                                </td>
+                                <td className="px-4 py-4">
                                     {p.qc
                                         ? <Check size={16} className="text-success" />
                                         : <X size={16} className="text-muted opacity-40" />
                                     }
-                                </TableCell>
-                                <TableCell>
+                                </td>
+                                <td className="px-4 py-4">
                                     {p.realtime
                                         ? <Check size={16} className="text-success" />
                                         : <X size={16} className="text-muted opacity-40" />
                                     }
-                                </TableCell>
-                                <TableCell>
+                                </td>
+                                <td className="px-4 py-4">
                                     {p.key === "enterprise" && (
                                         <Link
                                             href="mailto:support@vitaperformance.com"
@@ -132,12 +118,12 @@ export default function PlanComparisonTable({ plans, currentPlan }: PlanComparis
                                             Upgrade
                                         </Button>
                                     )}
-                                </TableCell>
-                            </TableRow>
+                                </td>
+                            </tr>
                         );
                     })}
-                </TableBody>
-            </Table>
+                </tbody>
+            </table>
         </div>
     );
 }

@@ -3,9 +3,12 @@
 import { Button as HeroButton } from "@heroui/react";
 import type { ButtonProps as HeroButtonProps } from "@heroui/react";
 
-export default function Button({ children, ...props }: HeroButtonProps) {
+export default function Button({ children, className, ...props }: HeroButtonProps) {
     return (
-        <HeroButton {...props}>
+        <HeroButton
+            className={className}
+            {...props}
+        >
             {children}
         </HeroButton>
     );

@@ -14,6 +14,13 @@ export default function Input({ error, hint, ...props }: CustomInputProps) {
             <HeroInput
                 isInvalid={!!error}
                 errorMessage={error}
+                classNames={{
+                    base: "!bg-transparent",
+                    inputWrapper: "!bg-surface !border-border hover:!border-text focus-within:!border-text !rounded-none !shadow-none",
+                    input: "!text-text !bg-transparent placeholder:!text-muted",
+                    label: "!text-muted",
+                    errorMessage: "!text-error",
+                }}
                 {...props}
             />
             {hint && !error && (

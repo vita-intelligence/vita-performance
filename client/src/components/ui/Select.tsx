@@ -18,10 +18,24 @@ export default function Select({ options, error, ...props }: CustomSelectProps) 
         <HeroSelect
             isInvalid={!!error}
             errorMessage={error}
+            classNames={{
+                base: "!bg-transparent",
+                trigger: "!bg-surface !border-border hover:!border-text !rounded-none !shadow-none",
+                value: "!text-text",
+                label: "!text-muted",
+                errorMessage: "!text-error",
+                popoverContent: "!bg-surface !rounded-none !border !border-border",
+                listbox: "!bg-surface",
+            }}
             {...props}
         >
             {options.map((option) => (
-                <SelectItem key={option.value}>
+                <SelectItem
+                    key={option.value}
+                    classNames={{
+                        base: "!rounded-none !text-text hover:!bg-background data-[hover=true]:!bg-background data-[selected=true]:!bg-background",
+                    }}
+                >
                     {option.label}
                 </SelectItem>
             ))}

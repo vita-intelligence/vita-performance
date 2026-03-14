@@ -29,3 +29,47 @@
 button {
     cursor: pointer;
 }
+
+
+/* Scrollbar */
+:root {
+    --scrollbar-width: 6px;
+    --scrollbar-track: var(--color-surface);
+    --scrollbar-thumb: var(--color-border);
+    --scrollbar-thumb-hover: var(--color-muted);
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: var(--scrollbar-width);
+    height: var(--scrollbar-width);
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+html {
+    overflow-y: scroll;
+}
+
+::-webkit-scrollbar {
+    width: var(--scrollbar-width);
+    height: var(--scrollbar-width);
+    -webkit-appearance: none;
+}

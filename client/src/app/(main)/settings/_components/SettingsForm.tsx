@@ -18,6 +18,7 @@ import {
     THOUSANDS_SEPARATORS,
     WEEK_STARTS,
 } from "@/constants/settings.constants";
+import ThemeSelector from "./ThemeSelector";
 
 interface SectionProps {
     title: string;
@@ -262,6 +263,8 @@ export default function SettingsForm() {
                     {...register("work_start_time")}
                 />
             </Section>
+
+            <ThemeSelector />
 
             <div className="flex justify-end pt-4 border-t border-border">
                 <Button

@@ -1,5 +1,6 @@
 export const themes = {
   default: {
+    label: "Default",
     colors: {
       primary: "#6C63FF",
       secondary: "#F5A623",
@@ -17,6 +18,7 @@ export const themes = {
     },
   },
   dark: {
+    label: "Dark",
     colors: {
       primary: "#6C63FF",
       secondary: "#F5A623",
@@ -25,6 +27,114 @@ export const themes = {
       text: "#F9F9F9",
       muted: "#9CA3AF",
       border: "#2E2E2E",
+      error: "#EF4444",
+      success: "#22C55E",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  industrial: {
+    label: "Industrial",
+    colors: {
+      primary: "#F97316",
+      secondary: "#FB923C",
+      background: "#111827",
+      surface: "#1F2937",
+      text: "#F9FAFB",
+      muted: "#6B7280",
+      border: "#374151",
+      error: "#EF4444",
+      success: "#22C55E",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  forest: {
+    label: "Forest",
+    colors: {
+      primary: "#16A34A",
+      secondary: "#4ADE80",
+      background: "#F0FDF4",
+      surface: "#DCFCE7",
+      text: "#14532D",
+      muted: "#4B7A5E",
+      border: "#BBF7D0",
+      error: "#EF4444",
+      success: "#16A34A",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  ocean: {
+    label: "Ocean",
+    colors: {
+      primary: "#0EA5E9",
+      secondary: "#38BDF8",
+      background: "#F0F9FF",
+      surface: "#E0F2FE",
+      text: "#0C4A6E",
+      muted: "#4A90A4",
+      border: "#BAE6FD",
+      error: "#EF4444",
+      success: "#22C55E",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  midnight: {
+    label: "Midnight",
+    colors: {
+      primary: "#818CF8",
+      secondary: "#A78BFA",
+      background: "#0F0F1A",
+      surface: "#1A1A2E",
+      text: "#E2E8F0",
+      muted: "#7C85A2",
+      border: "#2D2D4A",
+      error: "#F87171",
+      success: "#34D399",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  rose: {
+    label: "Rose",
+    colors: {
+      primary: "#E11D48",
+      secondary: "#FB7185",
+      background: "#FFF1F2",
+      surface: "#FFE4E6",
+      text: "#881337",
+      muted: "#9F5064",
+      border: "#FECDD3",
+      error: "#BE123C",
+      success: "#16A34A",
+    },
+    fonts: {
+      sans: ["Inter", "sans-serif"],
+      heading: ["Cal Sans", "sans-serif"],
+    },
+  },
+  slate: {
+    label: "Slate",
+    colors: {
+      primary: "#475569",
+      secondary: "#64748B",
+      background: "#F8FAFC",
+      surface: "#F1F5F9",
+      text: "#0F172A",
+      muted: "#64748B",
+      border: "#CBD5E1",
       error: "#EF4444",
       success: "#22C55E",
     },
