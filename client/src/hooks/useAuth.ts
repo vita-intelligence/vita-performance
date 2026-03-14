@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { authService } from "@/services/auth.service";
 import { useAuthStore, useMetaStore, useSettingsStore } from "@/lib/stores";
-import { LoginPayload, RegisterPayload } from "@/types/auth";
+import { LoginPayload, PasswordResetConfirmPayload, PasswordResetPayload, RegisterPayload } from "@/types/auth";
 import { usePathname } from "next/navigation";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -72,6 +72,46 @@ export const useAuth = () => {
     },
   });
 
+  const passwordResetMutation = useMutation({
+    mutationFn: (payload: PasswordResetPayload) => authService.passwordReset(payload),
+    onSuccess: () => {
+        addToast({
+            title: "Reset link sent",
+            description: "Check your email for a password reset link.",
+            color: "success",
+            timeout: 5000,
+        });
+    },
+    onError: (error) => {
+        addToast({
+            title: "Failed to send reset link",
+            description: getErrorMessage(error),
+            color: "danger",
+            timeout: 4000,
+        });
+    },
+});
+
+const passwordResetConfirmMutation = useMutation({
+    mutationFn: (payload: PasswordResetConfirmPayload) => authService.passwordResetConfirm(payload),
+    onSuccess: () => {
+        addToast({
+            title: "Password reset successful",
+            description: "You can now log in with your new password.",
+            color: "success",
+            timeout: 5000,
+        });
+    },
+    onError: (error) => {
+        addToast({
+            title: "Failed to reset password",
+            description: getErrorMessage(error),
+            color: "danger",
+            timeout: 4000,
+        });
+    },
+});
+
   return {
     user,
     isLoading: isPublicPage ? false : isLoading,
@@ -81,5 +121,9 @@ export const useAuth = () => {
     logout: logoutMutation.mutateAsync,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
+    passwordReset: passwordResetMutation.mutateAsync,
+    passwordResetConfirm: passwordResetConfirmMutation.mutateAsync,
+    isPasswordResetLoading: passwordResetMutation.isPending,
+    isPasswordResetConfirmLoading: passwordResetConfirmMutation.isPending,
   };
 };

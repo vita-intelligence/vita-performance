@@ -2,7 +2,7 @@ import axios from "axios";
 import { API_CONFIG } from "@/config/api";
 import { addToast } from "@heroui/react";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 const SKIP_REFRESH_URLS = [
   API_CONFIG.endpoints.auth.login,
   API_CONFIG.endpoints.auth.register,
@@ -25,7 +25,10 @@ api.interceptors.response.use(
 
     // Subscription expired — redirect to billing
     if (error.response?.status === 402) {
-      if (typeof window !== "undefined" && window.location.pathname !== "/billing") {
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/billing")
+      ) {
         window.location.href = "/billing";
       }
       return Promise.reject(error);
@@ -38,23 +41,23 @@ api.interceptors.response.use(
       const code = typeof data?.detail === 'object' ? data.detail.code : data?.code;
 
       const isPlanError = [
-          'worker_limit_reached',
-          'workstation_limit_reached',
-          'kiosk_not_available',
-          'qc_not_available',
-          'realtime_not_available',
+        'worker_limit_reached',
+        'workstation_limit_reached',
+        'kiosk_not_available',
+        'qc_not_available',
+        'realtime_not_available',
       ].includes(code);
 
       if (isPlanError && detail) {
-          addToast({
-              title: "Plan limit reached",
-              description: detail,
-              color: "danger",
-              timeout: 5000,
-          });
+        addToast({
+          title: "Plan limit reached",
+          description: detail,
+          color: "danger",
+          timeout: 5000,
+        });
       }
       return Promise.reject(error);
-  }
+    }
 
     if (
       error.response?.status === 401 &&
@@ -73,7 +76,7 @@ api.interceptors.response.use(
       } catch {
         if (
           typeof window !== "undefined" &&
-          !PUBLIC_PATHS.includes(window.location.pathname)
+          !PUBLIC_PATHS.some(path => window.location.pathname.startsWith(path))
         ) {
           window.location.href = "/login";
         }

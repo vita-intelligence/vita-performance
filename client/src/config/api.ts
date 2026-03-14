@@ -3,11 +3,13 @@ export const API_CONFIG = {
   wsBase: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000",
   endpoints: {
     auth: {
-      register: "/api/accounts/register",
-      login: "/api/accounts/login",
-      logout: "/api/accounts/logout",
-      refresh: "/api/accounts/refresh",
-      user: "/api/accounts/user",
+        register: "/api/accounts/register",
+        login: "/api/accounts/login",
+        logout: "/api/accounts/logout",
+        refresh: "/api/accounts/refresh",
+        user: "/api/accounts/user",
+        passwordReset: "/api/accounts/password-reset/",
+        passwordResetConfirm: "/api/accounts/password-reset/confirm/",
     },
     settings: {
       base: "/api/settings/",

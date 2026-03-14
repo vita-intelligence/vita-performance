@@ -7,6 +7,7 @@ import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import { loginSchema, LoginFormData } from "@/validations/auth.validation";
 import { useAuth } from "@/hooks/useAuth";
+import Link from "next/link";
 
 export default function LoginForm() {
     const router = useRouter();
@@ -65,6 +66,14 @@ export default function LoginForm() {
                 )}
             </div>
 
+            <div className="flex justify-end">
+                <Link
+                    href="/forgot-password"
+                    className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors">
+                    Forgot password?
+                </Link>
+            </div>
+
             <button
                 type="submit"
                 disabled={isLoginLoading}
@@ -75,9 +84,9 @@ export default function LoginForm() {
 
             <p className="text-xs text-muted text-center">
                 Don't have an account?{" "}
-                <a href="/register" className="text-text font-semibold underline">
+                <Link href="/register" className="text-text font-semibold underline">
                     Register
-                </a>
+                </Link>
             </p>
         </form>
     );

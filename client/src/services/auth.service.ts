@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
-import { AuthResponse, LoginPayload, RegisterPayload, User } from "@/types/auth";
+import { AuthResponse, LoginPayload, PasswordResetConfirmPayload, PasswordResetPayload, RegisterPayload, User } from "@/types/auth";
 
 const { auth } = API_CONFIG.endpoints;
 
@@ -22,5 +22,13 @@ export const authService = {
   getUser: async (): Promise<User> => {
     const { data } = await api.get<User>(auth.user);
     return data;
+  },
+
+  passwordReset: async (payload: PasswordResetPayload): Promise<void> => {
+      await api.post(auth.passwordReset, payload);
+  },
+
+  passwordResetConfirm: async (payload: PasswordResetConfirmPayload): Promise<void> => {
+      await api.post(auth.passwordResetConfirm, payload);
   },
 };

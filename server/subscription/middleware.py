@@ -7,6 +7,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 EXEMPT_PATHS = [
     '/api/accounts/login',
     '/api/accounts/register',
+    '/api/accounts/password-reset',
     '/api/accounts/refresh',
     '/api/accounts/logout',
     '/api/accounts/user',

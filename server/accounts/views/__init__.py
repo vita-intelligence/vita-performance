@@ -1,1 +1,1 @@
-from .auth import RegisterView, LoginView, LogoutView, UserView, RefreshTokenView
+from .auth import RegisterView, LoginView, LogoutView, UserView, RefreshTokenView, PasswordResetRequestView, PasswordResetConfirmView
