@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'channels',
+    'django_ratelimit',
     
     # Custom apps
     'accounts',
@@ -77,6 +78,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'subscription.middleware.SubscriptionMiddleware',
+    'core.middleware.rate_limit.RateLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'

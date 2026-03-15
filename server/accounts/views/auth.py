@@ -12,6 +12,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.core.mail import EmailMessage
 from django.contrib.auth.tokens import default_token_generator
 
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
+
 import base64
 import json
 
@@ -21,6 +24,7 @@ from ..utils import set_jwt_cookies, clear_jwt_cookies
 User = get_user_model()
 
 
+@method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -38,6 +42,7 @@ class RegisterView(APIView):
         return response
 
 
+@method_decorator(ratelimit(key='ip', rate='10/m', method='POST', block=True), name='post')
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -131,6 +136,7 @@ class RefreshTokenView(APIView):
             )
 
 
+@method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 

@@ -3,9 +3,9 @@ PLANS = {
         'name': 'Trial',
         'price_gbp': 0,
         'limits': {
-            'workers': 999,
-            'workstations': 999,
-            'session_history_days': 999,
+            'workers': 5,
+            'workstations': 2,
+            'session_history_days': 90,
         },
         'features': {
             'kiosk': True,

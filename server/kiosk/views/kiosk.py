@@ -7,6 +7,8 @@ from workstations.models import Workstation
 from workers.models import Worker
 from work_sessions.models import WorkSession
 from items.models import Item
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 
 
 def check_kiosk_access(workstation):
@@ -80,6 +82,7 @@ class KioskWorkersView(APIView):
         ])
 
 
+@method_decorator(ratelimit(key='ip', rate='10/m', method='POST', block=True), name='post')
 class KioskVerifyPinView(APIView):
     """POST /api/kiosk/<token>/verify-pin/ — verify worker PIN"""
     permission_classes = [AllowAny]

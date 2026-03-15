@@ -59,6 +59,16 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (error.response?.status === 429) {
+        addToast({
+            title: "Too many requests",
+            description: "Please slow down and try again in a moment.",
+            color: "danger",
+            timeout: 5000,
+        });
+        return Promise.reject(error);
+    }
+
     if (
       error.response?.status === 401 &&
       !original._retry &&

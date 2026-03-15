@@ -2,11 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from django.utils import timezone
 from workers.models import Worker
 from workstations.models import Workstation
 from work_sessions.models import WorkSession
 from ..models import QCToken
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 
 
 def check_qc_access(qc_token):
@@ -64,6 +65,7 @@ class QCWorkersView(APIView):
         ])
 
 
+@method_decorator(ratelimit(key='ip', rate='10/m', method='POST', block=True), name='post')
 class QCVerifyPinView(APIView):
     permission_classes = [AllowAny]
 
