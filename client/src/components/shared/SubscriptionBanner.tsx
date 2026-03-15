@@ -2,7 +2,7 @@
 
 import { useSubscription } from "@/hooks/useSubscription";
 import { useRouter } from "next/navigation";
-import { Button } from "@heroui/react";
+import Button from "@/components/ui/Button";
 
 export default function SubscriptionBanner() {
     const { subscription, isTrialing, isPastDue, isExpired, daysRemaining } = useSubscription();
@@ -10,7 +10,7 @@ export default function SubscriptionBanner() {
 
     // Don't show if active and not close to expiry
     if (!subscription) return null;
-    if (!isTrialing && !isPastDue && !isExpired) return null;
+    if (!isTrialing && !isPastDue && !isExpired && !(subscription?.is_active && daysRemaining <= 7)) return null;
     if (isTrialing && daysRemaining > 7) return null;
 
     const getBanner = () => {
@@ -24,10 +24,15 @@ export default function SubscriptionBanner() {
             className: "bg-warning/10 border-warning text-warning",
             cta: "Update Payment",
         };
-        if (isTrialing) return {
+        if (isTrialing && daysRemaining <= 7) return {
             message: `Your free trial ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}. Subscribe to keep your access.`,
             className: "bg-warning/10 border-warning text-warning",
             cta: "Subscribe",
+        };
+        if (subscription?.is_active && daysRemaining <= 7) return {
+            message: `Your subscription renews in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}. Make sure your payment is up to date.`,
+            className: "bg-warning/10 border-warning text-warning",
+            cta: "Billing",
         };
         return null;
     };

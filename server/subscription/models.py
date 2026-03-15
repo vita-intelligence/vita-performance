@@ -73,7 +73,11 @@ class Subscription(models.Model):
 
     @property
     def is_active(self):
-        return self.status == self.STATUS_ACTIVE and self.current_period_ends_at and timezone.now() < self.current_period_ends_at
+        return (
+            self.status == self.STATUS_ACTIVE and
+            self.current_period_ends_at is not None and
+            timezone.now() < self.current_period_ends_at
+        )
 
     @property
     def is_past_due(self):
@@ -81,11 +85,13 @@ class Subscription(models.Model):
 
     @property
     def is_expired(self):
-        if self.status == self.STATUS_EXPIRED:
+        if self.status in (self.STATUS_EXPIRED, self.STATUS_CANCELED):
             return True
         if self.status == self.STATUS_TRIALING and timezone.now() >= self.trial_ends_at:
             return True
         if self.status == self.STATUS_PAST_DUE and self.grace_period_ends_at and timezone.now() >= self.grace_period_ends_at:
+            return True
+        if self.status == self.STATUS_ACTIVE and self.current_period_ends_at and timezone.now() >= self.current_period_ends_at:
             return True
         return False
 

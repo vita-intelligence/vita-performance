@@ -25,5 +25,6 @@ export const useSubscription = () => {
         workstationLimit: subscription?.workstation_limit ?? null,
         plan: subscription?.plan ?? null,
         planDetails: subscription?.plan_details ?? null,
+        isActive: subscription?.is_active ?? false,
     };
 };
