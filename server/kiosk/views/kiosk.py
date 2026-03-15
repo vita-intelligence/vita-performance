@@ -10,6 +10,7 @@ from items.models import Item
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from workstations.models import SOP
+from dynamic_forms.models import DynamicForm
 
 
 def check_kiosk_access(workstation):
@@ -249,3 +250,28 @@ class KioskSOPView(APIView):
             return Response({'content': sop.content, 'updated_at': sop.updated_at.isoformat()})
         except SOP.DoesNotExist:
             return Response({'content': '', 'updated_at': None})
+        
+
+class KioskFormsView(APIView):
+    """GET /api/kiosk/<token>/forms/?trigger=start|end"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        workstation = get_workstation_by_token(token)
+        if not workstation:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+
+        trigger = request.query_params.get('trigger', 'start')
+
+        forms = DynamicForm.objects.filter(
+            user=workstation.user,
+            workstation=workstation,
+            is_active=True,
+        ).filter(
+            trigger__in=[trigger, 'both']
+        )
+
+        return Response([
+            {'id': f.id, 'name': f.name, 'schema': f.schema}
+            for f in forms
+        ])

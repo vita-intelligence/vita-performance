@@ -3,13 +3,13 @@ export const API_CONFIG = {
   wsBase: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000",
   endpoints: {
     auth: {
-        register: "/api/accounts/register",
-        login: "/api/accounts/login",
-        logout: "/api/accounts/logout",
-        refresh: "/api/accounts/refresh",
-        user: "/api/accounts/user",
-        passwordReset: "/api/accounts/password-reset/",
-        passwordResetConfirm: "/api/accounts/password-reset/confirm/",
+      register: "/api/accounts/register",
+      login: "/api/accounts/login",
+      logout: "/api/accounts/logout",
+      refresh: "/api/accounts/refresh",
+      user: "/api/accounts/user",
+      passwordReset: "/api/accounts/password-reset/",
+      passwordResetConfirm: "/api/accounts/password-reset/confirm/",
     },
     settings: {
       base: "/api/settings/",
@@ -58,6 +58,8 @@ export const API_CONFIG = {
         stop: (token: string) => `/api/kiosk/${token}/stop/`,
         searchItems: (token: string) => `/api/kiosk/${token}/items/`,
         sop: (token: string) => `/api/kiosk/${token}/sop/`,
+        forms: (token: string, trigger: string) => `/api/kiosk/${token}/forms/?trigger=${trigger}`,
+        formRespond: (token: string, formId: number) => `/api/kiosk/${token}/forms/${formId}/respond/`,
     },
     qc: {
         token: "/api/qc/token/",
@@ -69,6 +71,11 @@ export const API_CONFIG = {
     },
     subscription: {
         base: "/api/subscription/",
+    },
+    dynamicForms: {
+        base: "/api/dynamic-forms/",
+        detail: (id: number) => `/api/dynamic-forms/${id}/`,
+        sessionResponses: (sessionId: number) => `/api/dynamic-forms/sessions/${sessionId}/responses/`,
     },
   },
 } as const;

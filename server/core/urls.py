@@ -13,6 +13,7 @@ api_patterns = [
     path('kiosk/', include('kiosk.urls')),
     path('qc/', include('qc.urls')),
     path('subscription/', include('subscription.urls')),
+    path('dynamic-forms/', include('dynamic_forms.urls')),
 ]
 
 urlpatterns = [

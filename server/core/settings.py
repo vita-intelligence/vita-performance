@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'kiosk',
     'qc',
     'subscription',
+    'dynamic_forms',
 ]
 
 MIDDLEWARE = [

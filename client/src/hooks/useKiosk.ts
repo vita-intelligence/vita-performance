@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { kioskService } from "@/services/kiosk.service";
 import { KioskState, KioskWorker } from "@/types/kiosk";
+import { KioskForm } from "@/types/dynamic-form";
+import { dynamicFormService } from "@/services/dynamic-form.service";
 
 export const useKiosk = (token: string) => {
     const [state, setState] = useState<KioskState | null>(null);
@@ -9,15 +11,21 @@ export const useKiosk = (token: string) => {
     const [error, setError] = useState("");
     const [sop, setSOP] = useState<{ content: string; updated_at: string | null } | null>(null);
     const [isSOPLoading, setIsSOPLoading] = useState(false);
+    const [startForms, setStartForms] = useState<KioskForm[]>([]);
+    const [endForms, setEndForms] = useState<KioskForm[]>([]);
 
     const load = useCallback(async () => {
         try {
-            const [kioskState, kioskWorkers] = await Promise.all([
+            const [kioskState, kioskWorkers, sForms, eForms] = await Promise.all([
                 kioskService.getWorkstation(token),
                 kioskService.getWorkers(token),
+                dynamicFormService.getKioskForms(token, "start"),
+                dynamicFormService.getKioskForms(token, "end"),
             ]);
             setState(kioskState);
             setWorkers(kioskWorkers);
+            setStartForms(sForms);
+            setEndForms(eForms);
         } catch {
             setError("Invalid or expired kiosk link.");
         } finally {
@@ -29,7 +37,6 @@ export const useKiosk = (token: string) => {
         load();
     }, [load]);
 
-    // Auto fetch SOP when session is active
     useEffect(() => {
         if (state?.active_session) {
             fetchSOP();
@@ -53,6 +60,7 @@ export const useKiosk = (token: string) => {
         try {
             const session = await kioskService.startSession(token, workerIds, itemId);
             setState((prev) => prev ? { ...prev, active_session: session } : prev);
+            return session;
         } catch (e: any) {
             throw new Error(e?.response?.data?.detail || "Failed to start session.");
         }
@@ -67,6 +75,10 @@ export const useKiosk = (token: string) => {
         }
     };
 
+    const submitFormResponse = async (formId: number, sessionId: number, answers: Record<string, any>) => {
+        await dynamicFormService.submitResponse(token, formId, sessionId, answers);
+    };
+
     return {
         state,
         workers,
@@ -75,7 +87,10 @@ export const useKiosk = (token: string) => {
         sop,
         isSOPLoading,
         fetchSOP,
+        startForms,
+        endForms,
         startSession,
         stopSession,
+        submitFormResponse,
     };
 };

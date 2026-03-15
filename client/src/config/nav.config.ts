@@ -2,14 +2,15 @@ import {
   LayoutDashboard,
   Timer,
   MonitorCheck,
-  Users,
-  UsersRound,
   Settings,
   CirclePlay,
   History,
   Plus,
   Package,
   CreditCard,
+  ClipboardList,
+  User,
+  Users,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -36,17 +37,22 @@ export const NAV_ITEMS = [
   {
     label: "Workers",
     href: "/workers",
-    icon: Users,
+    icon: User,
   },
   {
     label: "Groups",
     href: "/groups",
-    icon: UsersRound,
+    icon: Users,
   },
   {
     label: "Items",
     href: "/items",
     icon: Package,
+  },
+  {
+    label: "Forms",
+    href: "/forms",
+    icon: ClipboardList,
   },
   {
     label: "Billing",
