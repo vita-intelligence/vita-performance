@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
-import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload } from "@/types/workstation";
+import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload, SOP } from "@/types/workstation";
 
 const { workstations } = API_CONFIG.endpoints;
 
@@ -27,5 +27,15 @@ export const workstationService = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(workstations.detail(id));
+  },
+
+  getSOP: async (id: number): Promise<SOP> => {
+    const { data } = await api.get<SOP>(workstations.sop(id));
+    return data;
+  },
+  
+  updateSOP: async (id: number, content: string): Promise<SOP> => {
+    const { data } = await api.put<SOP>(workstations.sop(id), { content });
+    return data;
   },
 };

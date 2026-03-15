@@ -36,3 +36,10 @@ export interface CreateWorkstationPayload {
 export interface UpdateWorkstationPayload extends Partial<CreateWorkstationPayload> {
   is_active?: boolean;
 }
+
+export interface SOP {
+    id: number;
+    content: string;
+    created_at: string;
+    updated_at: string;
+}

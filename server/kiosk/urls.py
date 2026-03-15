@@ -6,7 +6,8 @@ from kiosk.views import (
     KioskStartSessionView,
     KioskActiveSessionView,
     KioskStopSessionView,
-    KioskItemSearchView
+    KioskItemSearchView,
+    KioskSOPView
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path('<uuid:token>/active/', KioskActiveSessionView.as_view()),
     path('<uuid:token>/stop/', KioskStopSessionView.as_view()),
     path('<uuid:token>/items/', KioskItemSearchView.as_view()),
+    path('<uuid:token>/sop/', KioskSOPView.as_view()),
 ]

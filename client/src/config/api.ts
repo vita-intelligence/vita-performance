@@ -22,6 +22,7 @@ export const API_CONFIG = {
     workstations: {
       base: "/api/workstations/",
       detail: (id: number) => `/api/workstations/${id}/`,
+      sop: (id: number) => `/api/workstations/${id}/sop/`,
     },
     workers: {
       base: "/api/workers/",
@@ -56,6 +57,7 @@ export const API_CONFIG = {
         active: (token: string) => `/api/kiosk/${token}/active/`,
         stop: (token: string) => `/api/kiosk/${token}/stop/`,
         searchItems: (token: string) => `/api/kiosk/${token}/items/`,
+        sop: (token: string) => `/api/kiosk/${token}/sop/`,
     },
     qc: {
         token: "/api/qc/token/",

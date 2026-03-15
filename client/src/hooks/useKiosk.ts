@@ -7,6 +7,8 @@ export const useKiosk = (token: string) => {
     const [workers, setWorkers] = useState<KioskWorker[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
+    const [sop, setSOP] = useState<{ content: string; updated_at: string | null } | null>(null);
+    const [isSOPLoading, setIsSOPLoading] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -26,6 +28,26 @@ export const useKiosk = (token: string) => {
     useEffect(() => {
         load();
     }, [load]);
+
+    // Auto fetch SOP when session is active
+    useEffect(() => {
+        if (state?.active_session) {
+            fetchSOP();
+        }
+    }, [state?.active_session]);
+
+    const fetchSOP = useCallback(async () => {
+        if (sop !== null) return;
+        setIsSOPLoading(true);
+        try {
+            const data = await kioskService.getSOP(token);
+            setSOP(data);
+        } catch {
+            setSOP({ content: "", updated_at: null });
+        } finally {
+            setIsSOPLoading(false);
+        }
+    }, [token, sop]);
 
     const startSession = async (workerIds: number[], itemId?: number | null) => {
         try {
@@ -50,6 +72,9 @@ export const useKiosk = (token: string) => {
         workers,
         isLoading,
         error,
+        sop,
+        isSOPLoading,
+        fetchSOP,
         startSession,
         stopSession,
     };

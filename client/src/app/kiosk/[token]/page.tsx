@@ -7,7 +7,17 @@ import KioskActive from "./_components/KioskActive";
 
 export default function KioskPage() {
     const { token } = useParams<{ token: string }>();
-    const { state, workers, isLoading, error, startSession, stopSession } = useKiosk(token);
+    const {
+        state,
+        workers,
+        isLoading,
+        error,
+        sop,
+        isSOPLoading,
+        fetchSOP,
+        startSession,
+        stopSession,
+    } = useKiosk(token);
 
     if (isLoading) {
         return (
@@ -33,6 +43,10 @@ export default function KioskPage() {
                     session={state.active_session}
                     workers={workers}
                     onStop={stopSession}
+                    sop={sop}
+                    isSOPLoading={isSOPLoading}
+                    onFetchSOP={fetchSOP}
+                    workstationName={state.workstation.name}
                 />
             ) : (
                 <KioskIdle
@@ -40,6 +54,9 @@ export default function KioskPage() {
                     workstationName={state.workstation.name}
                     workers={workers}
                     onStart={startSession}
+                    sop={sop}
+                    isSOPLoading={isSOPLoading}
+                    onFetchSOP={fetchSOP}
                 />
             )}
         </div>

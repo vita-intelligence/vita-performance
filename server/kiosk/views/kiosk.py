@@ -9,6 +9,7 @@ from work_sessions.models import WorkSession
 from items.models import Item
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
+from workstations.models import SOP
 
 
 def check_kiosk_access(workstation):
@@ -233,3 +234,18 @@ class KioskItemSearchView(APIView):
         q = request.query_params.get('q', '').strip()
         items = Item.objects.filter(user=workstation.user, name__icontains=q)[:10]
         return Response([{'id': i.id, 'name': i.name} for i in items])
+    
+
+class KioskSOPView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        workstation = get_workstation_by_token(token)
+        if not workstation:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            sop = SOP.objects.get(workstation=workstation)
+            return Response({'content': sop.content, 'updated_at': sop.updated_at.isoformat()})
+        except SOP.DoesNotExist:
+            return Response({'content': '', 'updated_at': None})

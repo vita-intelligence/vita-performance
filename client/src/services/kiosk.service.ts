@@ -40,4 +40,9 @@ export const kioskService = {
         const { data } = await kioskApi.get(API_CONFIG.endpoints.kiosk.searchItems(token), { params: { q } });
         return data;
     },
+
+    getSOP: async (token: string): Promise<{ content: string; updated_at: string | null }> => {
+        const { data } = await kioskApi.get(API_CONFIG.endpoints.kiosk.sop(token));
+        return data;
+    },
 };
