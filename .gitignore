@@ -7,9 +7,11 @@
 .env
 .env.dev
 .env.prod
+.env.production
 .env.local
 .env*.local
 dump.rdb
+staticfiles/
 # ================================
 
 

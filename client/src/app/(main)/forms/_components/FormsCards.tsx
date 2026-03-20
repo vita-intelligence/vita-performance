@@ -48,7 +48,7 @@ export default function FormsCards({ forms, onEdit, onBuild }: FormsCardsProps) 
                             <div className="flex flex-col gap-1">
                                 <p className="text-xs font-semibold uppercase tracking-widest text-muted">Questions</p>
                                 <p className="text-sm text-text">
-                                    {form.schema?.pages?.[0]?.elements?.length ?? 0} fields
+                                    {Array.isArray(form.schema) ? form.schema.length : 0} fields
                                 </p>
                             </div>
                         </div>

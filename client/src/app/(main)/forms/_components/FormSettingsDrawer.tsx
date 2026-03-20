@@ -73,7 +73,7 @@ export default function FormSettingsDrawer({ form, isOpen, onClose }: FormSettin
                 trigger: data.trigger,
                 workstation: data.workstation || null,
                 is_active: data.is_active ?? true,
-                schema: form?.schema || {},
+                schema: form?.schema || [],
             };
             if (isEditing) {
                 await updateForm({ id: form.id, payload });

@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { X, Clock, List, ChevronDown, ChevronUp } from "lucide-react";
 import { SOP } from "@/types/workstation";
-import { useSettings } from "@/hooks/useSettings";
 import { formatDate } from "@/lib/utils/date.utils";
 import { marked } from "marked";
 import { useThemeStore } from "@/lib/stores";
@@ -31,7 +30,7 @@ interface Heading {
 }
 
 export default function SOPViewer({ sop, workstationName, onClose }: SOPViewerProps) {
-    const { settings } = useSettings();
+    const settings = null;
     const { theme } = useThemeStore();
     const isDark = DARK_THEMES.includes(theme);
     const panelRef = useRef<HTMLDivElement>(null);
@@ -116,7 +115,7 @@ export default function SOPViewer({ sop, workstationName, onClose }: SOPViewerPr
                             key={h.id}
                             onClick={() => handleTOCClick(h.id)}
                             className={`text-left text-sm text-muted hover:text-text transition-colors py-1 truncate ${h.level === 1 ? "font-semibold" :
-                                    h.level === 2 ? "pl-3" : "pl-6 text-xs"
+                                h.level === 2 ? "pl-3" : "pl-6 text-xs"
                                 }`}
                         >
                             {h.text}
@@ -138,7 +137,7 @@ export default function SOPViewer({ sop, workstationName, onClose }: SOPViewerPr
                                 key={h.id}
                                 onClick={() => handleTOCClick(h.id)}
                                 className={`text-left text-sm text-muted hover:text-text transition-colors py-1 truncate ${h.level === 1 ? "font-semibold" :
-                                        h.level === 2 ? "pl-3" : "pl-6 text-xs"
+                                    h.level === 2 ? "pl-3" : "pl-6 text-xs"
                                     }`}
                             >
                                 {h.text}
@@ -159,8 +158,8 @@ export default function SOPViewer({ sop, workstationName, onClose }: SOPViewerPr
                         <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-8">
                             <div
                                 className={`prose max-w-none prose-headings:font-bold prose-h1:text-2xl md:prose-h1:text-3xl prose-h2:text-xl md:prose-h2:text-2xl prose-h3:text-lg md:prose-h3:text-xl prose-table:border-collapse prose-td:border prose-td:px-3 prose-td:py-2 prose-th:border prose-th:px-3 prose-th:py-2 ${isDark
-                                        ? "prose-invert prose-td:border-gray-600 prose-th:border-gray-600 prose-th:bg-gray-800"
-                                        : "prose-td:border-gray-300 prose-th:border-gray-300 prose-th:bg-gray-50"
+                                    ? "prose-invert prose-td:border-gray-600 prose-th:border-gray-600 prose-th:bg-gray-800"
+                                    : "prose-td:border-gray-300 prose-th:border-gray-300 prose-th:bg-gray-50"
                                     }`}
                                 dangerouslySetInnerHTML={{ __html: html }}
                             />
