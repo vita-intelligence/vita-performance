@@ -8,6 +8,7 @@
 .env.dev
 .env.prod
 .env.production
+.env.deploy
 .env.local
 .env*.local
 dump.rdb
