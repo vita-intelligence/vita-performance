@@ -9,6 +9,7 @@ import {
     ChevronDown,
     Star,
     PenLine,
+    ShieldCheck,
 } from "lucide-react";
 
 interface FieldPaletteProps {
@@ -23,6 +24,7 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: React.ElementType; de
     { type: "dropdown", label: "Dropdown", icon: ChevronDown, description: "Single choice from list" },
     { type: "rating", label: "Rating", icon: Star, description: "Star rating 1 to 5" },
     { type: "signature", label: "Signature", icon: PenLine, description: "Draw signature on screen" },
+    { type: "qc_approval", label: "QC Approval", icon: ShieldCheck, description: "Requires QC person sign-off" },
 ];
 
 export default function FieldPalette({ onAdd }: FieldPaletteProps) {

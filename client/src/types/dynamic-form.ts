@@ -5,7 +5,8 @@ export type FieldType =
     | "checkbox"
     | "dropdown"
     | "rating"
-    | "signature";
+    | "signature"
+    | "qc_approval";
 
 export interface FieldOption {
     id: string;
@@ -18,8 +19,8 @@ export interface FormField {
     label: string;
     required: boolean;
     placeholder?: string;
-    options?: FieldOption[]; // for checkbox and dropdown
-    max_rating?: number; // for rating, default 5
+    options?: FieldOption[];
+    max_rating?: number;
     condition?: {
         field_id: string;
         operator: "equals" | "not_equals";

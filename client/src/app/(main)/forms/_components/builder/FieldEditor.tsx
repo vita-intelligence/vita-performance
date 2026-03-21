@@ -197,35 +197,66 @@ export default function FieldEditor({ field, allFields, onChange, onDelete }: Fi
                                         </option>
                                     ))}
                                 </select>
-                                {field.condition?.field_id && (
-                                    <>
-                                        <select
-                                            value={field.condition.operator}
-                                            onChange={(e) => updateField({
-                                                condition: {
-                                                    ...field.condition!,
-                                                    operator: e.target.value as "equals" | "not_equals",
-                                                },
-                                            })}
-                                            className="border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
-                                        >
-                                            <option value="equals">equals</option>
-                                            <option value="not_equals">not equals</option>
-                                        </select>
-                                        <input
-                                            type="text"
-                                            value={field.condition.value}
-                                            onChange={(e) => updateField({
-                                                condition: {
-                                                    ...field.condition!,
-                                                    value: e.target.value,
-                                                },
-                                            })}
-                                            placeholder="Value..."
-                                            className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
-                                        />
-                                    </>
-                                )}
+                                {field.condition?.field_id && (() => {
+                                    const condField = allFields.find((f) => f.id === field.condition?.field_id);
+                                    const valueOptions: string[] = [];
+
+                                    if (condField?.type === "yes_no") {
+                                        valueOptions.push("yes", "no");
+                                    } else if ((condField?.type === "dropdown" || condField?.type === "checkbox") && condField.options) {
+                                        condField.options.forEach((o) => {
+                                            if (o.label) valueOptions.push(o.label);
+                                        });
+                                    }
+
+                                    return (
+                                        <>
+                                            <select
+                                                value={field.condition!.operator}
+                                                onChange={(e) => updateField({
+                                                    condition: {
+                                                        ...field.condition!,
+                                                        operator: e.target.value as "equals" | "not_equals",
+                                                    },
+                                                })}
+                                                className="border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                            >
+                                                <option value="equals">equals</option>
+                                                <option value="not_equals">not equals</option>
+                                            </select>
+                                            {valueOptions.length > 0 ? (
+                                                <select
+                                                    value={field.condition!.value}
+                                                    onChange={(e) => updateField({
+                                                        condition: {
+                                                            ...field.condition!,
+                                                            value: e.target.value,
+                                                        },
+                                                    })}
+                                                    className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                                >
+                                                    <option value="">Select value...</option>
+                                                    {valueOptions.map((v) => (
+                                                        <option key={v} value={v}>{v}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={field.condition!.value}
+                                                    onChange={(e) => updateField({
+                                                        condition: {
+                                                            ...field.condition!,
+                                                            value: e.target.value,
+                                                        },
+                                                    })}
+                                                    placeholder="Value..."
+                                                    className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                                />
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                     )}

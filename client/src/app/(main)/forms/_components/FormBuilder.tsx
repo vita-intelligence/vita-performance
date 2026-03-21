@@ -72,7 +72,7 @@ export default function FormBuilder({ form, onClose }: FormBuilderProps) {
         const newField: FormField = {
             id: crypto.randomUUID(),
             type,
-            label: "",
+            label: type === "qc_approval" ? "QC Approval" : "",
             required: false,
             placeholder: "",
             options: (type === "checkbox" || type === "dropdown") ? [
@@ -172,7 +172,7 @@ export default function FormBuilder({ form, onClose }: FormBuilderProps) {
                 {/* Mobile — bottom palette */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background p-4 overflow-x-auto">
                     <div className="flex gap-2">
-                        {(["text", "number", "yes_no", "checkbox", "dropdown", "rating", "signature"] as FieldType[]).map((type) => (
+                        {(["text", "number", "yes_no", "checkbox", "dropdown", "rating", "signature", "qc_approval"] as FieldType[]).map((type) => (
                             <button
                                 key={type}
                                 onClick={() => handleAddField(type)}

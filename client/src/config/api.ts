@@ -60,6 +60,7 @@ export const API_CONFIG = {
         sop: (token: string) => `/api/kiosk/${token}/sop/`,
         forms: (token: string, trigger: string) => `/api/kiosk/${token}/forms/?trigger=${trigger}`,
         formRespond: (token: string, formId: number) => `/api/kiosk/${token}/forms/${formId}/respond/`,
+        qcWorkers: (token: string) => `/api/kiosk/${token}/qc-workers/`,
     },
     qc: {
         token: "/api/qc/token/",

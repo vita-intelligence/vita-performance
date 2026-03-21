@@ -18,6 +18,7 @@ interface KioskIdleProps {
     sop: { content: string; updated_at: string | null } | null;
     isSOPLoading: boolean;
     onFetchSOP: () => void;
+    isSubmitting?: boolean;
 }
 
 export default function KioskIdle({
@@ -28,6 +29,7 @@ export default function KioskIdle({
     sop,
     isSOPLoading,
     onFetchSOP,
+    isSubmitting,
 }: KioskIdleProps) {
     const [step, setStep] = useState<Step>("workers");
     const [checkedIn, setCheckedIn] = useState<{ id: number; name: string }[]>([]);
@@ -65,9 +67,9 @@ export default function KioskIdle({
             <>
                 <div className="flex flex-col h-full overflow-hidden">
                     {/* Header */}
-                    <div className="px-6 pt-8 pb-6 border-b border-border shrink-0">
+                    <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
-                        <h1 className="text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
+                        <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                     </div>
 
                     {/* Checked in bar */}
@@ -101,8 +103,8 @@ export default function KioskIdle({
                     )}
 
                     {/* Worker list — scrollable */}
-                    <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted mb-2">
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted mb-1">
                             Tap your name to check in
                         </p>
                         {workers.map((worker) => {
@@ -113,15 +115,15 @@ export default function KioskIdle({
                                     onPress={() => handleWorkerTap(worker)}
                                     isDisabled={isCheckedIn}
                                     variant="bordered"
-                                    className={`w-full justify-start px-6 h-16 text-lg font-black uppercase tracking-wide rounded-none border transition-colors shrink-0 ${isCheckedIn
-                                            ? "border-success bg-success/10 text-success opacity-60"
-                                            : "border-border text-text hover:border-text hover:bg-surface"
+                                    className={`w-full justify-start px-4 h-12 sm:h-16 text-base sm:text-lg font-black uppercase tracking-wide rounded-none border transition-colors shrink-0 ${isCheckedIn
+                                        ? "border-success bg-success/10 text-success opacity-60"
+                                        : "border-border text-text hover:border-text hover:bg-surface"
                                         }`}
                                 >
                                     {worker.name}
                                     {isCheckedIn && (
                                         <span className="ml-auto text-xs font-semibold uppercase tracking-widest text-success">
-                                            ✓ Ready
+                                            ✓
                                         </span>
                                     )}
                                 </Button>
@@ -130,11 +132,11 @@ export default function KioskIdle({
                     </div>
 
                     {/* Footer — always visible */}
-                    <div className="p-6 border-t border-border shrink-0">
+                    <div className="p-4 border-t border-border shrink-0">
                         <Button
                             onPress={() => setStep("item")}
                             isDisabled={checkedIn.length === 0}
-                            className="w-full h-14 bg-text text-background text-sm font-black uppercase tracking-widest hover:opacity-80 rounded-none disabled:opacity-30"
+                            className="w-full h-12 sm:h-14 bg-text text-background text-sm font-black uppercase tracking-widest hover:opacity-80 rounded-none disabled:opacity-30"
                         >
                             Continue
                         </Button>
@@ -160,9 +162,9 @@ export default function KioskIdle({
     if (step === "pin" && selectingWorker) {
         return (
             <div className="flex flex-col h-full">
-                <div className="px-6 pt-8 pb-6 border-b border-border">
+                <div className="px-4 pt-6 pb-4 border-b border-border">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
-                    <h1 className="text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
+                    <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                 </div>
                 <div className="flex-1 flex flex-col justify-center">
                     <PinPad
@@ -179,9 +181,9 @@ export default function KioskIdle({
     if (step === "item") {
         return (
             <div className="flex flex-col h-full">
-                <div className="px-6 pt-8 pb-6 border-b border-border">
+                <div className="px-4 pt-6 pb-4 border-b border-border">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
-                    <h1 className="text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
+                    <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                 </div>
                 <div className="flex-1 flex flex-col justify-center">
                     <ItemStep
@@ -200,36 +202,38 @@ export default function KioskIdle({
         return (
             <>
                 <div className="flex flex-col h-full">
-                    <div className="px-6 pt-8 pb-6 border-b border-border">
+                    <div className="px-4 pt-6 pb-4 border-b border-border">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
-                        <h1 className="text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
+                        <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
-                        <div className="flex flex-col gap-3">
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+                        <div className="flex flex-col gap-2">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workers</p>
                             {checkedIn.map((w) => (
-                                <div key={w.id} className="flex items-center gap-3 px-6 py-4 border border-success">
+                                <div key={w.id} className="flex items-center gap-3 px-4 py-3 border border-success">
                                     <div className="w-2 h-2 rounded-full bg-success" />
-                                    <span className="text-lg font-black text-success uppercase">{w.name}</span>
+                                    <span className="text-base sm:text-lg font-black text-success uppercase">{w.name}</span>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Item</p>
-                            <div className="px-6 py-4 border border-border">
-                                <span className="text-lg font-black text-text uppercase">
+                            <div className="px-4 py-3 border border-border">
+                                <span className="text-base sm:text-lg font-black text-text uppercase">
                                     {selectedItem ? selectedItem.name : <span className="text-muted font-normal text-sm">No item selected</span>}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="p-6 border-t border-border flex flex-col gap-3">
+                    <div className="p-4 border-t border-border flex flex-col gap-2">
                         <Button
                             onPress={handleStart}
-                            className="w-full h-14 bg-text text-background text-sm font-black uppercase tracking-widest hover:opacity-80 rounded-none"
+                            isDisabled={isSubmitting}
+                            isLoading={isSubmitting}
+                            className="w-full h-12 sm:h-14 bg-text text-background text-sm font-black uppercase tracking-widest hover:opacity-80 rounded-none"
                         >
                             Start Session
                         </Button>
@@ -237,15 +241,15 @@ export default function KioskIdle({
                             onPress={handleSOPPress}
                             isLoading={isSOPLoading}
                             variant="bordered"
-                            className="w-full h-12 rounded-none border-border text-muted text-xs font-semibold uppercase tracking-widest hover:border-text hover:text-text"
-                            startContent={!isSOPLoading ? <FileText size={12} /> : undefined}
+                            className="w-full h-10 sm:h-12 rounded-none border-border text-muted text-xs font-semibold uppercase tracking-widest hover:border-text hover:text-text"
+                            startContent={!isSOPLoading ? <FileText size={14} /> : undefined}
                         >
                             Read SOP
                         </Button>
                         <Button
                             onPress={() => setStep("item")}
                             variant="bordered"
-                            className="w-full h-12 rounded-none border-border text-muted text-xs font-semibold uppercase tracking-widest hover:border-text hover:text-text"
+                            className="w-full h-10 sm:h-12 rounded-none border-border text-muted text-xs font-semibold uppercase tracking-widest hover:border-text hover:text-text"
                         >
                             Back
                         </Button>

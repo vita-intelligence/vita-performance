@@ -45,4 +45,9 @@ export const kioskService = {
         const { data } = await kioskApi.get(API_CONFIG.endpoints.kiosk.sop(token));
         return data;
     },
+
+    getQCWorkers: async (token: string): Promise<KioskWorker[]> => {
+        const { data } = await kioskApi.get(kiosk.qcWorkers(token));
+        return data;
+    },
 };

@@ -9,6 +9,7 @@ import FormRenderer from "@/components/shared/FormRenderer";
 
 export default function KioskPage() {
     const { token } = useParams<{ token: string }>();
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const {
         state,
         workers,
@@ -83,26 +84,30 @@ export default function KioskPage() {
 
     // Collect answers — create session only after last form
     const handleStartFormSubmit = async (answers: Record<string, any>) => {
-        const form = startForms[currentFormIndex];
-        const newCollected = [...collectedStartAnswers, { formId: form.id, answers }];
-        setCollectedStartAnswers(newCollected);
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const form = startForms[currentFormIndex];
+            const newCollected = [...collectedStartAnswers, { formId: form.id, answers }];
+            setCollectedStartAnswers(newCollected);
 
-        if (currentFormIndex < startForms.length - 1) {
-            setCurrentFormIndex((i) => i + 1);
-        } else {
-            // All forms done — NOW create session
-            setShowingStartForms(false);
-            setCurrentFormIndex(0);
-            if (pendingStart) {
-                const session = await startSession(pendingStart.workerIds, pendingStart.itemId);
-                setCurrentSessionId(session.id);
-                // Submit all collected answers now that we have session ID
-                for (const collected of newCollected) {
-                    await submitFormResponse(collected.formId, session.id, collected.answers);
+            if (currentFormIndex < startForms.length - 1) {
+                setCurrentFormIndex((i) => i + 1);
+            } else {
+                setShowingStartForms(false);
+                setCurrentFormIndex(0);
+                if (pendingStart) {
+                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId);
+                    setCurrentSessionId(session.id);
+                    for (const collected of newCollected) {
+                        await submitFormResponse(collected.formId, session.id, collected.answers);
+                    }
+                    setPendingStart(null);
+                    setCollectedStartAnswers([]);
                 }
-                setPendingStart(null);
-                setCollectedStartAnswers([]);
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -117,23 +122,28 @@ export default function KioskPage() {
     };
 
     const handleEndFormSubmit = async (answers: Record<string, any>) => {
-        if (!currentSessionId) return;
-        const form = endForms[currentFormIndex];
-        await submitFormResponse(form.id, currentSessionId, answers);
-        if (currentFormIndex < endForms.length - 1) {
-            setCurrentFormIndex((i) => i + 1);
-        } else {
-            setShowingEndForms(false);
-            setCurrentFormIndex(0);
-            if (stopParams) {
-                await stopSession(
-                    stopParams.workerId,
-                    stopParams.pin,
-                    stopParams.quantity,
-                    stopParams.notes
-                );
-                setStopParams(null);
+        if (!currentSessionId || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const form = endForms[currentFormIndex];
+            await submitFormResponse(form.id, currentSessionId, answers);
+            if (currentFormIndex < endForms.length - 1) {
+                setCurrentFormIndex((i) => i + 1);
+            } else {
+                setShowingEndForms(false);
+                setCurrentFormIndex(0);
+                if (stopParams) {
+                    await stopSession(
+                        stopParams.workerId,
+                        stopParams.pin,
+                        stopParams.quantity,
+                        stopParams.notes
+                    );
+                    setStopParams(null);
+                }
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -149,6 +159,8 @@ export default function KioskPage() {
                         setPendingStart(null);
                         setCollectedStartAnswers([]);
                     }}
+                    isSubmitting={isSubmitting}
+                    token={token}
                 />
             )}
 
@@ -158,6 +170,8 @@ export default function KioskPage() {
                     sessionId={currentSessionId}
                     onSubmit={handleEndFormSubmit}
                     onClose={() => setShowingEndForms(false)}
+                    isSubmitting={isSubmitting}
+                    token={token}
                 />
             )}
 
@@ -171,6 +185,7 @@ export default function KioskPage() {
                     isSOPLoading={isSOPLoading}
                     onFetchSOP={fetchSOP}
                     workstationName={state.workstation.name}
+                    isSubmitting={isSubmitting}
                 />
             ) : (
                 <KioskIdle
@@ -181,6 +196,7 @@ export default function KioskPage() {
                     sop={sop}
                     isSOPLoading={isSOPLoading}
                     onFetchSOP={fetchSOP}
+                    isSubmitting={isSubmitting}
                 />
             )}
         </div>

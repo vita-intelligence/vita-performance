@@ -11,6 +11,7 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from workstations.models import SOP
 from dynamic_forms.models import DynamicForm
+from django.db.models import Q
 
 
 def check_kiosk_access(workstation):
@@ -264,14 +265,34 @@ class KioskFormsView(APIView):
         trigger = request.query_params.get('trigger', 'start')
 
         forms = DynamicForm.objects.filter(
+            Q(workstation=workstation) | Q(workstation__isnull=True),
             user=workstation.user,
-            workstation=workstation,
             is_active=True,
-        ).filter(
-            trigger__in=[trigger, 'both']
+            trigger__in=[trigger, 'both'],
         )
 
         return Response([
             {'id': f.id, 'name': f.name, 'schema': f.schema}
             for f in forms
+        ])
+
+
+class KioskQCWorkersView(APIView):
+    """GET /api/kiosk/<token>/qc-workers/ — list active QC workers"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        workstation = get_workstation_by_token(token)
+        if not workstation:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+
+        workers = Worker.objects.filter(
+            user=workstation.user,
+            is_active=True,
+            is_qa=True,
+        ).order_by('full_name')
+
+        return Response([
+            {'id': w.id, 'name': w.full_name, 'has_pin': bool(w.pin)}
+            for w in workers
         ])

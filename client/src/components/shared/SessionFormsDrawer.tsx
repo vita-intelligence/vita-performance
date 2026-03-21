@@ -39,6 +39,20 @@ function AnswerValue({ field, value }: { field: FormField; value: any }) {
         );
     }
 
+    if (field.type === "qc_approval") {
+        if (value?.approved) {
+            return (
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-success uppercase tracking-widest">
+                        ✓ Approved
+                    </span>
+                    <span className="text-sm text-text">by {value.worker_name}</span>
+                </div>
+            );
+        }
+        return <span className="text-muted text-sm">Not approved</span>;
+    }
+
     if (field.type === "yes_no") {
         return (
             <span className={`text-sm font-semibold uppercase tracking-widest ${value === "yes" ? "text-success" : "text-error"

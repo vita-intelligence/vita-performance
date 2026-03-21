@@ -2,4 +2,4 @@ from .kiosk import ( KioskWorkstationView, KioskWorkersView,
                     KioskVerifyPinView, KioskStartSessionView, 
                     KioskActiveSessionView, KioskStopSessionView, 
                     KioskItemSearchView, KioskSOPView, 
-                    KioskFormsView )
+                    KioskFormsView, KioskQCWorkersView )

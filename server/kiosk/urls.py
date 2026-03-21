@@ -8,7 +8,8 @@ from kiosk.views import (
     KioskStopSessionView,
     KioskItemSearchView,
     KioskSOPView,
-    KioskFormsView
+    KioskFormsView,
+    KioskQCWorkersView
 )
 from dynamic_forms.views import FormResponseCreateView
 
@@ -23,4 +24,5 @@ urlpatterns = [
     path('<uuid:token>/sop/', KioskSOPView.as_view()),
     path('<uuid:token>/forms/<int:form_id>/respond/', FormResponseCreateView.as_view()),
     path('<uuid:token>/forms/', KioskFormsView.as_view()),
+    path('<str:token>/qc-workers/', KioskQCWorkersView.as_view()),
 ]

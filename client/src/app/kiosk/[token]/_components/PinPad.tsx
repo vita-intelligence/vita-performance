@@ -45,18 +45,17 @@ export default function PinPad({ token, worker, onSuccess, onCancel }: PinPadPro
     const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "DEL"];
 
     return (
-        <div className="flex flex-col h-full px-6 py-8 gap-8 max-w-sm mx-auto w-full">
+        <div className="flex flex-col h-full px-4 py-4 sm:py-8 gap-4 sm:gap-8 max-w-sm mx-auto w-full">
             <div className="flex flex-col gap-1">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted">Enter PIN for</p>
-                <p className="text-3xl font-black text-text uppercase">{worker.name}</p>
+                <p className="text-xl sm:text-3xl font-black text-text uppercase">{worker.name}</p>
             </div>
 
-            {/* Dots */}
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-4 sm:gap-6">
                 {[0, 1, 2, 3].map((i) => (
                     <div
                         key={i}
-                        className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${i < pin.length ? "bg-text border-text scale-110" : "bg-background border-border"
+                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 transition-all duration-150 ${i < pin.length ? "bg-text border-text scale-110" : "bg-background border-border"
                             }`}
                     />
                 ))}
@@ -66,16 +65,15 @@ export default function PinPad({ token, worker, onSuccess, onCancel }: PinPadPro
                 <p className="text-sm text-error font-semibold uppercase tracking-widest text-center">{error}</p>
             )}
 
-            {/* Numpad */}
-            <div className="grid grid-cols-3 gap-3 flex-1">
+            <div className="grid grid-cols-3 gap-2 flex-1">
                 {keys.map((key, i) => (
                     <Button
                         key={i}
                         onPress={() => key && handleKey(key)}
                         isDisabled={isLoading || !key || pin.length === 4}
                         variant="bordered"
-                        className={`h-16 text-2xl font-black rounded-none transition-colors ${key === "DEL"
-                            ? "border-border text-error hover:bg-error hover:text-background text-base"
+                        className={`h-12 sm:h-16 text-xl sm:text-2xl font-black rounded-none transition-colors ${key === "DEL"
+                            ? "border-border text-error hover:bg-error hover:text-background text-sm sm:text-base"
                             : key
                                 ? "border-border text-text hover:bg-surface"
                                 : "border-transparent pointer-events-none opacity-0"
