@@ -3,6 +3,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from datetime import datetime
 from workstations.models import Workstation
 from workers.models import Worker
 from work_sessions.models import WorkSession
@@ -19,6 +20,21 @@ def check_kiosk_access(workstation):
         return workstation.user.subscription.has_kiosk
     except Exception:
         return False
+
+def parse_requested_at(value):
+    """Parse an optional ISO timestamp from the client, falling back to now()."""
+    if not value:
+        return timezone.now()
+    try:
+        dt = datetime.fromisoformat(value)
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt)
+        if dt > timezone.now():
+            return timezone.now()
+        return dt
+    except (ValueError, TypeError):
+        return timezone.now()
+
 
 def get_workstation_by_token(token):
     try:
@@ -136,7 +152,7 @@ class KioskStartSessionView(APIView):
             workstation=workstation,
             item_id=item_id,
             status='active',
-            start_time=timezone.now(),
+            start_time=parse_requested_at(request.data.get('requested_at')),
         )
         session.workers.set(worker_ids)
 
@@ -214,7 +230,7 @@ class KioskStopSessionView(APIView):
         if not session.workers.filter(pk=worker_id).exists():
             return Response({'detail': 'You are not part of this session.'}, status=status.HTTP_403_FORBIDDEN)
 
-        session.end_time = timezone.now()
+        session.end_time = parse_requested_at(request.data.get('requested_at'))
         session.status = 'completed'
         session.quantity_produced = quantity
         if notes:

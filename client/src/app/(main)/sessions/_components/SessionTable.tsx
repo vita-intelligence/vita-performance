@@ -22,8 +22,8 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
 
     return (
         <>
-            <div className="hidden md:block border border-border overflow-hidden">
-                <table className="w-full text-sm">
+            <div className="hidden md:block border border-border overflow-x-auto">
+                <table className="w-full text-sm min-w-[900px]">
                     <thead>
                         <tr className="border-b border-border bg-surface">
                             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Worker</th>
@@ -46,21 +46,21 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                 <td className="px-4 py-3">
                                     <WorkerTags workers={session.workers ?? []} />
                                 </td>
-                                <td className="px-4 py-3 text-muted">{session.workstation_name}</td>
-                                <td className="px-4 py-3 text-muted">{session.item_name || "—"}</td>
-                                <td className="px-4 py-3 text-text">
+                                <td className="px-4 py-3 text-muted whitespace-nowrap">{session.workstation_name}</td>
+                                <td className="px-4 py-3 text-muted whitespace-nowrap">{session.item_name || "—"}</td>
+                                <td className="px-4 py-3 text-text whitespace-nowrap">
                                     {session.duration_hours ? `${session.duration_hours}h` : "—"}
                                 </td>
                                 <td className="px-4 py-3">
                                     <div className="flex flex-col gap-0.5">
-                                        <span className="text-text">
+                                        <span className="text-text whitespace-nowrap">
                                             {session.quantity_produced
                                                 ? formatNumber(Number(session.quantity_produced), settings)
                                                 : "—"
                                             }
                                         </span>
                                         {session.quantity_rejected !== null && session.quantity_rejected !== undefined && (
-                                            <span className="text-xs text-error">
+                                            <span className="text-xs text-error whitespace-nowrap">
                                                 -{formatNumber(Number(session.quantity_rejected), settings)} rejected
                                             </span>
                                         )}
@@ -78,11 +78,11 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                         </span>
                                     ) : "—"}
                                 </td>
-                                <td className="px-4 py-3 text-muted">
+                                <td className="px-4 py-3 text-muted whitespace-nowrap">
                                     {formatDateTime(session.start_time, settings)}
                                 </td>
                                 <td className="px-4 py-3">
-                                    <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
+                                    <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border whitespace-nowrap ${session.status === "verified"
                                         ? "border-success text-success"
                                         : "border-warning text-warning"
                                         }`}>
@@ -90,7 +90,7 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 whitespace-nowrap">
                                         <button
                                             onClick={() => setFormsSessionId(session.id)}
                                             className="text-muted hover:text-text transition-colors"

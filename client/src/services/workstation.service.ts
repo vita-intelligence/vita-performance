@@ -1,12 +1,22 @@
 import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
 import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload, SOP } from "@/types/workstation";
+import { PaginatedResponse } from "@/types/api";
 
 const { workstations } = API_CONFIG.endpoints;
 
 export const workstationService = {
   getAll: async (): Promise<Workstation[]> => {
-    const { data } = await api.get<Workstation[]>(workstations.base);
+    const { data } = await api.get<Workstation[]>(workstations.base, {
+      params: { all: 'true' },
+    });
+    return data;
+  },
+
+  getPaginated: async (page: number = 1): Promise<PaginatedResponse<Workstation>> => {
+    const { data } = await api.get<PaginatedResponse<Workstation>>(workstations.base, {
+      params: { page },
+    });
     return data;
   },
 

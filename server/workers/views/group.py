@@ -1,24 +1,26 @@
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ..models import WorkerGroup
 from ..serializers import WorkerGroupSerializer
 
 
-class WorkerGroupListView(APIView):
+class WorkerGroupListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = WorkerGroupSerializer
 
-    def get(self, request):
-        groups = WorkerGroup.objects.filter(user=request.user)
-        serializer = WorkerGroupSerializer(groups, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return WorkerGroup.objects.filter(user=self.request.user)
 
-    def post(self, request):
-        serializer = WorkerGroupSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class WorkerGroupDetailView(APIView):

@@ -6,9 +6,11 @@ import { PaginatedResponse } from "@/types/api";
 const { items } = API_CONFIG.endpoints;
 
 export const itemService = {
-    getAll: async (): Promise<Item[]> => {
-        const { data } = await api.get<PaginatedResponse<Item>>(items.base);
-        return data.results;
+    getAll: async (page: number = 1, search?: string): Promise<PaginatedResponse<Item>> => {
+        const { data } = await api.get<PaginatedResponse<Item>>(items.base, {
+            params: { page, ...(search ? { search } : {}) },
+        });
+        return data;
     },
 
     search: async (q: string): Promise<Item[]> => {

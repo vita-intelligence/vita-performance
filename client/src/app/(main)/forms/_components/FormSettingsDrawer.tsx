@@ -35,6 +35,12 @@ export default function FormSettingsDrawer({ form, isOpen, onClose }: FormSettin
 
     const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
+        defaultValues: {
+            name: "",
+            trigger: "start",
+            workstation: null,
+            is_active: true,
+        },
     });
 
     useEffect(() => {

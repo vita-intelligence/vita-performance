@@ -1,5 +1,6 @@
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ..models import Worker
@@ -54,19 +55,20 @@ class WorkerLeaderboardView(APIView):
         })
 
 
-class WorkerListView(APIView):
+class WorkerListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated, WithinWorkerLimit]
+    serializer_class = WorkerSerializer
 
-    def get(self, request):
-        workers = Worker.objects.filter(user=request.user)
-        serializer = WorkerSerializer(workers, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return Worker.objects.filter(user=self.request.user)
 
-    def post(self, request):
-        serializer = WorkerSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class WorkerDetailView(APIView):

@@ -24,16 +24,16 @@ export const kioskService = {
         const { data } = await kioskApi.post(kiosk.verifyPin(token), { worker_id, pin });
         return data;
     },
-    startSession: async (token: string, worker_ids: number[], item_id?: number | null): Promise<KioskActiveSession> => {
-        const { data } = await kioskApi.post(kiosk.start(token), { worker_ids, item_id });
+    startSession: async (token: string, worker_ids: number[], item_id?: number | null, requested_at?: string): Promise<KioskActiveSession> => {
+        const { data } = await kioskApi.post(kiosk.start(token), { worker_ids, item_id, requested_at });
         return data;
     },
     getActiveSession: async (token: string): Promise<KioskActiveSession | null> => {
         const { data } = await kioskApi.get(kiosk.active(token));
         return data;
     },
-    stopSession: async (token: string, worker_id: number, pin: string, quantity_produced: number, notes?: string): Promise<void> => {
-        await kioskApi.post(kiosk.stop(token), { worker_id, pin, quantity_produced, notes });
+    stopSession: async (token: string, worker_id: number, pin: string, quantity_produced: number, notes?: string, requested_at?: string): Promise<void> => {
+        await kioskApi.post(kiosk.stop(token), { worker_id, pin, quantity_produced, notes, requested_at });
     },
 
     searchItems: async (token: string, q: string): Promise<KioskItem[]> => {

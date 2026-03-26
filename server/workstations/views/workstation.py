@@ -1,5 +1,6 @@
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ..models import Workstation
@@ -7,19 +8,20 @@ from ..serializers import WorkstationSerializer
 from subscription.permissions import WithinWorkstationLimit
 
 
-class WorkstationListView(APIView):
+class WorkstationListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated, WithinWorkstationLimit]
+    serializer_class = WorkstationSerializer
 
-    def get(self, request):
-        workstations = Workstation.objects.filter(user=request.user)
-        serializer = WorkstationSerializer(workstations, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return Workstation.objects.filter(user=self.request.user)
 
-    def post(self, request):
-        serializer = WorkstationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class WorkstationDetailView(APIView):

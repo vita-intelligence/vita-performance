@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkstations } from "@/hooks/useWorkstations";
 import { Workstation } from "@/types/workstation";
 import WorkstationTable from "./_components/WorkstationTable";
@@ -10,9 +10,33 @@ import Drawer from "@/components/ui/Drawer";
 import WorkstationsHeader from "./_components/WorkstationHeader";
 
 export default function WorkstationsPage() {
-    const { workstations, isLoading } = useWorkstations();
+    const {
+        paginatedWorkstations,
+        isPaginatedLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useWorkstations();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | undefined>(undefined);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!hasNextPage) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1 }
+        );
+
+        const el = loadMoreRef.current;
+        if (el) observer.observe(el);
+        return () => { if (el) observer.unobserve(el); };
+    }, [fetchNextPage, hasNextPage]);
 
     const handleAdd = () => {
         setSelectedWorkstation(undefined);
@@ -34,11 +58,11 @@ export default function WorkstationsPage() {
             <div className="max-w-6xl mx-auto flex flex-col gap-10">
                 <WorkstationsHeader onAdd={handleAdd} />
 
-                {isLoading ? (
+                {isPaginatedLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <p className="text-muted text-sm uppercase tracking-widest">Loading...</p>
                     </div>
-                ) : !workstations?.length ? (
+                ) : !paginatedWorkstations.length ? (
                     <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border gap-4">
                         <p className="text-muted text-sm uppercase tracking-widest">No workstations yet</p>
                         <button
@@ -50,8 +74,14 @@ export default function WorkstationsPage() {
                     </div>
                 ) : (
                     <>
-                        <WorkstationTable workstations={workstations} onEdit={handleEdit} />
-                        <WorkstationCards workstations={workstations} onEdit={handleEdit} />
+                        <WorkstationTable workstations={paginatedWorkstations} onEdit={handleEdit} />
+                        <WorkstationCards workstations={paginatedWorkstations} onEdit={handleEdit} />
+
+                        <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                            {isFetchingNextPage && (
+                                <p className="text-muted text-xs uppercase tracking-widest">Loading more...</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>

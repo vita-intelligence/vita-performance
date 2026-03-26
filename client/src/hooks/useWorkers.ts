@@ -1,12 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { workerService } from "@/services/worker.service";
 import {
+  Worker,
+  WorkerGroup,
   CreateWorkerPayload,
   UpdateWorkerPayload,
   CreateWorkerGroupPayload,
   UpdateWorkerGroupPayload,
 } from "@/types/worker";
+import { PaginatedResponse } from "@/types/api";
 import { getErrorMessage } from "@/lib/utils";
 
 const WORKERS_KEY = ["workers"];
@@ -15,17 +18,61 @@ const GROUPS_KEY = ["workers", "groups"];
 export const useWorkers = () => {
   const queryClient = useQueryClient();
 
+  // Unpaginated — for dropdowns
   const { data: workers, isLoading: isWorkersLoading } = useQuery({
     queryKey: WORKERS_KEY,
     queryFn: workerService.getAll,
     retry: false,
   });
 
+  // Paginated — for list page
+  const {
+    data: paginatedWorkersData,
+    isLoading: isPaginatedWorkersLoading,
+    fetchNextPage: fetchNextWorkersPage,
+    hasNextPage: hasNextWorkersPage,
+    isFetchingNextPage: isFetchingNextWorkersPage,
+  } = useInfiniteQuery({
+    queryKey: [...WORKERS_KEY, "paginated"],
+    queryFn: ({ pageParam = 1 }) => workerService.getPaginated(pageParam),
+    getNextPageParam: (lastPage: PaginatedResponse<Worker>) => {
+      if (!lastPage.next) return undefined;
+      const url = new URL(lastPage.next);
+      return Number(url.searchParams.get("page"));
+    },
+    initialPageParam: 1,
+    retry: false,
+  });
+
+  const paginatedWorkers = paginatedWorkersData?.pages.flatMap((page) => page?.results ?? []) ?? [];
+
+  // Unpaginated groups — for dropdowns
   const { data: groups, isLoading: isGroupsLoading } = useQuery({
     queryKey: GROUPS_KEY,
     queryFn: workerService.getAllGroups,
     retry: false,
   });
+
+  // Paginated groups — for list page
+  const {
+    data: paginatedGroupsData,
+    isLoading: isPaginatedGroupsLoading,
+    fetchNextPage: fetchNextGroupsPage,
+    hasNextPage: hasNextGroupsPage,
+    isFetchingNextPage: isFetchingNextGroupsPage,
+  } = useInfiniteQuery({
+    queryKey: [...GROUPS_KEY, "paginated"],
+    queryFn: ({ pageParam = 1 }) => workerService.getPaginatedGroups(pageParam),
+    getNextPageParam: (lastPage: PaginatedResponse<WorkerGroup>) => {
+      if (!lastPage.next) return undefined;
+      const url = new URL(lastPage.next);
+      return Number(url.searchParams.get("page"));
+    },
+    initialPageParam: 1,
+    retry: false,
+  });
+
+  const paginatedGroups = paginatedGroupsData?.pages.flatMap((page) => page?.results ?? []) ?? [];
 
   const createWorkerMutation = useMutation({
     mutationFn: (payload: CreateWorkerPayload) => workerService.create(payload),
@@ -130,6 +177,16 @@ export const useWorkers = () => {
     groups,
     isWorkersLoading,
     isGroupsLoading,
+    paginatedWorkers,
+    isPaginatedWorkersLoading,
+    fetchNextWorkersPage,
+    hasNextWorkersPage,
+    isFetchingNextWorkersPage,
+    paginatedGroups,
+    isPaginatedGroupsLoading,
+    fetchNextGroupsPage,
+    hasNextGroupsPage,
+    isFetchingNextGroupsPage,
     createWorker: createWorkerMutation.mutateAsync,
     updateWorker: updateWorkerMutation.mutateAsync,
     deleteWorker: deleteWorkerMutation.mutateAsync,

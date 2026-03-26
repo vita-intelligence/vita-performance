@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -6,19 +7,20 @@ from ..models import DynamicForm
 from ..serializers import DynamicFormSerializer
 
 
-class DynamicFormListView(APIView):
+class DynamicFormListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = DynamicFormSerializer
 
-    def get(self, request):
-        forms = DynamicForm.objects.filter(user=request.user)
-        serializer = DynamicFormSerializer(forms, many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return DynamicForm.objects.filter(user=self.request.user)
 
-    def post(self, request):
-        serializer = DynamicFormSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class DynamicFormDetailView(APIView):

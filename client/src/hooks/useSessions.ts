@@ -14,7 +14,7 @@ import { getErrorMessage } from "@/lib/utils";
 const SESSIONS_KEY = ["sessions"];
 const ACTIVE_SESSIONS_KEY = ["sessions", "active"];
 
-export const useSessions = () => {
+export const useSessions = (search?: string, statusFilter?: string) => {
   const queryClient = useQueryClient();
 
   const {
@@ -24,8 +24,8 @@ export const useSessions = () => {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: SESSIONS_KEY,
-    queryFn: ({ pageParam = 1 }) => sessionService.getAll(pageParam),
+    queryKey: [...SESSIONS_KEY, { search, status: statusFilter }],
+    queryFn: ({ pageParam = 1 }) => sessionService.getAll(pageParam, search, statusFilter),
     getNextPageParam: (lastPage: PaginatedResponse<WorkSession>) => {
       if (!lastPage.next) return undefined;
       const url = new URL(lastPage.next);

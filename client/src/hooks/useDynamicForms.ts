@@ -1,7 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { dynamicFormService } from "@/services/dynamic-form.service";
-import { CreateFormPayload, UpdateFormPayload } from "@/types/dynamic-form";
+import { DynamicForm, CreateFormPayload, UpdateFormPayload } from "@/types/dynamic-form";
+import { PaginatedResponse } from "@/types/api";
 import { getErrorMessage } from "@/lib/utils";
 
 const FORMS_KEY = ["dynamic-forms"];
@@ -13,6 +14,27 @@ export const useDynamicForms = () => {
         queryKey: FORMS_KEY,
         queryFn: dynamicFormService.getAll,
     });
+
+    // Paginated — for list page
+    const {
+        data: paginatedData,
+        isLoading: isPaginatedLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteQuery({
+        queryKey: [...FORMS_KEY, "paginated"],
+        queryFn: ({ pageParam = 1 }) => dynamicFormService.getPaginated(pageParam),
+        getNextPageParam: (lastPage: PaginatedResponse<DynamicForm>) => {
+            if (!lastPage.next) return undefined;
+            const url = new URL(lastPage.next);
+            return Number(url.searchParams.get("page"));
+        },
+        initialPageParam: 1,
+        retry: false,
+    });
+
+    const paginatedForms = paginatedData?.pages.flatMap((page) => page?.results ?? []) ?? [];
 
     const createMutation = useMutation({
         mutationFn: (payload: CreateFormPayload) => dynamicFormService.create(payload),
@@ -66,6 +88,11 @@ export const useDynamicForms = () => {
     return {
         forms,
         isLoading,
+        paginatedForms,
+        isPaginatedLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
         createForm: createMutation.mutateAsync,
         updateForm: updateMutation.mutateAsync,
         deleteForm: deleteMutation.mutateAsync,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDynamicForms } from "@/hooks/useDynamicForms";
 import { DynamicForm } from "@/types/dynamic-form";
 import FormsHeader from "./_components/FormsHeader";
@@ -10,10 +10,34 @@ import FormSettingsDrawer from "./_components/FormSettingsDrawer";
 import FormBuilder from "./_components/FormBuilder";
 
 export default function FormsPage() {
-    const { forms, isLoading } = useDynamicForms();
+    const {
+        paginatedForms,
+        isPaginatedLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useDynamicForms();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedForm, setSelectedForm] = useState<DynamicForm | undefined>(undefined);
     const [buildingForm, setBuildingForm] = useState<DynamicForm | null>(null);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!hasNextPage) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1 }
+        );
+
+        const el = loadMoreRef.current;
+        if (el) observer.observe(el);
+        return () => { if (el) observer.unobserve(el); };
+    }, [fetchNextPage, hasNextPage]);
 
     const handleAdd = () => {
         setSelectedForm(undefined);
@@ -43,11 +67,11 @@ export default function FormsPage() {
             <div className="max-w-6xl mx-auto flex flex-col gap-10">
                 <FormsHeader onAdd={handleAdd} />
 
-                {isLoading ? (
+                {isPaginatedLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <p className="text-muted text-sm uppercase tracking-widest">Loading...</p>
                     </div>
-                ) : !forms?.length ? (
+                ) : !paginatedForms.length ? (
                     <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border gap-4">
                         <p className="text-muted text-sm uppercase tracking-widest">No forms yet</p>
                         <button
@@ -60,15 +84,21 @@ export default function FormsPage() {
                 ) : (
                     <>
                         <FormsTable
-                            forms={forms}
+                            forms={paginatedForms}
                             onEdit={handleEdit}
                             onBuild={handleBuild}
                         />
                         <FormsCards
-                            forms={forms}
+                            forms={paginatedForms}
                             onEdit={handleEdit}
                             onBuild={handleBuild}
                         />
+
+                        <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                            {isFetchingNextPage && (
+                                <p className="text-muted text-xs uppercase tracking-widest">Loading more...</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>

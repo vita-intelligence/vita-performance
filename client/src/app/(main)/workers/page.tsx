@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkers } from "@/hooks/useWorkers";
 import { Worker } from "@/types/worker";
 import WorkersHeader from "./_components/WorkersHeader";
@@ -11,9 +11,33 @@ import Drawer from "@/components/ui/Drawer";
 import QCLinkCard from "@/components/shared/QCLinkCard";
 
 export default function WorkersPage() {
-    const { workers, isWorkersLoading } = useWorkers();
+    const {
+        paginatedWorkers,
+        isPaginatedWorkersLoading,
+        fetchNextWorkersPage,
+        hasNextWorkersPage,
+        isFetchingNextWorkersPage,
+    } = useWorkers();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedWorker, setSelectedWorker] = useState<Worker | undefined>(undefined);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!hasNextWorkersPage) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextWorkersPage();
+                }
+            },
+            { threshold: 1 }
+        );
+
+        const el = loadMoreRef.current;
+        if (el) observer.observe(el);
+        return () => { if (el) observer.unobserve(el); };
+    }, [fetchNextWorkersPage, hasNextWorkersPage]);
 
     const handleAdd = () => {
         setSelectedWorker(undefined);
@@ -36,11 +60,11 @@ export default function WorkersPage() {
                 <WorkersHeader onAdd={handleAdd} />
                 <QCLinkCard />
 
-                {isWorkersLoading ? (
+                {isPaginatedWorkersLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <p className="text-muted text-sm uppercase tracking-widest">Loading...</p>
                     </div>
-                ) : !workers?.length ? (
+                ) : !paginatedWorkers.length ? (
                     <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border gap-4">
                         <p className="text-muted text-sm uppercase tracking-widest">No workers yet</p>
                         <button
@@ -52,8 +76,14 @@ export default function WorkersPage() {
                     </div>
                 ) : (
                     <>
-                        <WorkerTable workers={workers} onEdit={handleEdit} />
-                        <WorkerCards workers={workers} onEdit={handleEdit} />
+                        <WorkerTable workers={paginatedWorkers} onEdit={handleEdit} />
+                        <WorkerCards workers={paginatedWorkers} onEdit={handleEdit} />
+
+                        <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                            {isFetchingNextWorkersPage && (
+                                <p className="text-muted text-xs uppercase tracking-widest">Loading more...</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>

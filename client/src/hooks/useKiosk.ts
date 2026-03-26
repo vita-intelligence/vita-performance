@@ -56,9 +56,9 @@ export const useKiosk = (token: string) => {
         }
     }, [token, sop]);
 
-    const startSession = async (workerIds: number[], itemId?: number | null) => {
+    const startSession = async (workerIds: number[], itemId?: number | null, requestedAt?: string) => {
         try {
-            const session = await kioskService.startSession(token, workerIds, itemId);
+            const session = await kioskService.startSession(token, workerIds, itemId, requestedAt);
             setState((prev) => prev ? { ...prev, active_session: session } : prev);
             return session;
         } catch (e: any) {
@@ -66,9 +66,9 @@ export const useKiosk = (token: string) => {
         }
     };
 
-    const stopSession = async (workerId: number, pin: string, quantity: number, notes: string) => {
+    const stopSession = async (workerId: number, pin: string, quantity: number, notes: string, requestedAt?: string) => {
         try {
-            await kioskService.stopSession(token, workerId, pin, quantity, notes);
+            await kioskService.stopSession(token, workerId, pin, quantity, notes, requestedAt);
             setState((prev) => prev ? { ...prev, active_session: null } : prev);
         } catch (e: any) {
             throw new Error(e?.response?.data?.detail || "Failed to stop session.");

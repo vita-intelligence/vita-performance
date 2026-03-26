@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import { FileText } from "lucide-react";
 import { KioskActiveSession, KioskWorker } from "@/types/kiosk";
@@ -32,7 +32,6 @@ export default function KioskActive({
     workstationName,
     isSubmitting,
 }: KioskActiveProps) {
-    const [elapsed, setElapsed] = useState("");
     const [stopping, setStopping] = useState(false);
     const [stopStep, setStopStep] = useState<StopStep>("confirm");
     const [selectedWorker, setSelectedWorker] = useState<KioskWorker | null>(null);
@@ -40,19 +39,6 @@ export default function KioskActive({
     const [quantity, setQuantity] = useState("");
     const [notes, setNotes] = useState("");
     const [showSOP, setShowSOP] = useState(false);
-
-    useEffect(() => {
-        const calc = () => {
-            const diff = Math.floor((Date.now() - new Date(session.start_time).getTime()) / 1000);
-            const h = Math.floor(diff / 3600);
-            const m = Math.floor((diff % 3600) / 60);
-            const s = diff % 60;
-            setElapsed(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
-        };
-        calc();
-        const interval = setInterval(calc, 1000);
-        return () => clearInterval(interval);
-    }, [session.start_time]);
 
     const sessionWorkers = workers.filter((w) => session.workers.find((sw) => sw.id === w.id));
 
@@ -90,7 +76,7 @@ export default function KioskActive({
                             <p className="text-xs font-semibold uppercase tracking-widest text-success">Session Active</p>
                         </div>
 
-                        <p className="font-mono text-5xl sm:text-7xl md:text-8xl font-black text-text tracking-widest">{elapsed}</p>
+                        <p className="text-3xl sm:text-5xl font-black text-text uppercase tracking-tight">{workstationName}</p>
 
                         {session.item_name && (
                             <div className="flex flex-col items-center gap-1">

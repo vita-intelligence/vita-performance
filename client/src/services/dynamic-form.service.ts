@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import axios from "axios";
 import { API_CONFIG } from "@/config/api";
 import { DynamicForm, KioskForm, FormResponse, CreateFormPayload, UpdateFormPayload } from "@/types/dynamic-form";
+import { PaginatedResponse } from "@/types/api";
 
 const { dynamicForms, kiosk } = API_CONFIG.endpoints;
 
@@ -12,7 +13,16 @@ const kioskApi = axios.create({
 
 export const dynamicFormService = {
     getAll: async (): Promise<DynamicForm[]> => {
-        const { data } = await api.get<DynamicForm[]>(dynamicForms.base);
+        const { data } = await api.get<DynamicForm[]>(dynamicForms.base, {
+            params: { all: 'true' },
+        });
+        return data;
+    },
+
+    getPaginated: async (page: number = 1): Promise<PaginatedResponse<DynamicForm>> => {
+        const { data } = await api.get<PaginatedResponse<DynamicForm>>(dynamicForms.base, {
+            params: { page },
+        });
         return data;
     },
 

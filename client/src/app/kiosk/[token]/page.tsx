@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { addToast } from "@heroui/react";
 import { useKiosk } from "@/hooks/useKiosk";
 import KioskIdle from "./_components/KioskIdle";
 import KioskActive from "./_components/KioskActive";
@@ -46,6 +47,8 @@ export default function KioskPage() {
     } | null>(null);
     // Collect all start form answers before session is created
     const [collectedStartAnswers, setCollectedStartAnswers] = useState<StartFormAnswer[]>([]);
+    // Capture the real start/stop timestamp before forms are shown
+    const [requestedAt, setRequestedAt] = useState<string | null>(null);
 
     useEffect(() => {
         if (state?.active_session) {
@@ -72,13 +75,21 @@ export default function KioskPage() {
     // Show forms BEFORE creating session
     const handleStart = async (workerIds: number[], itemId?: number | null) => {
         if (startForms.length > 0) {
+            setRequestedAt(new Date().toISOString());
             setPendingStart({ workerIds, itemId });
             setCollectedStartAnswers([]);
             setCurrentFormIndex(0);
             setShowingStartForms(true);
         } else {
-            const session = await startSession(workerIds, itemId);
-            setCurrentSessionId(session.id);
+            setIsSubmitting(true);
+            try {
+                const session = await startSession(workerIds, itemId);
+                setCurrentSessionId(session.id);
+            } catch {
+                addToast({ title: "Failed to start session", description: "Please try again.", color: "danger", timeout: 4000 });
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -97,15 +108,18 @@ export default function KioskPage() {
                 setShowingStartForms(false);
                 setCurrentFormIndex(0);
                 if (pendingStart) {
-                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId);
+                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId, requestedAt ?? undefined);
                     setCurrentSessionId(session.id);
                     for (const collected of newCollected) {
                         await submitFormResponse(collected.formId, session.id, collected.answers);
                     }
                     setPendingStart(null);
                     setCollectedStartAnswers([]);
+                    setRequestedAt(null);
                 }
             }
+        } catch {
+            addToast({ title: "Failed to submit form", description: "Please try again.", color: "danger", timeout: 4000 });
         } finally {
             setIsSubmitting(false);
         }
@@ -113,11 +127,19 @@ export default function KioskPage() {
 
     const handleStop = async (workerId: number, pin: string, quantity: number, notes: string) => {
         if (endForms.length > 0 && currentSessionId) {
+            setRequestedAt(new Date().toISOString());
             setStopParams({ workerId, pin, quantity, notes });
             setCurrentFormIndex(0);
             setShowingEndForms(true);
         } else {
-            await stopSession(workerId, pin, quantity, notes);
+            setIsSubmitting(true);
+            try {
+                await stopSession(workerId, pin, quantity, notes);
+            } catch {
+                addToast({ title: "Failed to stop session", description: "Please try again.", color: "danger", timeout: 4000 });
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -137,11 +159,15 @@ export default function KioskPage() {
                         stopParams.workerId,
                         stopParams.pin,
                         stopParams.quantity,
-                        stopParams.notes
+                        stopParams.notes,
+                        requestedAt ?? undefined
                     );
                     setStopParams(null);
+                    setRequestedAt(null);
                 }
             }
+        } catch {
+            addToast({ title: "Failed to submit form", description: "Please try again.", color: "danger", timeout: 4000 });
         } finally {
             setIsSubmitting(false);
         }
@@ -158,6 +184,7 @@ export default function KioskPage() {
                         setShowingStartForms(false);
                         setPendingStart(null);
                         setCollectedStartAnswers([]);
+                        setRequestedAt(null);
                     }}
                     isSubmitting={isSubmitting}
                     token={token}
@@ -169,7 +196,7 @@ export default function KioskPage() {
                     form={endForms[currentFormIndex]}
                     sessionId={currentSessionId}
                     onSubmit={handleEndFormSubmit}
-                    onClose={() => setShowingEndForms(false)}
+                    onClose={() => { setShowingEndForms(false); setRequestedAt(null); }}
                     isSubmitting={isSubmitting}
                     token={token}
                 />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkers } from "@/hooks/useWorkers";
 import { WorkerGroup } from "@/types/worker";
 import GroupsHeader from "./_components/GroupsHeader";
@@ -10,9 +10,33 @@ import GroupForm from "./_components/GroupForm";
 import Drawer from "@/components/ui/Drawer";
 
 export default function GroupsPage() {
-    const { groups, isGroupsLoading } = useWorkers();
+    const {
+        paginatedGroups,
+        isPaginatedGroupsLoading,
+        fetchNextGroupsPage,
+        hasNextGroupsPage,
+        isFetchingNextGroupsPage,
+    } = useWorkers();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<WorkerGroup | undefined>(undefined);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (!hasNextGroupsPage) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextGroupsPage();
+                }
+            },
+            { threshold: 1 }
+        );
+
+        const el = loadMoreRef.current;
+        if (el) observer.observe(el);
+        return () => { if (el) observer.unobserve(el); };
+    }, [fetchNextGroupsPage, hasNextGroupsPage]);
 
     const handleAdd = () => {
         setSelectedGroup(undefined);
@@ -34,11 +58,11 @@ export default function GroupsPage() {
             <div className="max-w-6xl mx-auto flex flex-col gap-10">
                 <GroupsHeader onAdd={handleAdd} />
 
-                {isGroupsLoading ? (
+                {isPaginatedGroupsLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <p className="text-muted text-sm uppercase tracking-widest">Loading...</p>
                     </div>
-                ) : !groups?.length ? (
+                ) : !paginatedGroups.length ? (
                     <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border gap-4">
                         <p className="text-muted text-sm uppercase tracking-widest">No groups yet</p>
                         <button
@@ -50,8 +74,14 @@ export default function GroupsPage() {
                     </div>
                 ) : (
                     <>
-                        <GroupTable groups={groups} onEdit={handleEdit} />
-                        <GroupCards groups={groups} onEdit={handleEdit} />
+                        <GroupTable groups={paginatedGroups} onEdit={handleEdit} />
+                        <GroupCards groups={paginatedGroups} onEdit={handleEdit} />
+
+                        <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                            {isFetchingNextGroupsPage && (
+                                <p className="text-muted text-xs uppercase tracking-widest">Loading more...</p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>

@@ -10,12 +10,22 @@ import {
   WorkerLeaderboard,
   WorkerStats,
 } from "@/types/worker";
+import { PaginatedResponse } from "@/types/api";
 
 const { workers, dashboard } = API_CONFIG.endpoints;
 
 export const workerService = {
   getAll: async (): Promise<Worker[]> => {
-    const { data } = await api.get<Worker[]>(workers.base);
+    const { data } = await api.get<Worker[]>(workers.base, {
+      params: { all: 'true' },
+    });
+    return data;
+  },
+
+  getPaginated: async (page: number = 1): Promise<PaginatedResponse<Worker>> => {
+    const { data } = await api.get<PaginatedResponse<Worker>>(workers.base, {
+      params: { page },
+    });
     return data;
   },
 
@@ -53,7 +63,16 @@ export const workerService = {
   },
 
   getAllGroups: async (): Promise<WorkerGroup[]> => {
-    const { data } = await api.get<WorkerGroup[]>(workers.groups);
+    const { data } = await api.get<WorkerGroup[]>(workers.groups, {
+      params: { all: 'true' },
+    });
+    return data;
+  },
+
+  getPaginatedGroups: async (page: number = 1): Promise<PaginatedResponse<WorkerGroup>> => {
+    const { data } = await api.get<PaginatedResponse<WorkerGroup>>(workers.groups, {
+      params: { page },
+    });
     return data;
   },
 

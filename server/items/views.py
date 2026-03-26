@@ -11,7 +11,11 @@ class ItemListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Item.objects.filter(user=self.request.user)
+        qs = Item.objects.filter(user=self.request.user)
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

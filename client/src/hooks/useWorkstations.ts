@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { addToast } from "@heroui/react";
 import { workstationService } from "@/services/workstation.service";
-import { CreateWorkstationPayload, UpdateWorkstationPayload } from "@/types/workstation";
+import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload } from "@/types/workstation";
+import { PaginatedResponse } from "@/types/api";
 import { getErrorMessage } from "@/lib/utils";
 
 const WORKSTATIONS_KEY = ["workstations"];
@@ -9,11 +10,33 @@ const WORKSTATIONS_KEY = ["workstations"];
 export const useWorkstations = () => {
   const queryClient = useQueryClient();
 
+  // Unpaginated — for dropdowns
   const { data: workstations, isLoading } = useQuery({
     queryKey: WORKSTATIONS_KEY,
     queryFn: workstationService.getAll,
     retry: false,
   });
+
+  // Paginated — for list page
+  const {
+    data: paginatedData,
+    isLoading: isPaginatedLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [...WORKSTATIONS_KEY, "paginated"],
+    queryFn: ({ pageParam = 1 }) => workstationService.getPaginated(pageParam),
+    getNextPageParam: (lastPage: PaginatedResponse<Workstation>) => {
+      if (!lastPage.next) return undefined;
+      const url = new URL(lastPage.next);
+      return Number(url.searchParams.get("page"));
+    },
+    initialPageParam: 1,
+    retry: false,
+  });
+
+  const paginatedWorkstations = paginatedData?.pages.flatMap((page) => page?.results ?? []) ?? [];
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateWorkstationPayload) => workstationService.create(payload),
@@ -67,6 +90,11 @@ export const useWorkstations = () => {
   return {
     workstations,
     isLoading,
+    paginatedWorkstations,
+    isPaginatedLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     createWorkstation: createMutation.mutateAsync,
     updateWorkstation: updateMutation.mutateAsync,
     deleteWorkstation: deleteMutation.mutateAsync,

@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from django.utils import timezone
+from django.db.models import Q
 from datetime import timedelta
 from subscription.plans import get_limit
 
@@ -30,6 +31,19 @@ class WorkSessionListView(ListCreateAPIView):
         if history_days is not None:
             cutoff = timezone.now() - timedelta(days=history_days)
             qs = qs.filter(start_time__gte=cutoff)
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(workstation__name__icontains=search) |
+                Q(workers__full_name__icontains=search) |
+                Q(item__name__icontains=search)
+            ).distinct()
+
+        status_param = self.request.query_params.get('status', '').strip()
+        if status_param:
+            qs = qs.filter(status=status_param)
+
         return qs
 
     def perform_create(self, serializer):

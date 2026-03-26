@@ -12,12 +12,12 @@ import { PaginatedResponse } from "@/types/api";
 const { sessions } = API_CONFIG.endpoints;
 
 export const sessionService = {
-  getAll: async (page: number = 1): Promise<PaginatedResponse<WorkSession>> => {
-  const { data } = await api.get<PaginatedResponse<WorkSession>>(sessions.base, {
-    params: { page },
-  });
-  return data;
-},
+  getAll: async (page: number = 1, search?: string, status?: string): Promise<PaginatedResponse<WorkSession>> => {
+    const { data } = await api.get<PaginatedResponse<WorkSession>>(sessions.base, {
+      params: { page, ...(search ? { search } : {}), ...(status ? { status } : {}) },
+    });
+    return data;
+  },
 
   getOne: async (id: number): Promise<WorkSession> => {
     const { data } = await api.get<WorkSession>(sessions.detail(id));
