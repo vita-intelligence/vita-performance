@@ -8,6 +8,7 @@ const optionalNumber = z.union([
 export const workstationSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().max(500).optional(),
+  is_general: z.boolean().optional(),
   target_quantity: z.coerce.number({ required_error: "Target quantity is required" }).min(1, "Must be at least 1"),
   target_duration: z.coerce.number({ required_error: "Target duration is required" }).min(0.1, "Must be at least 0.1"),
   working_hours_per_day: optionalNumber,

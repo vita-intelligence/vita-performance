@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { addToast } from "@heroui/react";
 import { useKiosk } from "@/hooks/useKiosk";
+import { KioskActiveSession } from "@/types/kiosk";
 import KioskIdle from "./_components/KioskIdle";
 import KioskActive from "./_components/KioskActive";
 import FormRenderer from "@/components/shared/FormRenderer";
@@ -49,6 +50,13 @@ export default function KioskPage() {
     const [collectedStartAnswers, setCollectedStartAnswers] = useState<StartFormAnswer[]>([]);
     // Capture the real start/stop timestamp before forms are shown
     const [requestedAt, setRequestedAt] = useState<string | null>(null);
+    // For general workstations: session resumed after worker check-in
+    const [resumedSession, setResumedSession] = useState<KioskActiveSession | null>(null);
+
+    const handleResumeSession = (session: KioskActiveSession) => {
+        setResumedSession(session);
+        setCurrentSessionId(session.id);
+    };
 
     useEffect(() => {
         if (state?.active_session) {
@@ -75,7 +83,6 @@ export default function KioskPage() {
     // Show forms BEFORE creating session
     const handleStart = async (workerIds: number[], itemId?: number | null) => {
         if (startForms.length > 0) {
-            setRequestedAt(new Date().toISOString());
             setPendingStart({ workerIds, itemId });
             setCollectedStartAnswers([]);
             setCurrentFormIndex(0);
@@ -108,14 +115,13 @@ export default function KioskPage() {
                 setShowingStartForms(false);
                 setCurrentFormIndex(0);
                 if (pendingStart) {
-                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId, requestedAt ?? undefined);
+                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId);
                     setCurrentSessionId(session.id);
                     for (const collected of newCollected) {
                         await submitFormResponse(collected.formId, session.id, collected.answers);
                     }
                     setPendingStart(null);
                     setCollectedStartAnswers([]);
-                    setRequestedAt(null);
                 }
             }
         } catch {
@@ -135,6 +141,7 @@ export default function KioskPage() {
             setIsSubmitting(true);
             try {
                 await stopSession(workerId, pin, quantity, notes);
+                setResumedSession(null);
             } catch {
                 addToast({ title: "Failed to stop session", description: "Please try again.", color: "danger", timeout: 4000 });
             } finally {
@@ -164,6 +171,7 @@ export default function KioskPage() {
                     );
                     setStopParams(null);
                     setRequestedAt(null);
+                    setResumedSession(null);
                 }
             }
         } catch {
@@ -202,10 +210,10 @@ export default function KioskPage() {
                 />
             )}
 
-            {state.active_session ? (
+            {(state.active_session || resumedSession) ? (
                 <KioskActive
                     token={token}
-                    session={state.active_session}
+                    session={(state.active_session || resumedSession)!}
                     workers={workers}
                     onStop={handleStop}
                     sop={sop}
@@ -224,6 +232,8 @@ export default function KioskPage() {
                     isSOPLoading={isSOPLoading}
                     onFetchSOP={fetchSOP}
                     isSubmitting={isSubmitting}
+                    isGeneral={state.workstation.is_general}
+                    onResumeSession={handleResumeSession}
                 />
             )}
         </div>

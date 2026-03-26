@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
 import { FileText } from "lucide-react";
-import { KioskWorker, KioskItem } from "@/types/kiosk";
+import { KioskWorker, KioskItem, KioskActiveSession } from "@/types/kiosk";
+import { kioskService } from "@/services/kiosk.service";
 import PinPad from "./PinPad";
 import ItemStep from "./ItemStep";
 import SOPViewer from "@/components/shared/SOPViewer";
@@ -19,6 +20,8 @@ interface KioskIdleProps {
     isSOPLoading: boolean;
     onFetchSOP: () => void;
     isSubmitting?: boolean;
+    isGeneral?: boolean;
+    onResumeSession?: (session: KioskActiveSession) => void;
 }
 
 export default function KioskIdle({
@@ -30,6 +33,8 @@ export default function KioskIdle({
     isSOPLoading,
     onFetchSOP,
     isSubmitting,
+    isGeneral,
+    onResumeSession,
 }: KioskIdleProps) {
     const [step, setStep] = useState<Step>("workers");
     const [checkedIn, setCheckedIn] = useState<{ id: number; name: string }[]>([]);
@@ -43,7 +48,14 @@ export default function KioskIdle({
         setStep("pin");
     };
 
-    const handlePinSuccess = (worker: { id: number; name: string }) => {
+    const handlePinSuccess = async (worker: { id: number; name: string }) => {
+        if (isGeneral && onResumeSession) {
+            const existing = await kioskService.getActiveSession(token, worker.id);
+            if (existing) {
+                onResumeSession(existing);
+                return;
+            }
+        }
         setCheckedIn((prev) => [...prev, worker]);
         setSelectingWorker(null);
         setStep("workers");

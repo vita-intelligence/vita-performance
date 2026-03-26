@@ -9,6 +9,7 @@ import { Workstation } from "@/types/workstation";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import { Switch } from "@heroui/react";
 import { WEEK_STARTS } from "@/constants/settings.constants";
 import { FileText } from "lucide-react";
 import SOPEditor from "@/components/shared/SOPEditor";
@@ -31,6 +32,7 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
             reset({
                 name: workstation.name,
                 description: workstation.description || "",
+                is_general: workstation.is_general,
                 target_quantity: workstation.target_quantity ?? undefined,
                 target_duration: workstation.target_duration ?? undefined,
                 working_hours_per_day: workstation.working_hours_per_day ?? undefined,
@@ -79,6 +81,23 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                     hint="A short description to help identify this workstation."
                     error={errors.description?.message}
                     {...register("description")}
+                />
+
+                <Controller
+                    name="is_general"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex flex-col gap-0.5">
+                                <p className="text-sm font-semibold text-text">General Workstation</p>
+                                <p className="text-xs text-muted">Allow multiple sessions at the same time. Each worker runs their own session.</p>
+                            </div>
+                            <Switch
+                                isSelected={field.value ?? false}
+                                onValueChange={field.onChange}
+                            />
+                        </div>
+                    )}
                 />
 
                 <div className="flex flex-col gap-2">

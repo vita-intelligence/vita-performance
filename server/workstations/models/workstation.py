@@ -10,6 +10,7 @@ class Workstation(models.Model):
     target_quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     target_duration = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    is_general = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

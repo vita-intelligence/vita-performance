@@ -53,6 +53,21 @@ function AnswerValue({ field, value }: { field: FormField; value: any }) {
         return <span className="text-muted text-sm">Not approved</span>;
     }
 
+    if (field.type === "task_select" && value?.label) {
+        return (
+            <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold text-text">{value.label}</span>
+                {(value.target_quantity || value.target_duration) && (
+                    <span className="text-xs text-muted">
+                        {value.target_quantity && `${value.target_quantity} units`}
+                        {value.target_quantity && value.target_duration && " / "}
+                        {value.target_duration && `${value.target_duration}h`}
+                    </span>
+                )}
+            </div>
+        );
+    }
+
     if (field.type === "yes_no") {
         return (
             <span className={`text-sm font-semibold uppercase tracking-widest ${value === "yes" ? "text-success" : "text-error"

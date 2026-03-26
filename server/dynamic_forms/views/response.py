@@ -5,6 +5,7 @@ from rest_framework import status
 from ..models import DynamicForm, FormResponse
 from ..serializers import FormResponseSerializer
 from workstations.models import Workstation
+from work_sessions.models import WorkSession
 
 
 def get_workstation_by_token(token):
@@ -45,6 +46,25 @@ class FormResponseCreateView(APIView):
             form=form,
             answers=answers,
         )
+
+        # Apply task_select overrides to the session
+        for field in form.schema:
+            if field.get('type') == 'task_select':
+                answer = answers.get(field.get('id'))
+                if answer and isinstance(answer, dict):
+                    try:
+                        session = WorkSession.objects.get(pk=session_id)
+                        if answer.get('target_quantity') is not None:
+                            session.override_target_quantity = answer['target_quantity']
+                        if answer.get('target_duration') is not None:
+                            session.override_target_duration = answer['target_duration']
+                        if answer.get('label'):
+                            session.override_task_name = answer['label']
+                        session.save(update_fields=['override_target_quantity', 'override_target_duration', 'override_task_name'])
+                    except WorkSession.DoesNotExist:
+                        pass
+                break  # Only one task_select per form
+
         serializer = FormResponseSerializer(response)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

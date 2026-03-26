@@ -10,6 +10,7 @@ import {
     Star,
     PenLine,
     ShieldCheck,
+    ClipboardList,
 } from "lucide-react";
 
 interface FieldPaletteProps {
@@ -25,6 +26,7 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: React.ElementType; de
     { type: "rating", label: "Rating", icon: Star, description: "Star rating 1 to 5" },
     { type: "signature", label: "Signature", icon: PenLine, description: "Draw signature on screen" },
     { type: "qc_approval", label: "QC Approval", icon: ShieldCheck, description: "Requires QC person sign-off" },
+    { type: "task_select", label: "Task Select", icon: ClipboardList, description: "Task with target quantity and duration" },
 ];
 
 export default function FieldPalette({ onAdd }: FieldPaletteProps) {

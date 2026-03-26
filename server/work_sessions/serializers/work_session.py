@@ -40,6 +40,9 @@ class WorkSessionSerializer(serializers.ModelSerializer):
             'performance_percentage',
             'overtime_hours',
             'wage_cost',
+            'override_target_quantity',
+            'override_target_duration',
+            'override_task_name',
             'created_at',
             'updated_at'
         )

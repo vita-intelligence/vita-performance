@@ -28,8 +28,10 @@ export const kioskService = {
         const { data } = await kioskApi.post(kiosk.start(token), { worker_ids, item_id, requested_at });
         return data;
     },
-    getActiveSession: async (token: string): Promise<KioskActiveSession | null> => {
-        const { data } = await kioskApi.get(kiosk.active(token));
+    getActiveSession: async (token: string, workerId?: number): Promise<KioskActiveSession | null> => {
+        const { data } = await kioskApi.get(kiosk.active(token), {
+            params: workerId ? { worker_id: workerId } : {},
+        });
         return data;
     },
     stopSession: async (token: string, worker_id: number, pin: string, quantity_produced: number, notes?: string, requested_at?: string): Promise<void> => {

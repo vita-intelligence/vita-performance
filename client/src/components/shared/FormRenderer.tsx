@@ -372,6 +372,36 @@ function QCApprovalField({ field, value, onChange, error, token }: FieldProps & 
     );
 }
 
+function TaskSelectField({ field, value, onChange, error }: FieldProps) {
+    return (
+        <div className="flex flex-col gap-2">
+            {(field.options || []).map((option) => (
+                <button
+                    key={option.id}
+                    onClick={() => onChange({
+                        label: option.label,
+                        target_quantity: option.target_quantity,
+                        target_duration: option.target_duration,
+                    })}
+                    className={`w-full text-left px-4 py-3 border-2 text-sm font-semibold transition-colors ${value?.label === option.label
+                        ? "border-text bg-text text-background"
+                        : "border-border text-text hover:border-text"
+                        }`}
+                >
+                    <span>{option.label}</span>
+                    {(option.target_quantity || option.target_duration) && (
+                        <span className="block text-xs font-normal mt-0.5 opacity-70">
+                            {option.target_quantity && `${option.target_quantity} units`}
+                            {option.target_quantity && option.target_duration && " / "}
+                            {option.target_duration && `${option.target_duration}h`}
+                        </span>
+                    )}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSubmitting, token }: FormRendererProps) {
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [errors, setErrors] = useState<Record<string, boolean>>({});
@@ -392,6 +422,8 @@ export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSub
             let isEmpty;
             if (field.type === "qc_approval") {
                 isEmpty = !val?.approved;
+            } else if (field.type === "task_select") {
+                isEmpty = !val?.label;
             } else {
                 isEmpty =
                     val === undefined ||
@@ -432,6 +464,7 @@ export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSub
             case "rating": return <RatingField {...props} />;
             case "signature": return <SignatureField {...props} />;
             case "qc_approval": return <QCApprovalField {...props} token={token || ""} />;
+            case "task_select": return <TaskSelectField {...props} />;
             default: return null;
         }
     };

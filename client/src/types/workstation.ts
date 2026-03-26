@@ -11,6 +11,7 @@ export interface Workstation {
   description: string | null;
   kiosk_token: string;
   is_active: boolean;
+  is_general: boolean;
   created_at: string;
   updated_at: string;
   target_quantity: number | null;
@@ -25,6 +26,7 @@ export interface Workstation {
 export interface CreateWorkstationPayload {
   name: string;
   description?: string;
+  is_general?: boolean;
   target_quantity?: number;
   target_duration?: number;
   working_hours_per_day?: number;

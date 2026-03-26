@@ -6,11 +6,14 @@ export type FieldType =
     | "dropdown"
     | "rating"
     | "signature"
-    | "qc_approval";
+    | "qc_approval"
+    | "task_select";
 
 export interface FieldOption {
     id: string;
     label: string;
+    target_quantity?: number;
+    target_duration?: number;
 }
 
 export interface FormField {

@@ -33,16 +33,19 @@ export default function FieldEditor({ field, allFields, onChange, onDelete }: Fi
 
     const addOption = () => {
         const options = field.options || [];
+        const newOption = field.type === "task_select"
+            ? { id: crypto.randomUUID(), label: "", target_quantity: undefined, target_duration: undefined }
+            : { id: crypto.randomUUID(), label: "" };
         onChange({
             ...field,
-            options: [...options, { id: crypto.randomUUID(), label: "" }],
+            options: [...options, newOption],
         });
     };
 
-    const updateOption = (id: string, label: string) => {
+    const updateOption = (id: string, updates: Partial<FieldOption>) => {
         onChange({
             ...field,
-            options: (field.options || []).map((o) => o.id === id ? { ...o, label } : o),
+            options: (field.options || []).map((o) => o.id === id ? { ...o, ...updates } : o),
         });
     };
 
@@ -132,7 +135,7 @@ export default function FieldEditor({ field, allFields, onChange, onDelete }: Fi
                                     <input
                                         type="text"
                                         value={option.label}
-                                        onChange={(e) => updateOption(option.id, e.target.value)}
+                                        onChange={(e) => updateOption(option.id, { label: e.target.value })}
                                         placeholder="Option label..."
                                         className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
                                     />
@@ -150,6 +153,56 @@ export default function FieldEditor({ field, allFields, onChange, onDelete }: Fi
                             >
                                 <Plus size={12} />
                                 Add Option
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Task select options — with target quantity and duration */}
+                    {field.type === "task_select" && (
+                        <div className="flex flex-col gap-3">
+                            <label className="text-xs font-semibold uppercase tracking-widest text-muted">Tasks</label>
+                            <p className="text-xs text-muted">Each task overrides the workstation output targets for performance calculation.</p>
+                            {(field.options || []).map((option) => (
+                                <div key={option.id} className="flex flex-col gap-2 p-3 border border-border">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={option.label}
+                                            onChange={(e) => updateOption(option.id, { label: e.target.value })}
+                                            placeholder="Task name (e.g. V-Blender Room)..."
+                                            className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                        />
+                                        <button
+                                            onClick={() => removeOption(option.id)}
+                                            className="text-muted hover:text-error transition-colors shrink-0"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            value={option.target_quantity ?? ""}
+                                            onChange={(e) => updateOption(option.id, { target_quantity: e.target.value ? Number(e.target.value) : undefined })}
+                                            placeholder="Target qty"
+                                            className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                        />
+                                        <input
+                                            type="number"
+                                            value={option.target_duration ?? ""}
+                                            onChange={(e) => updateOption(option.id, { target_duration: e.target.value ? Number(e.target.value) : undefined })}
+                                            placeholder="Target hours"
+                                            className="flex-1 border border-border bg-background text-text px-3 py-2 text-sm outline-none focus:border-text transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                            <button
+                                onClick={addOption}
+                                className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors py-2"
+                            >
+                                <Plus size={12} />
+                                Add Task
                             </button>
                         </div>
                     )}

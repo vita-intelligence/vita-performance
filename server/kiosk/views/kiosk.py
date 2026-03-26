@@ -60,19 +60,25 @@ class KioskWorkstationView(APIView):
                 'code': 'kiosk_not_available',
             }, status=status.HTTP_403_FORBIDDEN)
 
-        active_session = WorkSession.objects.filter(
-            workstation=workstation,
-            status='active',
-        ).prefetch_related('workers').first()
+        # For general workstations, active_session is not returned here —
+        # the worker must check in first, then we find their session.
+        active_session = None
+        if not workstation.is_general:
+            active_session = WorkSession.objects.filter(
+                workstation=workstation,
+                status='active',
+            ).prefetch_related('workers').first()
 
         return Response({
             'workstation': {
                 'id': workstation.id,
                 'name': workstation.name,
+                'is_general': workstation.is_general,
             },
             'active_session': {
                 'id': active_session.id,
                 'start_time': active_session.start_time.isoformat(),
+                'item_name': active_session.item.name if active_session.item else None,
                 'workers': [
                     {'id': w.id, 'name': w.full_name}
                     for w in active_session.workers.all()
@@ -143,9 +149,24 @@ class KioskStartSessionView(APIView):
         if not worker_ids:
             return Response({'detail': 'At least one worker is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check no active session already running on this workstation
-        if WorkSession.objects.filter(workstation=workstation, status='active').exists():
-            return Response({'detail': 'A session is already active on this workstation.'}, status=status.HTTP_400_BAD_REQUEST)
+        if workstation.is_general:
+            # General workstation: allow multiple sessions, but block if any
+            # of the selected workers already have an active session here
+            busy_workers = WorkSession.objects.filter(
+                workstation=workstation,
+                status='active',
+                workers__pk__in=worker_ids,
+            ).values_list('workers__full_name', flat=True).distinct()
+            if busy_workers:
+                names = ', '.join(busy_workers)
+                return Response(
+                    {'detail': f'{names} already in an active session on this workstation.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Normal workstation: only one active session at a time
+            if WorkSession.objects.filter(workstation=workstation, status='active').exists():
+                return Response({'detail': 'A session is already active on this workstation.'}, status=status.HTTP_400_BAD_REQUEST)
 
         session = WorkSession.objects.create(
             user=workstation.user,
@@ -167,7 +188,7 @@ class KioskStartSessionView(APIView):
 
 
 class KioskActiveSessionView(APIView):
-    """GET /api/kiosk/<token>/active/ — get current active session"""
+    """GET /api/kiosk/<token>/active/?worker_id=N — get current active session"""
     permission_classes = [AllowAny]
 
     def get(self, request, token):
@@ -175,10 +196,17 @@ class KioskActiveSessionView(APIView):
         if not workstation:
             return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
 
-        session = WorkSession.objects.filter(
+        qs = WorkSession.objects.filter(
             workstation=workstation,
             status='active',
-        ).prefetch_related('workers').first()
+        ).prefetch_related('workers')
+
+        # For general workstations, find the session for a specific worker
+        worker_id = request.query_params.get('worker_id')
+        if worker_id:
+            qs = qs.filter(workers__pk=worker_id)
+
+        session = qs.first()
 
         if not session:
             return Response(None)
@@ -220,15 +248,15 @@ class KioskStopSessionView(APIView):
         if not worker.check_pin(str(pin)):
             return Response({'detail': 'Incorrect PIN.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get active session
-        try:
-            session = WorkSession.objects.get(workstation=workstation, status='active')
-        except WorkSession.DoesNotExist:
-            return Response({'detail': 'No active session found.'}, status=status.HTTP_404_NOT_FOUND)
+        # Get active session — for general workstations find by worker, otherwise single session
+        session = WorkSession.objects.filter(
+            workstation=workstation,
+            status='active',
+            workers__pk=worker_id,
+        ).first()
 
-        # Verify worker is part of this session
-        if not session.workers.filter(pk=worker_id).exists():
-            return Response({'detail': 'You are not part of this session.'}, status=status.HTTP_403_FORBIDDEN)
+        if not session:
+            return Response({'detail': 'No active session found for this worker.'}, status=status.HTTP_404_NOT_FOUND)
 
         session.end_time = parse_requested_at(request.data.get('requested_at'))
         session.status = 'completed'

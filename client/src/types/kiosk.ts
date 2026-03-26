@@ -1,6 +1,7 @@
 export interface KioskWorkstation {
     id: number;
     name: string;
+    is_general: boolean;
 }
 
 export interface KioskWorker {

@@ -23,6 +23,9 @@ class WorkSession(models.Model):
     quantity_produced = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     quantity_rejected = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
+    override_target_quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    override_target_duration = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    override_task_name = models.CharField(max_length=200, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -39,8 +42,8 @@ class WorkSession(models.Model):
             return None
 
         settings = self.workstation.get_effective_settings()
-        target_qty = self.workstation.target_quantity
-        target_dur = self.workstation.target_duration
+        target_qty = self.override_target_quantity or self.workstation.target_quantity
+        target_dur = self.override_target_duration or self.workstation.target_duration
 
         if not target_qty or not target_dur:
             return None
