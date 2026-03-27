@@ -47,7 +47,7 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                     <WorkerTags workers={session.workers ?? []} />
                                 </td>
                                 <td className="px-4 py-3 text-muted whitespace-nowrap">{session.workstation_name}</td>
-                                <td className="px-4 py-3 text-muted whitespace-nowrap">{session.item_name || "—"}</td>
+                                <td className="px-4 py-3 text-muted max-w-[160px] truncate" title={session.item_name || undefined}>{session.item_name || "—"}</td>
                                 <td className="px-4 py-3 text-text whitespace-nowrap">
                                     {session.duration_hours ? `${session.duration_hours}h` : "—"}
                                 </td>
