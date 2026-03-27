@@ -19,7 +19,7 @@ class WorkerLeaderboardView(APIView):
 
         session_filter = Q(
             work_sessions__user=request.user,
-            work_sessions__status='completed',
+            work_sessions__status__in=['completed', 'verified'],
         )
         if since:
             session_filter &= Q(work_sessions__start_time__gte=since)
