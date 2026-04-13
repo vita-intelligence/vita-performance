@@ -1,7 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { WorkerStatsSession } from "@/types/worker";
 import { useSettings } from "@/hooks/useSettings";
-import { formatCurrency, formatNumber } from "@/lib/utils/number.utils";
 import { formatDate } from "@/lib/utils/date.utils";
+import WorkerSessionDetailsDrawer from "./WorkerSessionDetailsDrawer";
 
 interface WorkerSessionsTableProps {
     sessions: WorkerStatsSession[];
@@ -9,6 +12,7 @@ interface WorkerSessionsTableProps {
 
 export default function WorkerSessionsTable({ sessions }: WorkerSessionsTableProps) {
     const { settings } = useSettings();
+    const [detailsSession, setDetailsSession] = useState<WorkerStatsSession | null>(null);
 
     return (
         <div className="flex flex-col gap-4">
@@ -25,43 +29,31 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                 </div>
             ) : (
                 <div className="border border-border overflow-hidden">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
                         <thead>
                             <tr className="border-b border-border bg-surface">
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Date</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workstation</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Item</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Duration</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Quantity</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Wage Cost</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workers</th>
-                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[20%]">Date</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[25%]">Workstation</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[25%]">Item</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Performance</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {sessions.map((session, index) => (
                                 <tr
                                     key={session.id}
-                                    className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"
+                                    onClick={() => setDetailsSession(session)}
+                                    className={`border-b border-border hover:bg-surface transition-colors cursor-pointer ${index % 2 === 0 ? "bg-background" : "bg-surface/50"
                                         }`}
                                 >
-                                    <td className="px-4 py-3 text-muted">
+                                    <td className="px-4 py-3 text-muted truncate">
                                         {formatDate(session.date, settings)}
                                     </td>
-                                    <td className="px-4 py-3 text-text font-medium">
+                                    <td className="px-4 py-3 text-text font-medium truncate">
                                         {session.workstation_name}
                                     </td>
-                                    <td className="px-4 py-3 text-muted">{session.item_name || "—"}</td>
-                                    <td className="px-4 py-3 text-text">
-                                        {session.duration_hours ? `${session.duration_hours}h` : "—"}
-                                    </td>
-                                    <td className="px-4 py-3 text-text">
-                                        {session.quantity_produced
-                                            ? formatNumber(session.quantity_produced, settings)
-                                            : "—"
-                                        }
-                                    </td>
+                                    <td className="px-4 py-3 text-muted truncate">{session.item_name || "—"}</td>
                                     <td className="px-4 py-3">
                                         {session.performance_percentage !== null ? (
                                             <span className={`text-xs font-semibold ${session.performance_percentage >= 100
@@ -74,22 +66,10 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                                             </span>
                                         ) : "—"}
                                     </td>
-                                    <td className="px-4 py-3 text-text">
-                                        {session.wage_cost
-                                            ? formatCurrency(session.wage_cost, settings)
-                                            : "—"
-                                        }
-                                    </td>
-                                    <td className="px-4 py-3 text-muted text-xs">
-                                        {session.worker_count > 1
-                                            ? `${session.worker_count} workers`
-                                            : "Solo"
-                                        }
-                                    </td>
                                     <td className="px-4 py-3">
-                                        <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border ${session.status === "verified"
-                                                ? "border-success text-success"
-                                                : "border-warning text-warning"
+                                        <span className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 border whitespace-nowrap ${session.status === "verified"
+                                            ? "border-success text-success"
+                                            : "border-warning text-warning"
                                             }`}>
                                             {session.status === "verified" ? "Verified" : "QC Pending"}
                                         </span>
@@ -100,6 +80,11 @@ export default function WorkerSessionsTable({ sessions }: WorkerSessionsTablePro
                     </table>
                 </div>
             )}
+
+            <WorkerSessionDetailsDrawer
+                session={detailsSession}
+                onClose={() => setDetailsSession(null)}
+            />
         </div>
     );
 }

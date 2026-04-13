@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { WorkSession } from "@/types/session";
-import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { formatDateTime } from "@/lib/utils/date.utils";
-import { formatNumber } from "@/lib/utils/number.utils";
 import WorkerTags from "@/components/shared/WorkerTags";
 import SessionFormsDrawer from "@/components/shared/SessionFormsDrawer";
-import { ClipboardList } from "lucide-react";
+import SessionDetailsDrawer from "./SessionDetailsDrawer";
 
 interface SessionTableProps {
     sessions: WorkSession[];
@@ -16,55 +14,40 @@ interface SessionTableProps {
 }
 
 export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
-    const { deleteSession, isDeleting } = useSessions();
     const { settings } = useSettings();
     const [formsSessionId, setFormsSessionId] = useState<number | null>(null);
+    const [detailsSession, setDetailsSession] = useState<WorkSession | null>(null);
+
+    const handleEdit = (session: WorkSession) => {
+        setDetailsSession(null);
+        onEdit(session);
+    };
 
     return (
         <>
-            <div className="hidden md:block border border-border overflow-x-auto">
-                <table className="w-full text-sm min-w-[900px]">
+            <div className="hidden md:block border border-border">
+                <table className="w-full text-sm table-fixed">
                     <thead>
                         <tr className="border-b border-border bg-surface">
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Worker</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Workstation</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Item</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Duration</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Qty / Rejected</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Performance</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Date</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Actions</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[24%]">Worker</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[26%]">Item</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[14%]">Performance</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[18%]">Date</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[18%]">Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         {sessions.map((session, index) => (
                             <tr
                                 key={session.id}
-                                className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
+                                onClick={() => setDetailsSession(session)}
+                                className={`border-b border-border hover:bg-surface transition-colors cursor-pointer ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
                             >
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 align-top">
                                     <WorkerTags workers={session.workers ?? []} />
                                 </td>
-                                <td className="px-4 py-3 text-muted whitespace-nowrap">{session.workstation_name}</td>
-                                <td className="px-4 py-3 text-muted max-w-[160px] truncate" title={session.item_name || undefined}>{session.item_name || "—"}</td>
-                                <td className="px-4 py-3 text-text whitespace-nowrap">
-                                    {session.duration_hours ? `${session.duration_hours}h` : "—"}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-text whitespace-nowrap">
-                                            {session.quantity_produced
-                                                ? formatNumber(Number(session.quantity_produced), settings)
-                                                : "—"
-                                            }
-                                        </span>
-                                        {session.quantity_rejected !== null && session.quantity_rejected !== undefined && (
-                                            <span className="text-xs text-error whitespace-nowrap">
-                                                -{formatNumber(Number(session.quantity_rejected), settings)} rejected
-                                            </span>
-                                        )}
-                                    </div>
+                                <td className="px-4 py-3 text-muted truncate" title={session.item_name || undefined}>
+                                    {session.item_name || "—"}
                                 </td>
                                 <td className="px-4 py-3">
                                     {session.performance_percentage !== null ? (
@@ -78,7 +61,7 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                         </span>
                                     ) : "—"}
                                 </td>
-                                <td className="px-4 py-3 text-muted whitespace-nowrap">
+                                <td className="px-4 py-3 text-muted truncate">
                                     {formatDateTime(session.start_time, settings)}
                                 </td>
                                 <td className="px-4 py-3">
@@ -89,30 +72,6 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
                                         {session.status === "verified" ? "Verified" : "QC Pending"}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-3 whitespace-nowrap">
-                                        <button
-                                            onClick={() => setFormsSessionId(session.id)}
-                                            className="text-muted hover:text-text transition-colors"
-                                            title="View Forms"
-                                        >
-                                            <ClipboardList size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => onEdit(session)}
-                                            className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() => deleteSession(session.id)}
-                                            disabled={isDeleting}
-                                            className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-error transition-colors disabled:opacity-50"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -122,6 +81,13 @@ export default function SessionTable({ sessions, onEdit }: SessionTableProps) {
             <SessionFormsDrawer
                 sessionId={formsSessionId}
                 onClose={() => setFormsSessionId(null)}
+            />
+
+            <SessionDetailsDrawer
+                session={detailsSession}
+                onClose={() => setDetailsSession(null)}
+                onEdit={handleEdit}
+                onViewForms={(id) => setFormsSessionId(id)}
             />
         </>
     );

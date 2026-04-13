@@ -44,6 +44,8 @@ export interface CreateSessionPayload {
 }
 
 export interface UpdateSessionPayload {
+  workstation?: number;
+  worker_ids?: number[];
   start_time?: string;
   end_time?: string;
   quantity_produced?: number;

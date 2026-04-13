@@ -1,10 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Worker } from "@/types/worker";
-import { useWorkers } from "@/hooks/useWorkers";
 import { useSettings } from "@/hooks/useSettings";
-import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils/number.utils";
+import WorkerDetailsDrawer from "./WorkerDetailsDrawer";
 
 interface WorkerTableProps {
     workers: Worker[];
@@ -12,87 +12,52 @@ interface WorkerTableProps {
 }
 
 export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
-    const { updateWorker, deleteWorker, isDeletingWorker } = useWorkers();
-    const router = useRouter();
     const { settings } = useSettings();
-
-    const handleToggleActive = async (worker: Worker) => {
-        await updateWorker({ id: worker.id, payload: { is_active: !worker.is_active } });
-    };
+    const [detailsWorker, setDetailsWorker] = useState<Worker | null>(null);
 
     return (
-        <div className="hidden md:block border border-border overflow-hidden">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b border-border bg-surface">
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Name</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Group</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Hourly Rate</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">PIN</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">QC</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {workers.map((worker, index) => (
-                        <tr
-                            key={worker.id}
-                            className={`border-b border-border hover:bg-surface transition-colors ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
-                        >
-                            <td className="px-4 py-3 font-medium text-text">{worker.full_name}</td>
-                            <td className="px-4 py-3 text-muted">{worker.group_name || "—"}</td>
-                            <td className="px-4 py-3 text-text">
-                                {formatCurrency(Number(worker.hourly_rate), settings)}/hr
-                            </td>
-                            <td className="px-4 py-3">
-                                <span className={`text-xs font-semibold uppercase tracking-widest ${worker.has_pin ? "text-success" : "text-error"}`}>
-                                    {worker.has_pin ? "Set" : "No PIN"}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3">
-                                {worker.is_qa && (
-                                    <span className="text-xs font-semibold uppercase tracking-widest text-accent">QC</span>
-                                )}
-                            </td>
-                            <td className="px-4 py-3">
-                                <button
-                                    onClick={() => handleToggleActive(worker)}
-                                    className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border transition-colors ${worker.is_active
-                                        ? "border-success text-success hover:bg-success hover:text-background"
-                                        : "border-error text-error hover:bg-error hover:text-background"
-                                        }`}
-                                >
-                                    {worker.is_active ? "Active" : "Inactive"}
-                                </button>
-                            </td>
-                            <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => router.push(`/workers/${worker.id}`)}
-                                        className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"
-                                    >
-                                        Stats
-                                    </button>
-                                    <button
-                                        onClick={() => onEdit(worker)}
-                                        className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-text transition-colors"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => deleteWorker(worker.id)}
-                                        disabled={isDeletingWorker}
-                                        className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-error transition-colors disabled:opacity-50"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </td>
+        <>
+            <div className="hidden md:block border border-border overflow-hidden">
+                <table className="w-full text-sm table-fixed">
+                    <thead>
+                        <tr className="border-b border-border bg-surface">
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[35%]">Name</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[30%]">Group</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[20%]">Hourly Rate</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Status</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        {workers.map((worker, index) => (
+                            <tr
+                                key={worker.id}
+                                onClick={() => setDetailsWorker(worker)}
+                                className={`border-b border-border hover:bg-surface transition-colors cursor-pointer ${index % 2 === 0 ? "bg-background" : "bg-surface/50"}`}
+                            >
+                                <td className="px-4 py-3 font-medium text-text truncate">{worker.full_name}</td>
+                                <td className="px-4 py-3 text-muted truncate">{worker.group_name || "—"}</td>
+                                <td className="px-4 py-3 text-text truncate">
+                                    {formatCurrency(Number(worker.hourly_rate), settings)}/hr
+                                </td>
+                                <td className="px-4 py-3">
+                                    <span className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border whitespace-nowrap ${worker.is_active
+                                        ? "border-success text-success"
+                                        : "border-error text-error"
+                                        }`}>
+                                        {worker.is_active ? "Active" : "Inactive"}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <WorkerDetailsDrawer
+                worker={detailsWorker}
+                onClose={() => setDetailsWorker(null)}
+                onEdit={onEdit}
+            />
+        </>
     );
 }

@@ -59,6 +59,8 @@ export default function EditSessionDrawer({ session, onClose }: EditSessionDrawe
             await updateSession({
                 id: session.id,
                 payload: {
+                    workstation: data.workstation,
+                    worker_ids: data.worker_ids,
                     start_time: new Date(data.start_time).toISOString(),
                     end_time: new Date(data.end_time).toISOString(),
                     quantity_produced: data.quantity_produced,
