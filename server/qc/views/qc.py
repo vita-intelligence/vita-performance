@@ -2,6 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import Q
+from django.utils.dateparse import parse_date
 from workers.models import Worker
 from workstations.models import Workstation
 from work_sessions.models import WorkSession
@@ -117,22 +119,66 @@ class QCWorkstationsView(APIView):
 
 
 class QCSessionsView(APIView):
+    """Paginated, filterable list of pending QC sessions across all workstations."""
     permission_classes = [AllowAny]
 
-    def get(self, request, token, workstation_id):
+    def get(self, request, token):
         qc = get_qc_token(token)
         if not qc:
             return Response({'detail': 'Invalid QC link.'}, status=status.HTTP_404_NOT_FOUND)
 
-        sessions = WorkSession.objects.filter(
-            user=qc.user,
-            workstation_id=workstation_id,
-            status='completed',
-        ).prefetch_related('workers').select_related('item').order_by('-start_time')
+        qs = (
+            WorkSession.objects
+            .filter(user=qc.user, status='completed')
+            .select_related('workstation', 'item')
+            .prefetch_related('workers')
+            .order_by('-start_time')
+        )
 
-        return Response([
+        workstation_id = request.query_params.get('workstation')
+        if workstation_id:
+            qs = qs.filter(workstation_id=workstation_id)
+
+        worker_id = request.query_params.get('worker')
+        if worker_id:
+            qs = qs.filter(workers__pk=worker_id)
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(workstation__name__icontains=search)
+                | Q(workers__full_name__icontains=search)
+                | Q(item__name__icontains=search)
+            )
+
+        date_from = parse_date(request.query_params.get('date_from') or '')
+        if date_from:
+            qs = qs.filter(start_time__date__gte=date_from)
+
+        date_to = parse_date(request.query_params.get('date_to') or '')
+        if date_to:
+            qs = qs.filter(start_time__date__lte=date_to)
+
+        qs = qs.distinct()
+
+        try:
+            page = max(1, int(request.query_params.get('page') or 1))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = min(100, max(1, int(request.query_params.get('page_size') or 25)))
+        except (TypeError, ValueError):
+            page_size = 25
+
+        total = qs.count()
+        offset = (page - 1) * page_size
+        sessions = qs[offset:offset + page_size]
+
+        results = [
             {
                 'id': s.id,
+                'workstation_id': s.workstation_id,
+                'workstation_name': s.workstation.name if s.workstation else None,
                 'start_time': s.start_time.isoformat(),
                 'end_time': s.end_time.isoformat() if s.end_time else None,
                 'duration_hours': s.duration_hours,
@@ -141,7 +187,15 @@ class QCSessionsView(APIView):
                 'workers': [{'id': w.id, 'name': w.full_name} for w in s.workers.all()],
             }
             for s in sessions
-        ])
+        ]
+
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size if total else 0,
+            'results': results,
+        })
 
 
 class QCVerifySessionView(APIView):

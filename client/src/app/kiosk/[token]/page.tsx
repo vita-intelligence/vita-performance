@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { addToast } from "@heroui/react";
 import { useKiosk } from "@/hooks/useKiosk";
-import { KioskActiveSession } from "@/types/kiosk";
+import { KioskActiveSession, KioskCompletedSession } from "@/types/kiosk";
 import KioskIdle from "./_components/KioskIdle";
 import KioskActive from "./_components/KioskActive";
+import KioskCompleted from "./_components/KioskCompleted";
 import FormRenderer from "@/components/shared/FormRenderer";
+import { Loader2 } from "lucide-react";
 
 export default function KioskPage() {
     const { token } = useParams<{ token: string }>();
@@ -52,6 +54,8 @@ export default function KioskPage() {
     const [requestedAt, setRequestedAt] = useState<string | null>(null);
     // For general workstations: session resumed after worker check-in
     const [resumedSession, setResumedSession] = useState<KioskActiveSession | null>(null);
+    // Completed session result — shown briefly after stop succeeds
+    const [completedSession, setCompletedSession] = useState<KioskCompletedSession | null>(null);
 
     const handleResumeSession = (session: KioskActiveSession) => {
         setResumedSession(session);
@@ -140,8 +144,9 @@ export default function KioskPage() {
         } else {
             setIsSubmitting(true);
             try {
-                await stopSession(workerId, pin, quantity, notes);
+                const completed = await stopSession(workerId, pin, quantity, notes);
                 setResumedSession(null);
+                setCompletedSession(completed);
             } catch {
                 addToast({ title: "Failed to stop session", description: "Please try again.", color: "danger", timeout: 4000 });
             } finally {
@@ -162,7 +167,7 @@ export default function KioskPage() {
                 setShowingEndForms(false);
                 setCurrentFormIndex(0);
                 if (stopParams) {
-                    await stopSession(
+                    const completed = await stopSession(
                         stopParams.workerId,
                         stopParams.pin,
                         stopParams.quantity,
@@ -172,6 +177,7 @@ export default function KioskPage() {
                     setStopParams(null);
                     setRequestedAt(null);
                     setResumedSession(null);
+                    setCompletedSession(completed);
                 }
             }
         } catch {
@@ -182,7 +188,14 @@ export default function KioskPage() {
     };
 
     return (
-        <div className="h-screen bg-background flex flex-col overflow-hidden">
+        <div className="h-screen bg-background flex flex-col overflow-hidden relative">
+            {completedSession ? (
+                <KioskCompleted
+                    session={completedSession}
+                    onDone={() => setCompletedSession(null)}
+                />
+            ) : (
+            <>
             {showingStartForms && startForms[currentFormIndex] && (
                 <FormRenderer
                     form={startForms[currentFormIndex]}
@@ -235,6 +248,24 @@ export default function KioskPage() {
                     isGeneral={state.workstation.is_general}
                     onResumeSession={handleResumeSession}
                 />
+            )}
+            </>
+            )}
+
+            {isSubmitting && (
+                <div
+                    className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 size={48} className="animate-spin text-text" />
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                            Processing...
+                        </p>
+                    </div>
+                </div>
             )}
         </div>
     );

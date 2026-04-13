@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
+from django.db import transaction
 from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta
@@ -119,17 +120,15 @@ class WorkSessionStartView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Create session
-        session = WorkSession.objects.create(
-            user=request.user,
-            workstation_id=workstation_id,
-            status='active',
-            item_id=item_id,
-            start_time=timezone.now(),
-        )
-
-        # Assign workers (ManyToMany through)
-        session.workers.set(worker_ids)
+        with transaction.atomic():
+            session = WorkSession.objects.create(
+                user=request.user,
+                workstation_id=workstation_id,
+                status='active',
+                item_id=item_id,
+                start_time=timezone.now(),
+            )
+            session.workers.set(worker_ids)
 
         serializer = WorkSessionSerializer(session)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -160,13 +159,14 @@ class WorkSessionStopView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        session.end_time = timezone.now()
-        session.status = 'completed'
-        session.quantity_produced = quantity_produced
-        if notes:
-            session.notes = notes
-        session.save()
-        session.save_performance()  # compute after save so duration_hours is available
+        with transaction.atomic():
+            session.end_time = timezone.now()
+            session.status = 'completed'
+            session.quantity_produced = quantity_produced
+            if notes:
+                session.notes = notes
+            session.save()
+            session.save_performance()
 
         serializer = WorkSessionSerializer(
             WorkSession.objects.prefetch_related('workers').get(pk=session.pk)

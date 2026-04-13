@@ -16,12 +16,12 @@ export default function QCWorkerSelect({ token, workers, onVerified }: QCWorkerS
 
     if (selecting) {
         return (
-            <div className="flex flex-col h-full">
-                <div className="px-6 pt-8 pb-6 border-b border-border">
+            <div className="flex flex-col h-full overflow-hidden">
+                <div className="px-6 pt-8 pb-6 border-b border-border shrink-0">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Quality Control</p>
                     <h1 className="text-3xl font-black text-text uppercase tracking-tight">Verify Identity</h1>
                 </div>
-                <div className="flex-1 flex flex-col justify-center">
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
                     <QCPinPad
                         token={token}
                         worker={selecting}
@@ -34,14 +34,14 @@ export default function QCWorkerSelect({ token, workers, onVerified }: QCWorkerS
     }
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="px-6 pt-8 pb-6 border-b border-border">
+        <div className="flex flex-col h-full overflow-hidden">
+            <div className="px-6 pt-8 pb-6 border-b border-border shrink-0">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted">Quality Control</p>
                 <h1 className="text-3xl font-black text-text uppercase tracking-tight">Who are you?</h1>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted mb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted mb-2 shrink-0">
                     Select your name to continue
                 </p>
                 {workers.length === 0 && (
@@ -52,7 +52,7 @@ export default function QCWorkerSelect({ token, workers, onVerified }: QCWorkerS
                         key={worker.id}
                         onPress={() => setSelecting(worker)}
                         variant="bordered"
-                        className="w-full justify-start px-6 h-16 text-lg font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface"
+                        className="w-full justify-start px-6 h-16 text-lg font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface shrink-0"
                     >
                         {worker.name}
                     </Button>

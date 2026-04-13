@@ -83,8 +83,8 @@ export default function KioskActive({
     if (!stopping) {
         return (
             <>
-                <div className="flex flex-col h-full">
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4 sm:gap-8 p-4 sm:p-8">
+                <div className="flex flex-col h-full overflow-hidden">
+                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center gap-4 sm:gap-8 p-4 sm:p-8">
                         <div className="flex items-center gap-3">
                             <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
                             <p className="text-xs font-semibold uppercase tracking-widest text-success">Session Active</p>
@@ -153,7 +153,7 @@ export default function KioskActive({
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
             <div className="px-4 pt-6 pb-4 border-b border-border flex items-center justify-between shrink-0">
                 <h2 className="text-xl sm:text-2xl font-black text-text uppercase">Stop Session</h2>
                 <Button
@@ -165,10 +165,10 @@ export default function KioskActive({
                 </Button>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center">
+            <div className="flex-1 min-h-0 flex flex-col">
                 {stopStep === "confirm" && (
-                    <div className="p-4 flex flex-col gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted shrink-0">
                             Who is stopping the session?
                         </p>
                         {sessionWorkers.map((w) => (
@@ -176,7 +176,7 @@ export default function KioskActive({
                                 key={w.id}
                                 onPress={() => { setSelectedWorker(w); setStopStep("pin"); }}
                                 variant="bordered"
-                                className="w-full justify-start px-4 h-12 sm:h-16 text-base sm:text-lg font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface"
+                                className="w-full justify-start px-4 h-12 sm:h-16 text-base sm:text-lg font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface shrink-0"
                             >
                                 {w.name}
                             </Button>
@@ -185,16 +185,18 @@ export default function KioskActive({
                 )}
 
                 {stopStep === "pin" && selectedWorker && (
-                    <PinPad
-                        token={token}
-                        worker={selectedWorker}
-                        onSuccess={handlePinSuccess}
-                        onCancel={() => setStopStep("confirm")}
-                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
+                        <PinPad
+                            token={token}
+                            worker={selectedWorker}
+                            onSuccess={handlePinSuccess}
+                            onCancel={() => setStopStep("confirm")}
+                        />
+                    </div>
                 )}
 
                 {stopStep === "quantity" && (
-                    <div className="p-4 flex flex-col gap-4">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted">
                             How many units were produced?
                         </p>

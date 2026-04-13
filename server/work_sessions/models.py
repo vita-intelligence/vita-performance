@@ -41,18 +41,22 @@ class WorkSession(models.Model):
         if not self.quantity_produced or not self.workstation:
             return None
 
-        settings = self.workstation.get_effective_settings()
         target_qty = self.override_target_quantity or self.workstation.target_quantity
         target_dur = self.override_target_duration or self.workstation.target_duration
 
         if not target_qty or not target_dur:
             return None
 
-        quantity_accepted = float(self.quantity_produced) - float(self.quantity_rejected or 0)
-        duration = self.duration_hours or 0
-
-        if duration <= 0:
+        if not self.end_time or not self.start_time:
             return None
+
+        quantity_accepted = float(self.quantity_produced) - float(self.quantity_rejected or 0)
+        # Use raw seconds instead of the rounded duration_hours property so
+        # sub-minute sessions still produce a meaningful percentage.
+        duration_seconds = (self.end_time - self.start_time).total_seconds()
+        if duration_seconds <= 0:
+            return None
+        duration = duration_seconds / 3600.0
 
         expected_qty = (duration / float(target_dur)) * float(target_qty)
         if expected_qty <= 0:

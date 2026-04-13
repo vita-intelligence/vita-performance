@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_CONFIG } from "@/config/api";
-import { QCWorker, QCWorkstation, QCSession } from "@/types/qc";
+import { QCWorker, QCWorkstation, QCSessionPage, QCSessionFilters } from "@/types/qc";
 import api from "@/lib/api";
 
 const qcApi = axios.create({
@@ -49,8 +49,15 @@ export const qcService = {
         return data;
     },
 
-    getSessions: async (token: string, workstationId: number): Promise<QCSession[]> => {
-        const { data } = await qcApi.get(qc.sessions(token, workstationId));
+    getSessions: async (token: string, filters: QCSessionFilters = {}): Promise<QCSessionPage> => {
+        const params: Record<string, string | number> = {};
+        if (filters.search) params.search = filters.search;
+        if (filters.workstation) params.workstation = filters.workstation;
+        if (filters.date_from) params.date_from = filters.date_from;
+        if (filters.date_to) params.date_to = filters.date_to;
+        if (filters.page) params.page = filters.page;
+        if (filters.page_size) params.page_size = filters.page_size;
+        const { data } = await qcApi.get(qc.sessions(token), { params });
         return data;
     },
 

@@ -1,4 +1,5 @@
 import uuid
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from asgiref.sync import async_to_sync
@@ -9,9 +10,32 @@ from dashboard.serializers.realtime import build_dashboard_payload
 
 @receiver(post_save, sender=WorkSession)
 def session_changed(sender, instance, created, **kwargs):
+    # Defer until after the surrounding transaction commits, so that any
+    # workers.set(...) / workers.add(...) calls that follow .save() in the
+    # same view have already been written.
+    transaction.on_commit(lambda: _broadcast_session_change(instance.pk, created))
+
+
+def _broadcast_session_change(session_pk, created):
     channel_layer = get_channel_layer()
     if not channel_layer:
         return
+
+    try:
+        instance = (
+            WorkSession.objects
+            .select_related('workstation', 'user')
+            .prefetch_related('workers')
+            .get(pk=session_pk)
+        )
+    except WorkSession.DoesNotExist:
+        return
+
+    # Recompute performance now so the broadcast (and any later reads) see the
+    # correct value. save_performance() uses .update() which does NOT trigger
+    # post_save again, so this is safe from recursion.
+    if instance.status in ('completed', 'verified') and instance.end_time and instance.quantity_produced is not None:
+        instance.save_performance()
 
     worker_names = ", ".join(w.full_name for w in instance.workers.all())
     event_alerts = []
@@ -27,7 +51,7 @@ def session_changed(sender, instance, created, **kwargs):
             },
         })
 
-    elif not created and instance.status == 'completed':
+    elif not created and instance.status in ('completed', 'verified'):
         perf = instance.performance_percentage
 
         event_alerts.append({

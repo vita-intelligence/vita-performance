@@ -26,3 +26,12 @@ export interface KioskItem {
     id: number;
     name: string;
 }
+
+export interface KioskCompletedSession {
+    id: number;
+    performance_percentage: number | null;
+    duration_hours: number | null;
+    quantity_produced: number | null;
+    item_name: string | null;
+    worker_name: string;
+}

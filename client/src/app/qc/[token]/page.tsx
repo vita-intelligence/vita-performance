@@ -3,8 +3,7 @@
 import { useParams } from "next/navigation";
 import { useQC } from "@/hooks/useQC";
 import QCWorkerSelect from "./_components/QCWorkerSelect";
-import QCWorkstationList from "./_components/QCWorkstationList";
-import QCSessionList from "./_components/QCSessionList";
+import QCDashboard from "./_components/QCDashboard";
 
 export default function QCPage() {
     const { token } = useParams<{ token: string }>();
@@ -13,13 +12,19 @@ export default function QCPage() {
         workers,
         workstations,
         sessions,
+        count,
+        page,
+        totalPages,
+        filters,
         isLoading,
+        isLoadingSessions,
+        isVerifying,
         error,
         verifyPin,
-        selectWorkstation,
         verifySession,
         logout,
-        backToWorkstations
+        updateFilters,
+        goToPage,
     } = useQC(token);
 
     if (isLoading) {
@@ -40,33 +45,26 @@ export default function QCPage() {
 
     return (
         <div className="h-screen bg-background flex flex-col overflow-hidden">
-            {/* No worker logged in — show worker selection */}
-            {!state.worker && (
+            {!state.worker ? (
                 <QCWorkerSelect
                     token={token}
                     workers={workers}
                     onVerified={verifyPin}
                 />
-            )}
-
-            {/* Worker logged in, no workstation selected */}
-            {state.worker && !state.workstation && (
-                <QCWorkstationList
+            ) : (
+                <QCDashboard
                     worker={state.worker}
                     workstations={workstations}
-                    onSelect={selectWorkstation}
-                    onLogout={logout}
-                />
-            )}
-
-            {/* Worker logged in, workstation selected */}
-            {state.worker && state.workstation && (
-                <QCSessionList
-                    worker={state.worker}
-                    workstation={state.workstation}
                     sessions={sessions}
+                    count={count}
+                    page={page}
+                    totalPages={totalPages}
+                    filters={filters}
+                    isLoadingSessions={isLoadingSessions}
+                    isVerifying={isVerifying}
+                    onUpdateFilters={updateFilters}
+                    onGoToPage={goToPage}
                     onVerify={verifySession}
-                    onBack={backToWorkstations}
                     onLogout={logout}
                 />
             )}

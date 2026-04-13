@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 from ..models import WorkSession
 from workers.serializers import WorkerSerializer
@@ -50,17 +51,19 @@ class WorkSessionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         worker_ids = validated_data.pop('worker_ids', [])
-        session = WorkSession.objects.create(**validated_data)
-        session.workers.set(worker_ids)
-        session.save_performance()
+        with transaction.atomic():
+            session = WorkSession.objects.create(**validated_data)
+            session.workers.set(worker_ids)
+            session.save_performance()
         return WorkSession.objects.prefetch_related('workers').get(pk=session.pk)
 
     def update(self, instance, validated_data):
         worker_ids = validated_data.pop('worker_ids', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if worker_ids is not None:
-            instance.workers.set(worker_ids)
-        instance.save_performance()
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+            if worker_ids is not None:
+                instance.workers.set(worker_ids)
+            instance.save_performance()
         return WorkSession.objects.prefetch_related('workers').get(pk=instance.pk)

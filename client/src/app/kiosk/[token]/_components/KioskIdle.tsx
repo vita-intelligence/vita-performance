@@ -173,12 +173,12 @@ export default function KioskIdle({
 
     if (step === "pin" && selectingWorker) {
         return (
-            <div className="flex flex-col h-full">
-                <div className="px-4 pt-6 pb-4 border-b border-border">
+            <div className="flex flex-col h-full overflow-hidden">
+                <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
                     <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                 </div>
-                <div className="flex-1 flex flex-col justify-center">
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
                     <PinPad
                         token={token}
                         worker={selectingWorker}
@@ -192,12 +192,12 @@ export default function KioskIdle({
 
     if (step === "item") {
         return (
-            <div className="flex flex-col h-full">
-                <div className="px-4 pt-6 pb-4 border-b border-border">
+            <div className="flex flex-col h-full overflow-hidden">
+                <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
                     <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                 </div>
-                <div className="flex-1 flex flex-col justify-center">
+                <div className="flex-1 min-h-0 flex flex-col">
                     <ItemStep
                         token={token}
                         selected={selectedItem}
@@ -213,13 +213,13 @@ export default function KioskIdle({
     if (step === "review") {
         return (
             <>
-                <div className="flex flex-col h-full">
-                    <div className="px-4 pt-6 pb-4 border-b border-border">
+                <div className="flex flex-col h-full overflow-hidden">
+                    <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
                         <h1 className="text-xl sm:text-3xl font-black text-text uppercase tracking-tight">{workstationName}</h1>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-6">
                         <div className="flex flex-col gap-2">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workers</p>
                             {checkedIn.map((w) => (
@@ -240,7 +240,7 @@ export default function KioskIdle({
                         </div>
                     </div>
 
-                    <div className="p-4 border-t border-border flex flex-col gap-2">
+                    <div className="p-4 border-t border-border flex flex-col gap-2 shrink-0">
                         <Button
                             onPress={handleStart}
                             isDisabled={isSubmitting}

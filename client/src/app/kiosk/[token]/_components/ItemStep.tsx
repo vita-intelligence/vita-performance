@@ -41,7 +41,7 @@ export default function ItemStep({ token, selected, onSelect, onNext, onBack }: 
     }, [debouncedQuery, token]);
 
     return (
-        <div className="flex flex-col h-full px-4 py-6 gap-4">
+        <div className="flex flex-col h-full min-h-0 px-4 py-6 gap-4">
             <div className="flex flex-col gap-1">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted">Select Item</p>
                 <p className="text-sm text-muted">What are you producing this session?</p>
@@ -70,22 +70,20 @@ export default function ItemStep({ token, selected, onSelect, onNext, onBack }: 
             {isSearching && (
                 <p className="text-xs text-muted uppercase tracking-widest">Searching...</p>
             )}
-            {results.length > 0 && (
-                <div className="flex flex-col gap-2 overflow-y-auto flex-1">
-                    {results.map((item) => (
-                        <Button
-                            key={item.id}
-                            onPress={() => { onSelect(item); setQuery(""); setResults([]); }}
-                            variant="bordered"
-                            className="w-full justify-start px-4 h-12 sm:h-14 text-base font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface"
-                        >
-                            {item.name}
-                        </Button>
-                    ))}
-                </div>
-            )}
+            <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0">
+                {results.map((item) => (
+                    <Button
+                        key={item.id}
+                        onPress={() => { onSelect(item); setQuery(""); setResults([]); }}
+                        variant="bordered"
+                        className="w-full justify-start px-4 h-12 sm:h-14 text-base font-black uppercase tracking-wide rounded-none border-border text-text hover:border-text hover:bg-surface shrink-0"
+                    >
+                        {item.name}
+                    </Button>
+                ))}
+            </div>
 
-            <div className="mt-auto flex flex-col gap-2">
+            <div className="shrink-0 flex flex-col gap-2">
                 <Button
                     onPress={onNext}
                     className="w-full h-12 sm:h-14 bg-text text-background text-sm font-black uppercase tracking-widest hover:opacity-80 rounded-none"

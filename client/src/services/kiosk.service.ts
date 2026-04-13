@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_CONFIG } from "@/config/api";
-import { KioskState, KioskWorker, KioskActiveSession, KioskItem } from "@/types/kiosk";
+import { KioskState, KioskWorker, KioskActiveSession, KioskItem, KioskCompletedSession } from "@/types/kiosk";
 
 const kioskApi = axios.create({
     baseURL: API_CONFIG.baseUrl,
@@ -34,8 +34,9 @@ export const kioskService = {
         });
         return data;
     },
-    stopSession: async (token: string, worker_id: number, pin: string, quantity_produced: number, notes?: string, requested_at?: string): Promise<void> => {
-        await kioskApi.post(kiosk.stop(token), { worker_id, pin, quantity_produced, notes, requested_at });
+    stopSession: async (token: string, worker_id: number, pin: string, quantity_produced: number, notes?: string, requested_at?: string): Promise<KioskCompletedSession> => {
+        const { data } = await kioskApi.post(kiosk.stop(token), { worker_id, pin, quantity_produced, notes, requested_at });
+        return data.session;
     },
 
     searchItems: async (token: string, q: string): Promise<KioskItem[]> => {

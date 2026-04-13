@@ -67,7 +67,7 @@ export const API_CONFIG = {
         workers: (token: string) => `/api/qc/${token}/workers/`,
         verifyPin: (token: string) => `/api/qc/${token}/verify-pin/`,
         workstations: (token: string) => `/api/qc/${token}/workstations/`,
-        sessions: (token: string, workstationId: number) => `/api/qc/${token}/workstations/${workstationId}/sessions/`,
+        sessions: (token: string) => `/api/qc/${token}/sessions/`,
         verifySession: (token: string, sessionId: number) => `/api/qc/${token}/sessions/${sessionId}/verify/`,
     },
     subscription: {

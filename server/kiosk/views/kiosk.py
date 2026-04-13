@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 from django.utils import timezone
 from datetime import datetime
 from workstations.models import Workstation
@@ -168,14 +169,15 @@ class KioskStartSessionView(APIView):
             if WorkSession.objects.filter(workstation=workstation, status='active').exists():
                 return Response({'detail': 'A session is already active on this workstation.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        session = WorkSession.objects.create(
-            user=workstation.user,
-            workstation=workstation,
-            item_id=item_id,
-            status='active',
-            start_time=parse_requested_at(request.data.get('requested_at')),
-        )
-        session.workers.set(worker_ids)
+        with transaction.atomic():
+            session = WorkSession.objects.create(
+                user=workstation.user,
+                workstation=workstation,
+                item_id=item_id,
+                status='active',
+                start_time=parse_requested_at(request.data.get('requested_at')),
+            )
+            session.workers.set(worker_ids)
 
         return Response({
             'id': session.id,
@@ -258,15 +260,27 @@ class KioskStopSessionView(APIView):
         if not session:
             return Response({'detail': 'No active session found for this worker.'}, status=status.HTTP_404_NOT_FOUND)
 
-        session.end_time = parse_requested_at(request.data.get('requested_at'))
-        session.status = 'completed'
-        session.quantity_produced = quantity
-        if notes:
-            session.notes = notes
-        session.save()
-        session.save_performance()
+        with transaction.atomic():
+            session.end_time = parse_requested_at(request.data.get('requested_at'))
+            session.status = 'completed'
+            session.quantity_produced = quantity
+            if notes:
+                session.notes = notes
+            session.save()
+            session.save_performance()
+        session.refresh_from_db()
 
-        return Response({'detail': 'Session completed.'})
+        return Response({
+            'detail': 'Session completed.',
+            'session': {
+                'id': session.id,
+                'performance_percentage': session.performance_percentage,
+                'duration_hours': session.duration_hours,
+                'quantity_produced': session.quantity_produced,
+                'item_name': session.item.name if session.item else None,
+                'worker_name': worker.full_name,
+            },
+        })
 
 
 class KioskItemSearchView(APIView):
