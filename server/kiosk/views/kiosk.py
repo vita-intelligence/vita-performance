@@ -75,6 +75,7 @@ class KioskWorkstationView(APIView):
                 'id': workstation.id,
                 'name': workstation.name,
                 'is_general': workstation.is_general,
+                'uom': workstation.uom or None,
             },
             'active_session': {
                 'id': active_session.id,
@@ -279,6 +280,7 @@ class KioskStopSessionView(APIView):
                 'quantity_produced': session.quantity_produced,
                 'item_name': session.item.name if session.item else None,
                 'worker_name': worker.full_name,
+                'uom': workstation.uom or None,
             },
         })
 

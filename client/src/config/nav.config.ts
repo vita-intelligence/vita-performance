@@ -9,6 +9,7 @@ import {
   Package,
   CreditCard,
   ClipboardList,
+  Gauge,
   User,
   Users,
 } from "lucide-react";
@@ -43,6 +44,11 @@ export const NAV_ITEMS = [
     label: "Groups",
     href: "/groups",
     icon: Users,
+  },
+  {
+    label: "Reputation",
+    href: "/reputation",
+    icon: Gauge,
   },
   {
     label: "Items",

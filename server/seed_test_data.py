@@ -4,10 +4,11 @@ from datetime import timedelta
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from workers.models import Worker, WorkerGroup
+from workers.models import Worker, WorkerGroup, WorkerReputationEvent
 from workstations.models import Workstation
 from items.models import Item
 from work_sessions.models import WorkSession
+from dashboard.signals.session_signals import _auto_event_for_perf
 
 User = get_user_model()
 user = User.objects.get(email="maxchergik@gmail.com")
@@ -169,4 +170,97 @@ for _ in range(to_create):
 
 print(f"Sessions created: {created}")
 print(f"Total sessions: {WorkSession.objects.filter(user=user).count()}")
+
+# --- Reputation Events ---
+# Backfill auto events from every verified session (idempotent — wipes previous).
+print("Backfilling auto reputation events from verified sessions...")
+WorkerReputationEvent.objects.filter(
+    worker__user=user,
+    event_type__in=WorkerReputationEvent.AUTO_TYPES,
+).delete()
+
+verified_sessions = (
+    WorkSession.objects
+    .filter(user=user, status='verified')
+    .select_related('workstation')
+    .prefetch_related('workers')
+)
+auto_created = 0
+for session in verified_sessions:
+    band = _auto_event_for_perf(session.performance_percentage)
+    if not band:
+        continue
+    event_type, delta = band
+    for w in session.workers.all():
+        WorkerReputationEvent.objects.create(
+            worker=w,
+            session=session,
+            event_type=event_type,
+            score_delta=delta,
+            reason=f'{session.performance_percentage}% on {session.workstation.name}',
+            created_at=session.end_time or session.start_time,
+        )
+        auto_created += 1
+print(f"Auto reputation events: {auto_created}")
+
+# Random manual feedback events from QC inspectors.
+qc_inspectors = [w for w in workers if w.is_qa and w.is_active]
+manual_target = 60
+WorkerReputationEvent.objects.filter(
+    worker__user=user,
+    event_type__in=WorkerReputationEvent.MANUAL_TYPES,
+).delete()
+
+POSITIVE_REASONS = [
+    "Cleaned the line before leaving",
+    "Helped a new operator",
+    "Spotted a defect early",
+    "Stayed late to finish the batch",
+    "Excellent quality on every part",
+    "Volunteered for the urgent run",
+    "Caught a calibration drift",
+    "Trained the apprentice this morning",
+    "Reorganized the tool area",
+    "Reported a near-miss safety issue",
+]
+NEGATIVE_REASONS = [
+    "Late returning from break",
+    "Forgot to log the rejected units",
+    "Skipped the daily safety check",
+    "Loud argument on the floor",
+    "Left tools out at end of shift",
+    "Missed the morning briefing",
+    "Did not follow SOP for the cleaning step",
+    "Used phone while machine was running",
+    "Argued with QC about the reject count",
+    "Walked off station without handover",
+]
+
+manual_created = 0
+if qc_inspectors:
+    candidates = [w for w in workers if w.is_active]
+    for _ in range(manual_target):
+        worker = random.choice(candidates)
+        inspector = random.choice(qc_inspectors)
+        positive = random.random() < 0.65
+        days_ago = random.randint(0, 89)
+        hour = random.randint(8, 17)
+        when = (now - timedelta(days=days_ago)).replace(hour=hour, minute=random.randint(0, 59), second=0, microsecond=0)
+        WorkerReputationEvent.objects.create(
+            worker=worker,
+            session=None,
+            event_type='manual_positive' if positive else 'manual_negative',
+            score_delta=10 if positive else -10,
+            reason=random.choice(POSITIVE_REASONS if positive else NEGATIVE_REASONS),
+            created_by=inspector,
+            created_at=when,
+        )
+        manual_created += 1
+print(f"Manual reputation events: {manual_created}")
+
+# Recompute every worker's score so the stored field matches.
+print("Recomputing worker reputation scores...")
+for w in Worker.objects.filter(user=user):
+    w.recompute_reputation_score()
+
 print("Done.")

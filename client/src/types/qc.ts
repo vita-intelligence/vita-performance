@@ -13,6 +13,7 @@ export interface QCSession {
     id: number;
     workstation_id: number;
     workstation_name: string | null;
+    workstation_uom: string | null;
     start_time: string;
     end_time: string | null;
     duration_hours: number | null;
@@ -40,4 +41,16 @@ export interface QCSessionFilters {
 
 export interface QCState {
     worker: QCWorker | null;
+}
+
+export interface QCFeedbackMark {
+    worker_id: number;
+    mark: 'positive' | 'negative';
+    reason: string;
+}
+
+export interface QCVerifyPayload {
+    quantity_rejected: number;
+    qc_inspector_id?: number;
+    feedback?: QCFeedbackMark[];
 }

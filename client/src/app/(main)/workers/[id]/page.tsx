@@ -7,6 +7,7 @@ import { RangeKey } from "@/constants/filters.constants";
 import RangeSelector from "@/app/(main)/dashboard/leaderboard/_components/RangeSelector";
 import WorkerStatsHeader from "./_components/WorkerStatsHeader";
 import WorkerSummaryStats from "./_components/WorkerSummaryStats";
+import WorkerReputationCard from "./_components/WorkerReputationCard";
 import WorkerPerformanceChart from "./_components/WorkerPerformanceChart";
 import WorkerSessionsTable from "./_components/WorkerSessionsTable";
 
@@ -41,6 +42,7 @@ export default function WorkerStatsPage() {
                 <WorkerStatsHeader stats={stats} />
                 <RangeSelector value={range} onChange={(r) => setRange(r as RangeKey)} />
                 <WorkerSummaryStats summary={stats.summary} />
+                <WorkerReputationCard stats={stats} />
                 <WorkerPerformanceChart chart={stats.chart} grouping={stats.grouping} />
                 <WorkerSessionsTable sessions={stats.sessions} />
             </div>

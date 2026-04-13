@@ -101,7 +101,9 @@ export default function KioskCompleted({ session, onDone }: KioskCompletedProps)
                     {session.quantity_produced !== null && (
                         <div className="flex flex-col items-center gap-1">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Quantity</p>
-                            <p className="text-xl sm:text-2xl font-black text-text">{session.quantity_produced}</p>
+                            <p className="text-xl sm:text-2xl font-black text-text">
+                                {session.quantity_produced} {session.uom || "units"}
+                            </p>
                         </div>
                     )}
                     {session.item_name && (

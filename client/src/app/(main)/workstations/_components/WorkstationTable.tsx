@@ -38,7 +38,7 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                                 <td className="px-4 py-3 text-muted truncate">{workstation.description || "—"}</td>
                                 <td className="px-4 py-3 text-text truncate">
                                     {workstation.target_quantity && workstation.target_duration
-                                        ? `${formatNumber(Number(workstation.target_quantity), settings)} units / ${workstation.target_duration}h`
+                                        ? `${formatNumber(Number(workstation.target_quantity), settings)} ${workstation.uom || "units"} / ${workstation.target_duration}h`
                                         : <span className="text-muted text-xs">—</span>
                                     }
                                 </td>

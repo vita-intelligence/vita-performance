@@ -9,7 +9,7 @@ class WorkstationSerializer(serializers.ModelSerializer):
         model = Workstation
         fields = (
             'id', 'name', 'description', 'is_active', 'is_general', 'created_at', 'updated_at',
-            'target_quantity', 'target_duration',
+            'target_quantity', 'target_duration', 'uom',
             'working_hours_per_day', 'overtime_threshold', 'overtime_multiplier',
             'week_starts_on', 'effective_settings', 'kiosk_token',
         )

@@ -9,6 +9,8 @@ import {
   UpdateWorkerGroupPayload,
   WorkerLeaderboard,
   WorkerStats,
+  ReputationTimelinePage,
+  ReputationTimelineFilters,
 } from "@/types/worker";
 import { PaginatedResponse } from "@/types/api";
 
@@ -88,5 +90,21 @@ export const workerService = {
 
   deleteGroup: async (id: number): Promise<void> => {
     await api.delete(workers.groupDetail(id));
+  },
+
+  getReputationEvents: async (
+    page: number,
+    filters: ReputationTimelineFilters = {},
+  ): Promise<ReputationTimelinePage> => {
+    const params: Record<string, string | number> = { page };
+    if (filters.search) params.search = filters.search;
+    if (filters.worker) params.worker = filters.worker;
+    if (filters.category) params.category = filters.category;
+    if (filters.sign) params.sign = filters.sign;
+    if (filters.date_from) params.date_from = filters.date_from;
+    if (filters.date_to) params.date_to = filters.date_to;
+    if (filters.page_size) params.page_size = filters.page_size;
+    const { data } = await api.get<ReputationTimelinePage>(workers.reputationEvents, { params });
+    return data;
   },
 };

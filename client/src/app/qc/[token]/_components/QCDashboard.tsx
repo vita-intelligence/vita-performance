@@ -2,13 +2,16 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@heroui/react";
-import { LogOut, Search, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { QCWorker, QCWorkstation, QCSession, QCSessionFilters } from "@/types/qc";
+import { LogOut, Search, X, ChevronLeft, ChevronRight, Loader2, MessageSquarePlus } from "lucide-react";
+import { QCWorker, QCWorkstation, QCSession, QCSessionFilters, QCFeedbackMark } from "@/types/qc";
 import { useDebounce } from "@/hooks/useDebounce";
 import QCVerifyDrawer from "./QCVerifyDrawer";
+import QCGeneralFeedbackDrawer from "./QCGeneralFeedbackDrawer";
 
 interface QCDashboardProps {
+    token: string;
     worker: QCWorker;
+    allWorkers: QCWorker[];
     workstations: QCWorkstation[];
     sessions: QCSession[];
     count: number;
@@ -19,8 +22,9 @@ interface QCDashboardProps {
     isVerifying: boolean;
     onUpdateFilters: (next: Partial<QCSessionFilters>) => void;
     onGoToPage: (page: number) => void;
-    onVerify: (sessionId: number, quantityRejected: number) => Promise<void> | void;
+    onVerify: (sessionId: number, quantityRejected: number, feedback: QCFeedbackMark[]) => Promise<void> | void;
     onLogout: () => void;
+    onFeedbackSubmitted: () => void;
 }
 
 function formatDate(iso: string) {
@@ -30,7 +34,9 @@ function formatDate(iso: string) {
 }
 
 export default function QCDashboard({
+    token,
     worker,
+    allWorkers,
     workstations,
     sessions,
     count,
@@ -43,10 +49,12 @@ export default function QCDashboard({
     onGoToPage,
     onVerify,
     onLogout,
+    onFeedbackSubmitted,
 }: QCDashboardProps) {
     const [searchInput, setSearchInput] = useState(filters.search || "");
     const debouncedSearch = useDebounce(searchInput, 300);
     const [selected, setSelected] = useState<QCSession | null>(null);
+    const [generalOpen, setGeneralOpen] = useState(false);
 
     useEffect(() => {
         if ((filters.search || "") !== debouncedSearch) {
@@ -85,16 +93,26 @@ export default function QCDashboard({
                             Pending QC ({count})
                         </h1>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-2">
                         <p className="text-xs font-semibold uppercase tracking-widest text-success">{worker.name}</p>
-                        <Button
-                            onPress={onLogout}
-                            variant="light"
-                            className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-error rounded-none h-auto p-0 min-w-0"
-                            startContent={<LogOut size={12} />}
-                        >
-                            Logout
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            <Button
+                                onPress={() => setGeneralOpen(true)}
+                                variant="bordered"
+                                className="rounded-none border-text text-text text-xs font-semibold uppercase tracking-widest hover:bg-text hover:text-background h-9 px-3"
+                                startContent={<MessageSquarePlus size={12} />}
+                            >
+                                Feedback
+                            </Button>
+                            <Button
+                                onPress={onLogout}
+                                variant="light"
+                                className="text-xs font-semibold uppercase tracking-widest text-muted hover:text-error rounded-none h-auto p-0 min-w-0"
+                                startContent={<LogOut size={12} />}
+                            >
+                                Logout
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -185,7 +203,9 @@ export default function QCDashboard({
                                 <div className="flex items-center justify-between gap-3 text-xs text-muted uppercase tracking-widest">
                                     <span className="truncate">{session.workstation_name || "—"}</span>
                                     <span className="shrink-0">
-                                        {session.quantity_produced ? `${session.quantity_produced} units` : "—"}
+                                        {session.quantity_produced
+                                            ? `${session.quantity_produced} ${session.workstation_uom || "units"}`
+                                            : "—"}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 text-xs text-muted">
@@ -229,10 +249,19 @@ export default function QCDashboard({
                 session={selected}
                 isVerifying={isVerifying}
                 onClose={() => setSelected(null)}
-                onVerify={async (id, rejected) => {
-                    await onVerify(id, rejected);
+                onVerify={async (id, rejected, feedback) => {
+                    await onVerify(id, rejected, feedback);
                     setSelected(null);
                 }}
+            />
+
+            <QCGeneralFeedbackDrawer
+                token={token}
+                isOpen={generalOpen}
+                inspector={worker}
+                workers={allWorkers}
+                onClose={() => setGeneralOpen(false)}
+                onSubmitted={onFeedbackSubmitted}
             />
         </>
     );

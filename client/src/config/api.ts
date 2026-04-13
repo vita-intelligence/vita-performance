@@ -30,6 +30,7 @@ export const API_CONFIG = {
       groups: "/api/workers/groups/",
       groupDetail: (id: number) => `/api/workers/groups/${id}/`,
       leaderboard: '/api/workers/leaderboard/',
+      reputationEvents: "/api/workers/reputation/events/",
     },
     sessions: {
       base: "/api/sessions/",
@@ -65,10 +66,12 @@ export const API_CONFIG = {
     qc: {
         token: "/api/qc/token/",
         workers: (token: string) => `/api/qc/${token}/workers/`,
+        allWorkers: (token: string) => `/api/qc/${token}/all-workers/`,
         verifyPin: (token: string) => `/api/qc/${token}/verify-pin/`,
         workstations: (token: string) => `/api/qc/${token}/workstations/`,
         sessions: (token: string) => `/api/qc/${token}/sessions/`,
         verifySession: (token: string, sessionId: number) => `/api/qc/${token}/sessions/${sessionId}/verify/`,
+        feedback: (token: string) => `/api/qc/${token}/feedback/`,
     },
     subscription: {
         base: "/api/subscription/",

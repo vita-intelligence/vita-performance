@@ -36,13 +36,70 @@ export interface WorkerStatsSession {
     status: "completed" | "verified";
 }
 
+export type ReputationTier = 'poor' | 'fair' | 'good' | 'very_good' | 'excellent';
+
+export type ReputationEventType =
+    | 'auto_perf_excellent'
+    | 'auto_perf_high'
+    | 'auto_perf_low'
+    | 'auto_perf_very_low'
+    | 'manual_positive'
+    | 'manual_negative';
+
+export interface WorkerReputationEvent {
+    id: number;
+    event_type: ReputationEventType;
+    score_delta: number;
+    reason: string;
+    session_id: number | null;
+    session_workstation: string | null;
+    created_by: string | null;
+    created_at: string;
+}
+
+export interface ReputationTimelineEvent {
+    id: number;
+    worker_id: number;
+    worker_name: string;
+    event_type: ReputationEventType;
+    score_delta: number;
+    reason: string;
+    session_id: number | null;
+    session_workstation: string | null;
+    created_by_id: number | null;
+    created_by_name: string | null;
+    created_at: string;
+}
+
+export interface ReputationTimelinePage {
+    count: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+    has_more: boolean;
+    results: ReputationTimelineEvent[];
+}
+
+export interface ReputationTimelineFilters {
+    search?: string;
+    worker?: number | null;
+    category?: 'auto' | 'manual' | null;
+    sign?: 'positive' | 'negative' | null;
+    date_from?: string;
+    date_to?: string;
+    page_size?: number;
+}
+
 export interface WorkerStats {
     worker: {
         id: number;
         name: string;
         hourly_rate: number;
         is_active: boolean;
+        reputation_score: number;
+        reputation_tier: ReputationTier;
     };
+    reputation_history: WorkerReputationEvent[];
     summary: WorkerStatsSummary;
     chart: WorkerStatsChartPoint[];
     sessions: WorkerStatsSession[];
@@ -73,6 +130,8 @@ export interface Worker {
   has_pin: boolean;
   group: number | null;
   group_name: string | null;
+  reputation_score: number;
+  reputation_tier: ReputationTier;
   created_at: string;
   updated_at: string;
 }

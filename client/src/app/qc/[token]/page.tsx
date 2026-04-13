@@ -10,6 +10,7 @@ export default function QCPage() {
     const {
         state,
         workers,
+        allWorkers,
         workstations,
         sessions,
         count,
@@ -25,6 +26,7 @@ export default function QCPage() {
         logout,
         updateFilters,
         goToPage,
+        reloadAfterFeedback,
     } = useQC(token);
 
     if (isLoading) {
@@ -53,7 +55,9 @@ export default function QCPage() {
                 />
             ) : (
                 <QCDashboard
+                    token={token}
                     worker={state.worker}
+                    allWorkers={allWorkers}
                     workstations={workstations}
                     sessions={sessions}
                     count={count}
@@ -66,6 +70,7 @@ export default function QCPage() {
                     onGoToPage={goToPage}
                     onVerify={verifySession}
                     onLogout={logout}
+                    onFeedbackSubmitted={reloadAfterFeedback}
                 />
             )}
         </div>

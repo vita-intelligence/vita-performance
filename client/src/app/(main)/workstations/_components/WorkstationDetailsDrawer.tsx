@@ -63,8 +63,11 @@ export default function WorkstationDetailsDrawer({ workstation, onClose, onEdit 
                             </Field>
                             <Field label="Target Output">
                                 {workstation.target_quantity && workstation.target_duration
-                                    ? `${formatNumber(Number(workstation.target_quantity), settings)} units / ${workstation.target_duration}h`
+                                    ? `${formatNumber(Number(workstation.target_quantity), settings)} ${workstation.uom || "units"} / ${workstation.target_duration}h`
                                     : "—"}
+                            </Field>
+                            <Field label="Unit of Measure">
+                                {workstation.uom || <span className="text-muted text-xs">units (default)</span>}
                             </Field>
                             <Field label="Working Hours / Day">
                                 {workstation.working_hours_per_day

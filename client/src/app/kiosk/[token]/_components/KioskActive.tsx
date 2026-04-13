@@ -18,6 +18,7 @@ interface KioskActiveProps {
     isSOPLoading: boolean;
     onFetchSOP: () => void;
     workstationName: string;
+    workstationUom: string | null;
     isSubmitting?: boolean;
 }
 
@@ -30,8 +31,10 @@ export default function KioskActive({
     isSOPLoading,
     onFetchSOP,
     workstationName,
+    workstationUom,
     isSubmitting,
 }: KioskActiveProps) {
+    const uomLabel = workstationUom || "units";
     const [elapsed, setElapsed] = useState("");
     const [stopping, setStopping] = useState(false);
     const [stopStep, setStopStep] = useState<StopStep>("confirm");
@@ -198,16 +201,21 @@ export default function KioskActive({
                 {stopStep === "quantity" && (
                     <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted">
-                            How many units were produced?
+                            How many {uomLabel} were produced?
                         </p>
-                        <input
-                            type="number"
-                            value={quantity}
-                            onChange={(e) => setQuantity(e.target.value)}
-                            placeholder="0"
-                            className="text-4xl sm:text-5xl font-black text-text bg-transparent border-b-2 border-border focus:border-text outline-none pb-2 w-full"
-                            autoFocus
-                        />
+                        <div className="flex items-baseline gap-2 border-b-2 border-border focus-within:border-text pb-2">
+                            <input
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => setQuantity(e.target.value)}
+                                placeholder="0"
+                                className="flex-1 min-w-0 w-0 text-4xl sm:text-5xl font-black text-text bg-transparent outline-none"
+                                autoFocus
+                            />
+                            <span className="shrink-0 text-base sm:text-lg font-semibold uppercase tracking-widest text-muted">
+                                {uomLabel}
+                            </span>
+                        </div>
                         <input
                             type="text"
                             value={notes}

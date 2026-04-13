@@ -6,6 +6,7 @@ import { useWorkers } from "@/hooks/useWorkers";
 import { useSettings } from "@/hooks/useSettings";
 import { formatCurrency } from "@/lib/utils/number.utils";
 import { formatDateTime } from "@/lib/utils/date.utils";
+import { REPUTATION_TIER_COLORS, REPUTATION_TIER_LABELS } from "@/lib/utils/reputation.utils";
 import Drawer from "@/components/ui/Drawer";
 import { BarChart3, Pencil, Trash2 } from "lucide-react";
 
@@ -61,6 +62,16 @@ export default function WorkerDetailsDrawer({ worker, onClose, onEdit }: WorkerD
                             {worker.is_qa ? (
                                 <span className="text-xs font-semibold uppercase tracking-widest text-accent">Yes</span>
                             ) : "No"}
+                        </Field>
+                        <Field label="Reputation Score">
+                            <div className="flex items-center gap-2">
+                                <span className={`font-mono font-black text-lg ${REPUTATION_TIER_COLORS[worker.reputation_tier]}`}>
+                                    {worker.reputation_score}
+                                </span>
+                                <span className="text-xs uppercase tracking-widest text-muted">
+                                    {REPUTATION_TIER_LABELS[worker.reputation_tier]}
+                                </span>
+                            </div>
                         </Field>
                         <Field label="Status">
                             <button

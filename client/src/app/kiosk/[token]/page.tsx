@@ -233,6 +233,7 @@ export default function KioskPage() {
                     isSOPLoading={isSOPLoading}
                     onFetchSOP={fetchSOP}
                     workstationName={state.workstation.name}
+                    workstationUom={state.workstation.uom}
                     isSubmitting={isSubmitting}
                 />
             ) : (

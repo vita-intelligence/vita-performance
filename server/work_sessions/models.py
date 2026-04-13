@@ -58,7 +58,12 @@ class WorkSession(models.Model):
             return None
         duration = duration_seconds / 3600.0
 
-        expected_qty = (duration / float(target_dur)) * float(target_qty)
+        # Expected output scales with the number of workers on the session:
+        # if the workstation target is 1 unit/hour, two people working 1 hour
+        # are expected to produce 2 units to hit 100%.
+        worker_count = max(1, self.workers.count())
+
+        expected_qty = (duration / float(target_dur)) * float(target_qty) * worker_count
         if expected_qty <= 0:
             return None
 

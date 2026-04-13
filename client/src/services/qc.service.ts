@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_CONFIG } from "@/config/api";
-import { QCWorker, QCWorkstation, QCSessionPage, QCSessionFilters } from "@/types/qc";
+import { QCWorker, QCWorkstation, QCSessionPage, QCSessionFilters, QCVerifyPayload } from "@/types/qc";
 import api from "@/lib/api";
 
 const qcApi = axios.create({
@@ -39,6 +39,11 @@ export const qcService = {
         return data;
     },
 
+    getAllWorkers: async (token: string): Promise<QCWorker[]> => {
+        const { data } = await qcApi.get(qc.allWorkers(token));
+        return data;
+    },
+
     verifyPin: async (token: string, worker_id: number, pin: string): Promise<{ id: number; name: string }> => {
         const { data } = await qcApi.post(qc.verifyPin(token), { worker_id, pin });
         return data;
@@ -61,7 +66,14 @@ export const qcService = {
         return data;
     },
 
-    verifySession: async (token: string, sessionId: number, quantity_rejected: number): Promise<void> => {
-        await qcApi.post(qc.verifySession(token, sessionId), { quantity_rejected });
+    verifySession: async (token: string, sessionId: number, payload: QCVerifyPayload): Promise<void> => {
+        await qcApi.post(qc.verifySession(token, sessionId), payload);
+    },
+
+    leaveGeneralFeedback: async (
+        token: string,
+        payload: { worker_id: number; mark: 'positive' | 'negative'; reason: string; qc_inspector_id: number },
+    ): Promise<void> => {
+        await qcApi.post(qc.feedback(token), payload);
     },
 };

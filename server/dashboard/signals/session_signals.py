@@ -5,7 +5,52 @@ from django.dispatch import receiver
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from work_sessions.models import WorkSession
+from workers.models import WorkerReputationEvent
 from dashboard.serializers.realtime import build_dashboard_payload
+
+
+def _auto_event_for_perf(perf):
+    """Map a performance % to (event_type, score_delta) or None if neutral."""
+    if perf is None:
+        return None
+    if perf >= 125:
+        return ('auto_perf_excellent', 10)
+    if perf >= 100:
+        return ('auto_perf_high', 5)
+    if perf < 50:
+        return ('auto_perf_very_low', -10)
+    if perf < 75:
+        return ('auto_perf_low', -5)
+    return None
+
+
+def _sync_auto_reputation_events(session):
+    """Recreate auto reputation events for all workers on this session."""
+    if session.status != 'verified':
+        return
+    perf = session.performance_percentage
+    band = _auto_event_for_perf(perf)
+    # Always wipe previous auto events for this session so re-verifying or
+    # editing the quantity doesn't double-count.
+    WorkerReputationEvent.objects.filter(
+        session=session,
+        event_type__in=WorkerReputationEvent.AUTO_TYPES,
+    ).delete()
+    if band is None:
+        # Still recompute affected workers in case we just removed events.
+        for worker in session.workers.all():
+            worker.recompute_reputation_score()
+        return
+    event_type, delta = band
+    for worker in session.workers.all():
+        WorkerReputationEvent.objects.create(
+            worker=worker,
+            session=session,
+            event_type=event_type,
+            score_delta=delta,
+            reason=f'{perf}% on {session.workstation.name}',
+        )
+        worker.recompute_reputation_score()
 
 
 @receiver(post_save, sender=WorkSession)
@@ -36,6 +81,10 @@ def _broadcast_session_change(session_pk, created):
     # post_save again, so this is safe from recursion.
     if instance.status in ('completed', 'verified') and instance.end_time and instance.quantity_produced is not None:
         instance.save_performance()
+        instance.refresh_from_db(fields=['performance_percentage'])
+
+    # Auto reputation events on QC verify (idempotent — wipes prior auto events).
+    _sync_auto_reputation_events(instance)
 
     worker_names = ", ".join(w.full_name for w in instance.workers.all())
     event_alerts = []

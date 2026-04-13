@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Worker } from "@/types/worker";
 import { useSettings } from "@/hooks/useSettings";
 import { formatCurrency } from "@/lib/utils/number.utils";
+import { REPUTATION_TIER_COLORS } from "@/lib/utils/reputation.utils";
 import WorkerDetailsDrawer from "./WorkerDetailsDrawer";
 
 interface WorkerTableProps {
@@ -21,9 +22,10 @@ export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
                 <table className="w-full text-sm table-fixed">
                     <thead>
                         <tr className="border-b border-border bg-surface">
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[35%]">Name</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[30%]">Group</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[20%]">Hourly Rate</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[28%]">Name</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[24%]">Group</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[18%]">Hourly Rate</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Score</th>
                             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Status</th>
                         </tr>
                     </thead>
@@ -38,6 +40,11 @@ export default function WorkerTable({ workers, onEdit }: WorkerTableProps) {
                                 <td className="px-4 py-3 text-muted truncate">{worker.group_name || "—"}</td>
                                 <td className="px-4 py-3 text-text truncate">
                                     {formatCurrency(Number(worker.hourly_rate), settings)}/hr
+                                </td>
+                                <td className="px-4 py-3">
+                                    <span className={`font-mono font-black ${REPUTATION_TIER_COLORS[worker.reputation_tier]}`}>
+                                        {worker.reputation_score}
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border whitespace-nowrap ${worker.is_active

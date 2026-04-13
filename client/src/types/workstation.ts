@@ -16,6 +16,7 @@ export interface Workstation {
   updated_at: string;
   target_quantity: number | null;
   target_duration: number | null;
+  uom: string | null;
   working_hours_per_day: number | null;
   overtime_threshold: number | null;
   overtime_multiplier: number | null;
@@ -29,6 +30,7 @@ export interface CreateWorkstationPayload {
   is_general?: boolean;
   target_quantity?: number;
   target_duration?: number;
+  uom?: string;
   working_hours_per_day?: number;
   overtime_threshold?: number;
   overtime_multiplier?: number;

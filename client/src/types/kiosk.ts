@@ -2,6 +2,7 @@ export interface KioskWorkstation {
     id: number;
     name: string;
     is_general: boolean;
+    uom: string | null;
 }
 
 export interface KioskWorker {
@@ -34,4 +35,5 @@ export interface KioskCompletedSession {
     quantity_produced: number | null;
     item_name: string | null;
     worker_name: string;
+    uom: string | null;
 }

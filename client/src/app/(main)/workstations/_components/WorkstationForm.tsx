@@ -35,6 +35,7 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                 is_general: workstation.is_general,
                 target_quantity: workstation.target_quantity ?? undefined,
                 target_duration: workstation.target_duration ?? undefined,
+                uom: workstation.uom || "",
                 working_hours_per_day: workstation.working_hours_per_day ?? undefined,
                 overtime_threshold: workstation.overtime_threshold ?? undefined,
                 overtime_multiplier: workstation.overtime_multiplier ?? undefined,
@@ -128,6 +129,14 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                     hint="How many hours it should take to reach the target quantity."
                     error={errors.target_duration?.message}
                     {...register("target_duration")}
+                />
+
+                <Input
+                    label="Unit of Measure (optional)"
+                    placeholder="e.g. kg, boxes, meters"
+                    hint="Shown to workers when entering quantity. Leave blank to use the default 'units'."
+                    error={errors.uom?.message}
+                    {...register("uom")}
                 />
 
                 <div className="flex flex-col gap-2">

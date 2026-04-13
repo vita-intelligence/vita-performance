@@ -9,6 +9,7 @@ export const workstationSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().max(500).optional(),
   is_general: z.boolean().optional(),
+  uom: z.string().max(20).optional(),
   target_quantity: z.union([
     z.coerce.number().min(1, "Must be at least 1"),
     z.literal("").transform(() => undefined),

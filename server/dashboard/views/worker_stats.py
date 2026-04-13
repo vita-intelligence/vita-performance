@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Avg, Sum, Count, Max, Q
 from collections import defaultdict
-from workers.models import Worker
+from workers.models import Worker, WorkerReputationEvent
 from work_sessions.models import WorkSession
 from core.utils.date_utils import get_date_range
 
@@ -103,13 +103,36 @@ class WorkerStatsView(APIView):
             for s in reversed(sessions[-20:])
         ]
 
+        reputation_events = (
+            WorkerReputationEvent.objects
+            .filter(worker=worker)
+            .select_related('created_by', 'session__workstation')
+            .order_by('-created_at')[:20]
+        )
+        reputation_history = [
+            {
+                'id': e.id,
+                'event_type': e.event_type,
+                'score_delta': e.score_delta,
+                'reason': e.reason,
+                'session_id': e.session_id,
+                'session_workstation': e.session.workstation.name if e.session and e.session.workstation else None,
+                'created_by': e.created_by.full_name if e.created_by else None,
+                'created_at': e.created_at.isoformat(),
+            }
+            for e in reputation_events
+        ]
+
         return Response({
             'worker': {
                 'id': worker.id,
                 'name': worker.full_name,
                 'hourly_rate': float(worker.hourly_rate),
                 'is_active': worker.is_active,
+                'reputation_score': worker.reputation_score,
+                'reputation_tier': worker.reputation_tier,
             },
+            'reputation_history': reputation_history,
             'summary': {
                 'sessions_count': summary_qs['sessions_count'] or 0,
                 'avg_performance': round(summary_qs['avg_performance'], 2) if summary_qs['avg_performance'] else None,

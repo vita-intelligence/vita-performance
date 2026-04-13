@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { qcService } from "@/services/qc.service";
-import { QCWorker, QCWorkstation, QCSession, QCSessionFilters, QCState } from "@/types/qc";
+import { QCWorker, QCWorkstation, QCSession, QCSessionFilters, QCState, QCFeedbackMark } from "@/types/qc";
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 const PAGE_SIZE = 25;
@@ -8,6 +8,7 @@ const PAGE_SIZE = 25;
 export const useQC = (token: string) => {
     const [state, setState] = useState<QCState>({ worker: null });
     const [workers, setWorkers] = useState<QCWorker[]>([]);
+    const [allWorkers, setAllWorkers] = useState<QCWorker[]>([]);
     const [workstations, setWorkstations] = useState<QCWorkstation[]>([]);
     const [sessions, setSessions] = useState<QCSession[]>([]);
     const [count, setCount] = useState(0);
@@ -52,11 +53,13 @@ export const useQC = (token: string) => {
 
     const load = useCallback(async () => {
         try {
-            const [qcWorkers, qcWorkstations] = await Promise.all([
+            const [qcWorkers, qcAllWorkers, qcWorkstations] = await Promise.all([
                 qcService.getWorkers(token),
+                qcService.getAllWorkers(token),
                 qcService.getWorkstations(token),
             ]);
             setWorkers(qcWorkers);
+            setAllWorkers(qcAllWorkers);
             setWorkstations(qcWorkstations);
         } catch {
             setError("Invalid or expired QC link.");
@@ -105,6 +108,11 @@ export const useQC = (token: string) => {
         return () => clearInterval(i);
     }, [state.worker, token]);
 
+    const reloadAfterFeedback = useCallback(() => {
+        // Refresh sessions list (counts/items might change in future).
+        fetchSessions(filters, page);
+    }, [fetchSessions, filters, page]);
+
     const verifyPin = useCallback((workerId: number) => {
         const worker = workers.find((w) => w.id === workerId);
         if (worker) setState({ worker });
@@ -119,10 +127,18 @@ export const useQC = (token: string) => {
         setPage(p);
     }, []);
 
-    const verifySession = async (sessionId: number, quantityRejected: number) => {
+    const verifySession = async (
+        sessionId: number,
+        quantityRejected: number,
+        feedback: QCFeedbackMark[] = [],
+    ) => {
         setIsVerifying(true);
         try {
-            await qcService.verifySession(token, sessionId, quantityRejected);
+            await qcService.verifySession(token, sessionId, {
+                quantity_rejected: quantityRejected,
+                qc_inspector_id: state.worker?.id,
+                feedback: feedback.length ? feedback : undefined,
+            });
             // Optimistic update — drop from list, then refetch in background
             setSessions((prev) => prev.filter((s) => s.id !== sessionId));
             setCount((c) => Math.max(0, c - 1));
@@ -135,6 +151,7 @@ export const useQC = (token: string) => {
     return {
         state,
         workers,
+        allWorkers,
         workstations,
         sessions,
         count,
@@ -150,5 +167,6 @@ export const useQC = (token: string) => {
         logout,
         updateFilters,
         goToPage,
+        reloadAfterFeedback,
     };
 };

@@ -4,12 +4,21 @@ from ..models import Worker
 
 class WorkerSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
+    reputation_tier = serializers.CharField(read_only=True)
     pin = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = Worker
-        fields = ('id', 'full_name', 'hourly_rate', 'is_active', 'is_qa', 'group', 'group_name', 'has_pin', 'created_at', 'updated_at', 'pin')
-        read_only_fields = ('id', 'created_at', 'updated_at', 'group_name', 'has_pin')
+        fields = (
+            'id', 'full_name', 'hourly_rate', 'is_active', 'is_qa',
+            'group', 'group_name', 'has_pin',
+            'reputation_score', 'reputation_tier',
+            'created_at', 'updated_at', 'pin',
+        )
+        read_only_fields = (
+            'id', 'created_at', 'updated_at', 'group_name', 'has_pin',
+            'reputation_score', 'reputation_tier',
+        )
 
     def get_group_name(self, obj):
         return obj.group.name if obj.group else None
