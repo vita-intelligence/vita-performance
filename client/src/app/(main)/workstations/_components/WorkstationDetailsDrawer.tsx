@@ -69,6 +69,15 @@ export default function WorkstationDetailsDrawer({ workstation, onClose, onEdit 
                             <Field label="Unit of Measure">
                                 {workstation.uom || <span className="text-muted text-xs">units (default)</span>}
                             </Field>
+                            <Field label="Performance Formula">
+                                {workstation.performance_formula ? (
+                                    <code className="text-xs font-mono whitespace-pre-wrap break-all">
+                                        {workstation.performance_formula}
+                                    </code>
+                                ) : (
+                                    <span className="text-muted text-xs">default</span>
+                                )}
+                            </Field>
                             <Field label="Working Hours / Day">
                                 {workstation.working_hours_per_day
                                     ? `${workstation.working_hours_per_day}h`

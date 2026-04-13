@@ -36,6 +36,7 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                 target_quantity: workstation.target_quantity ?? undefined,
                 target_duration: workstation.target_duration ?? undefined,
                 uom: workstation.uom || "",
+                performance_formula: workstation.performance_formula || "",
                 working_hours_per_day: workstation.working_hours_per_day ?? undefined,
                 overtime_threshold: workstation.overtime_threshold ?? undefined,
                 overtime_multiplier: workstation.overtime_multiplier ?? undefined,
@@ -138,6 +139,60 @@ export default function WorkstationForm({ workstation, onClose }: WorkstationFor
                     error={errors.uom?.message}
                     {...register("uom")}
                 />
+
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted whitespace-nowrap">
+                            Performance Formula
+                        </p>
+                        <div className="h-px bg-border flex-1" />
+                    </div>
+                    <p className="text-xs text-muted">
+                        Optional custom formula to compute the performance percentage. Leave blank to use the default
+                        <code className="text-text mx-1">(produced - rejected) / expected * 100</code>.
+                        Falls back to the default if the formula errors.
+                    </p>
+                    <Controller
+                        name="performance_formula"
+                        control={control}
+                        render={({ field }) => (
+                            <textarea
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                ref={field.ref}
+                                rows={2}
+                                placeholder="e.g. min(150, (produced - rejected - form_defects) / expected * 100)"
+                                className="w-full px-3 py-2 text-sm font-mono bg-surface border border-border focus:border-text outline-none text-text placeholder:text-muted resize-none"
+                            />
+                        )}
+                    />
+                    {errors.performance_formula?.message && (
+                        <p className="text-xs text-error font-semibold uppercase tracking-widest">
+                            {errors.performance_formula.message}
+                        </p>
+                    )}
+                    <details className="text-xs text-muted">
+                        <summary className="cursor-pointer hover:text-text">Available variables</summary>
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 font-mono">
+                            <span><code className="text-text">produced</code> — units produced</span>
+                            <span><code className="text-text">rejected</code> — units rejected</span>
+                            <span><code className="text-text">accepted</code> — produced − rejected</span>
+                            <span><code className="text-text">duration</code> — hours worked</span>
+                            <span><code className="text-text">workers</code> — worker count</span>
+                            <span><code className="text-text">target_quantity</code></span>
+                            <span><code className="text-text">target_duration</code></span>
+                            <span><code className="text-text">expected</code> — baseline expected output</span>
+                            <span><code className="text-text">default</code> — default % result</span>
+                            <span><code className="text-text">form_&lt;label&gt;</code> — numeric end-form answer</span>
+                        </div>
+                        <p className="mt-2">
+                            Operators: <code className="text-text">+ − * / ( )</code>. Functions:{" "}
+                            <code className="text-text">min, max, abs, round</code>. Result must be a number — it will be
+                            rounded to 2 decimals and stored as the percentage.
+                        </p>
+                    </details>
+                </div>
 
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-4">

@@ -1,8 +1,15 @@
+import re
 from django.db import models
 from django.conf import settings
 from workstations.models import Workstation
 from workers.models import Worker
 from items.models import Item
+
+
+def _slugify_label(label):
+    """Turn a form field label into a snake_case identifier safe for formula use."""
+    s = re.sub(r'[^0-9a-zA-Z]+', '_', (label or '').strip().lower()).strip('_')
+    return s or 'field'
 
 
 class WorkSession(models.Model):
@@ -37,6 +44,74 @@ class WorkSession(models.Model):
         worker_names = ", ".join(w.full_name for w in self.workers.all())
         return f'{worker_names} @ {self.workstation.name} ({self.start_time})'
 
+    def _build_formula_context(self, target_qty, target_dur, duration, worker_count, expected_qty):
+        """Build the variable namespace for performance_formula evaluation."""
+        produced = float(self.quantity_produced or 0)
+        rejected = float(self.quantity_rejected or 0)
+        accepted = produced - rejected
+        default_pct = round((accepted / expected_qty) * 100, 2) if expected_qty > 0 else 0
+
+        ctx = {
+            'produced': produced,
+            'rejected': rejected,
+            'accepted': accepted,
+            'duration': duration,
+            'workers': worker_count,
+            'target_quantity': float(target_qty),
+            'target_duration': float(target_dur),
+            'expected': expected_qty,
+            'default': default_pct,
+        }
+
+        # Numeric form-field answers from this session's end/both forms,
+        # exposed as form_<snake_label>. Quietly skip non-numeric values.
+        try:
+            for response in self.form_responses.select_related('form').all():
+                form = response.form
+                if form.trigger not in ('end', 'both'):
+                    continue
+                schema = form.schema or []
+                for field in schema:
+                    if field.get('type') not in ('number', 'rating'):
+                        continue
+                    label = field.get('label') or field.get('id')
+                    raw = (response.answers or {}).get(field.get('id'))
+                    try:
+                        value = float(raw)
+                    except (TypeError, ValueError):
+                        continue
+                    key = f'form_{_slugify_label(label)}'
+                    ctx[key] = value
+        except Exception:
+            # Form access can fail if the session was just created; ignore
+            # rather than break performance computation.
+            pass
+
+        return ctx
+
+    def _evaluate_custom_formula(self, formula, context):
+        """Safely evaluate a user-provided formula. Returns None on any failure."""
+        try:
+            from simpleeval import SimpleEval, NameNotDefined, FunctionNotDefined
+        except ImportError:
+            return None
+        try:
+            evaluator = SimpleEval(
+                names=context,
+                functions={
+                    'min': min,
+                    'max': max,
+                    'round': round,
+                    'abs': abs,
+                },
+            )
+            result = evaluator.eval(formula)
+            return float(result)
+        except (NameNotDefined, FunctionNotDefined, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+            return None
+        except Exception:
+            return None
+
     def compute_performance(self):
         if not self.quantity_produced or not self.workstation:
             return None
@@ -66,6 +141,17 @@ class WorkSession(models.Model):
         expected_qty = (duration / float(target_dur)) * float(target_qty) * worker_count
         if expected_qty <= 0:
             return None
+
+        # Custom workstation formula (optional) — falls back to the default
+        # calculation if it can't evaluate.
+        formula = (self.workstation.performance_formula or '').strip()
+        if formula:
+            context = self._build_formula_context(
+                target_qty, target_dur, duration, worker_count, expected_qty,
+            )
+            result = self._evaluate_custom_formula(formula, context)
+            if result is not None:
+                return round(result, 2)
 
         return round((quantity_accepted / expected_qty) * 100, 2)
 
