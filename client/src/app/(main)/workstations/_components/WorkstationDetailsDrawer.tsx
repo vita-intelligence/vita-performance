@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Workstation } from "@/types/workstation";
 import { useWorkstations } from "@/hooks/useWorkstations";
 import { useSOP } from "@/hooks/useSOP";
@@ -10,7 +11,7 @@ import { formatDateTime } from "@/lib/utils/date.utils";
 import Drawer from "@/components/ui/Drawer";
 import KioskLink from "@/components/shared/KioskLink";
 import SOPViewer from "@/components/shared/SOPViewer";
-import { FileText, Pencil, Trash2 } from "lucide-react";
+import { BarChart3, FileText, Pencil, Trash2 } from "lucide-react";
 
 interface WorkstationDetailsDrawerProps {
     workstation: Workstation | null;
@@ -117,6 +118,13 @@ export default function WorkstationDetailsDrawer({ workstation, onClose, onEdit 
                         </div>
 
                         <div className="flex flex-col gap-2">
+                            <Link
+                                href={`/workstations/${workstation.id}`}
+                                className="flex items-center justify-center gap-2 px-4 py-3 border border-border text-xs font-semibold uppercase tracking-widest text-text hover:bg-surface transition-colors"
+                            >
+                                <BarChart3 size={14} />
+                                View Analytics
+                            </Link>
                             <button
                                 onClick={() => setViewingSOP(true)}
                                 className="flex items-center justify-center gap-2 px-4 py-3 border border-border text-xs font-semibold uppercase tracking-widest text-text hover:bg-surface transition-colors"

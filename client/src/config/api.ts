@@ -44,6 +44,7 @@ export const API_CONFIG = {
         wsToken: "/api/dashboard/ws-token/",
         ws: "/ws/dashboard/",
         workerStats: (id: number) => `/api/dashboard/workers/${id}/stats/`,
+        workstationStats: (id: number) => `/api/dashboard/workstations/${id}/stats/`,
     },
     items: {
         base: "/api/items/",

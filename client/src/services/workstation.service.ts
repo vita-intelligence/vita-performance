@@ -1,9 +1,9 @@
 import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
-import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload, SOP } from "@/types/workstation";
+import { Workstation, CreateWorkstationPayload, UpdateWorkstationPayload, SOP, WorkstationStats } from "@/types/workstation";
 import { PaginatedResponse } from "@/types/api";
 
-const { workstations } = API_CONFIG.endpoints;
+const { workstations, dashboard } = API_CONFIG.endpoints;
 
 export const workstationService = {
   getAll: async (): Promise<Workstation[]> => {
@@ -46,6 +46,13 @@ export const workstationService = {
   
   updateSOP: async (id: number, content: string): Promise<SOP> => {
     const { data } = await api.put<SOP>(workstations.sop(id), { content });
+    return data;
+  },
+
+  getStats: async (id: number, range: string): Promise<WorkstationStats> => {
+    const { data } = await api.get<WorkstationStats>(dashboard.workstationStats(id), {
+      params: { range },
+    });
     return data;
   },
 };

@@ -45,6 +45,14 @@ class WorkSessionListView(ListCreateAPIView):
         if status_param:
             qs = qs.filter(status=status_param)
 
+        workstation_param = self.request.query_params.get('workstation', '').strip()
+        if workstation_param:
+            qs = qs.filter(workstation_id=workstation_param)
+
+        worker_param = self.request.query_params.get('worker', '').strip()
+        if worker_param:
+            qs = qs.filter(workers__id=worker_param).distinct()
+
         return qs
 
     def perform_create(self, serializer):
