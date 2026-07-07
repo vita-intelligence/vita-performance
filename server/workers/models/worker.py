@@ -25,6 +25,20 @@ def reputation_tier(score):
 
 class Worker(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='workers')
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='workers',
+        null=True,
+        blank=True,
+    )
+    external_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='PSP employee uuid — populated by psp_sync when the worker is mirrored from PSP HR.',
+    )
     group = models.ForeignKey(WorkerGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='workers')
     full_name = models.CharField(max_length=200)
     pin = models.CharField(max_length=128, null=True, blank=True)

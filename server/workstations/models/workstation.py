@@ -5,6 +5,24 @@ import uuid
 
 class Workstation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='workstations')
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='workstations',
+        null=True,
+        blank=True,
+    )
+    external_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='PSP workstation uuid — populated by psp_sync when the workstation is mirrored from PSP.',
+    )
+    # When True, kiosk sources its MO picker from PSP via psp_sync
+    # rather than the local Item free-text search. Feature flag for
+    # rollout — see phase 6 of docs/PSP_INTEGRATION_PROPOSAL.md.
+    psp_source_of_truth = models.BooleanField(default=False)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     target_quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)

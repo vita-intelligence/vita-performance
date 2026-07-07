@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     
     # Custom apps
     'accounts',
+    'companies',
     'settings',
     'meta',
     'workstations',
@@ -68,6 +69,7 @@ INSTALLED_APPS = [
     'qc',
     'subscription',
     'dynamic_forms',
+    'psp_sync',
 ]
 
 MIDDLEWARE = [

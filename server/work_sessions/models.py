@@ -19,7 +19,54 @@ class WorkSession(models.Model):
         ('verified', 'Verified'),
     ]
 
+    ACTIVITY_KIND_CHOICES = [
+        ('mo', 'Manufacturing order'),
+        ('cleaning', 'Cleaning'),
+        ('maintenance', 'Maintenance'),
+        ('other', 'Other'),
+    ]
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_sessions')
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='work_sessions',
+        null=True,
+        blank=True,
+    )
+    external_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='PSP workstation-session uuid once the outbox has flushed this row to PSP.',
+    )
+    activity_kind = models.CharField(
+        max_length=16,
+        choices=ACTIVITY_KIND_CHOICES,
+        default='mo',
+        db_index=True,
+    )
+    activity_label = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text='Free-form label when activity_kind = "other". Ignored otherwise.',
+    )
+    mo_uuid = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='PSP manufacturing-order uuid when activity_kind = "mo".',
+    )
+    mo_step_uuid = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='PSP MO-step uuid when activity_kind = "mo".',
+    )
     workers = models.ManyToManyField(Worker, through='SessionWorker', related_name='work_sessions')
     workstation = models.ForeignKey(Workstation, on_delete=models.CASCADE, related_name='sessions')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
