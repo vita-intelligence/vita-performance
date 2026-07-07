@@ -148,6 +148,27 @@ class KioskStartSessionView(APIView):
         worker_ids = request.data.get('worker_ids', [])
         item_id = request.data.get('item_id', None)
 
+        # PSP-linked kiosk sends these instead of / in addition to item_id.
+        # activity_kind defaults to 'mo' when mo_uuid is present; falls back
+        # to 'mo' on the legacy Item-picker path too so historical rows are
+        # backwards-compatible with the new schema.
+        mo_uuid = request.data.get('mo_uuid')
+        mo_step_uuid = request.data.get('mo_step_uuid')
+        activity_kind = request.data.get('activity_kind') or ('mo' if mo_uuid else 'mo')
+        activity_label = request.data.get('activity_label')
+
+        if activity_kind not in {'mo', 'cleaning', 'maintenance', 'other'}:
+            return Response(
+                {'detail': f'Unknown activity_kind: {activity_kind}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if activity_kind == 'mo' and workstation.psp_source_of_truth and not mo_uuid:
+            return Response(
+                {'detail': 'mo_uuid is required for MO-attached sessions on PSP-linked stations.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if not worker_ids:
             return Response({'detail': 'At least one worker is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -173,9 +194,14 @@ class KioskStartSessionView(APIView):
         with transaction.atomic():
             session = WorkSession.objects.create(
                 user=workstation.user,
+                company=workstation.company,
                 workstation=workstation,
                 item_id=item_id,
                 status='active',
+                activity_kind=activity_kind,
+                activity_label=activity_label if activity_kind == 'other' else None,
+                mo_uuid=mo_uuid if activity_kind == 'mo' else None,
+                mo_step_uuid=mo_step_uuid if activity_kind == 'mo' else None,
                 start_time=parse_requested_at(request.data.get('requested_at')),
             )
             session.workers.set(worker_ids)
