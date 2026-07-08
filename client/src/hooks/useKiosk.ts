@@ -56,9 +56,18 @@ export const useKiosk = (token: string) => {
         }
     }, [token, sop]);
 
-    const startSession = async (workerIds: number[], itemId?: number | null, requestedAt?: string) => {
+    const startSession = async (
+        workerIds: number[],
+        selection: import("@/types/kiosk").KioskSelection | null,
+        requestedAt?: string
+    ) => {
         try {
-            const session = await kioskService.startSession(token, workerIds, itemId, requestedAt);
+            const session = await kioskService.startSession(
+                token,
+                workerIds,
+                selection,
+                requestedAt
+            );
             setState((prev) => prev ? { ...prev, active_session: session } : prev);
             return session;
         } catch (e: any) {

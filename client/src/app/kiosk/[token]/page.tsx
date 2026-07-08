@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { addToast } from "@heroui/react";
 import { useKiosk } from "@/hooks/useKiosk";
-import { KioskActiveSession, KioskCompletedSession } from "@/types/kiosk";
+import { KioskActiveSession, KioskCompletedSession, KioskSelection } from "@/types/kiosk";
 import KioskIdle from "./_components/KioskIdle";
 import KioskActive from "./_components/KioskActive";
 import KioskCompleted from "./_components/KioskCompleted";
@@ -46,7 +46,7 @@ export default function KioskPage() {
     } | null>(null);
     const [pendingStart, setPendingStart] = useState<{
         workerIds: number[];
-        itemId?: number | null;
+        selection: KioskSelection | null;
     } | null>(null);
     // Collect all start form answers before session is created
     const [collectedStartAnswers, setCollectedStartAnswers] = useState<StartFormAnswer[]>([]);
@@ -85,16 +85,16 @@ export default function KioskPage() {
     }
 
     // Show forms BEFORE creating session
-    const handleStart = async (workerIds: number[], itemId?: number | null) => {
+    const handleStart = async (workerIds: number[], selection: KioskSelection | null) => {
         if (startForms.length > 0) {
-            setPendingStart({ workerIds, itemId });
+            setPendingStart({ workerIds, selection });
             setCollectedStartAnswers([]);
             setCurrentFormIndex(0);
             setShowingStartForms(true);
         } else {
             setIsSubmitting(true);
             try {
-                const session = await startSession(workerIds, itemId);
+                const session = await startSession(workerIds, selection);
                 setCurrentSessionId(session.id);
             } catch {
                 addToast({ title: "Failed to start session", description: "Please try again.", color: "danger", timeout: 4000 });
@@ -119,7 +119,7 @@ export default function KioskPage() {
                 setShowingStartForms(false);
                 setCurrentFormIndex(0);
                 if (pendingStart) {
-                    const session = await startSession(pendingStart.workerIds, pendingStart.itemId);
+                    const session = await startSession(pendingStart.workerIds, pendingStart.selection);
                     setCurrentSessionId(session.id);
                     for (const collected of newCollected) {
                         await submitFormResponse(collected.formId, session.id, collected.answers);

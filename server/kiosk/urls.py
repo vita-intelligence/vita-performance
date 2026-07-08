@@ -11,6 +11,7 @@ from kiosk.views import (
     KioskFormsView,
     KioskQCWorkersView
 )
+from kiosk.views.psp_bridge import KioskMOsView, KioskNonMOActivitiesView
 from dynamic_forms.views import FormResponseCreateView
 
 urlpatterns = [
@@ -21,6 +22,8 @@ urlpatterns = [
     path('<uuid:token>/active/', KioskActiveSessionView.as_view()),
     path('<uuid:token>/stop/', KioskStopSessionView.as_view()),
     path('<uuid:token>/items/', KioskItemSearchView.as_view()),
+    path('<uuid:token>/mos/', KioskMOsView.as_view()),
+    path('<uuid:token>/non-mo-activities/', KioskNonMOActivitiesView.as_view()),
     path('<uuid:token>/sop/', KioskSOPView.as_view()),
     path('<uuid:token>/forms/<int:form_id>/respond/', FormResponseCreateView.as_view()),
     path('<uuid:token>/forms/', KioskFormsView.as_view()),
