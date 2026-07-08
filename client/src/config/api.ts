@@ -14,6 +14,15 @@ export const API_CONFIG = {
     settings: {
       base: "/api/settings/",
     },
+    companies: {
+      mine: "/api/companies/mine/",
+      integration: "/api/companies/integration/",
+      integrationTest: "/api/companies/integration/test/",
+      integrationSync: "/api/companies/integration/sync/",
+      integrationOutbox: "/api/companies/integration/outbox/",
+      integrationOutboxSweep: "/api/companies/integration/outbox/sweep/",
+      integrationSeedHR: "/api/companies/integration/seed-hr/",
+    },
     meta: {
       currencies: "/api/meta/currencies/",
       languages: "/api/meta/languages/",
@@ -59,6 +68,7 @@ export const API_CONFIG = {
         active: (token: string) => `/api/kiosk/${token}/active/`,
         stop: (token: string) => `/api/kiosk/${token}/stop/`,
         searchItems: (token: string) => `/api/kiosk/${token}/items/`,
+        mos: (token: string) => `/api/kiosk/${token}/mos/`,
         sop: (token: string) => `/api/kiosk/${token}/sop/`,
         forms: (token: string, trigger: string) => `/api/kiosk/${token}/forms/?trigger=${trigger}`,
         formRespond: (token: string, formId: number) => `/api/kiosk/${token}/forms/${formId}/respond/`,

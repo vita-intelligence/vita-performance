@@ -61,7 +61,11 @@ def _endpoint_path(session: WorkSession) -> str | None:
 
 
 def _should_push(session: WorkSession) -> bool:
-    if session.status not in ('completed', 'verified'):
+    # Push active sessions too — PSP needs the "started" event so the
+    # MO detail + wizard timelines can show a live running row + the
+    # kiosk's timer keeps ticking on the operator's screen even
+    # after they lock the phone. Idempotent on PSP side.
+    if session.status not in ('active', 'completed', 'verified'):
         return False
     workstation = session.workstation
     if not workstation or not workstation.psp_source_of_truth:

@@ -5,6 +5,7 @@ import { Workstation } from "@/types/workstation";
 import { useSettings } from "@/hooks/useSettings";
 import { formatNumber } from "@/lib/utils/number.utils";
 import WorkstationDetailsDrawer from "./WorkstationDetailsDrawer";
+import WorkstationSourceBadge from "./WorkstationSourceBadge";
 
 interface WorkstationTableProps {
     workstations: Workstation[];
@@ -21,10 +22,11 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                 <table className="w-full text-sm table-fixed">
                     <thead>
                         <tr className="border-b border-border bg-surface">
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[25%]">Name</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[35%]">Description</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[25%]">Target Output</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Status</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[22%]">Name</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[30%]">Description</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[15%]">Source</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[20%]">Target Output</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted w-[13%]">Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -36,6 +38,9 @@ export default function WorkstationTable({ workstations, onEdit }: WorkstationTa
                             >
                                 <td className="px-4 py-3 font-medium text-text truncate">{workstation.name}</td>
                                 <td className="px-4 py-3 text-muted truncate">{workstation.description || "—"}</td>
+                                <td className="px-4 py-3">
+                                    <WorkstationSourceBadge workstation={workstation} />
+                                </td>
                                 <td className="px-4 py-3 text-text truncate">
                                     {workstation.target_quantity && workstation.target_duration
                                         ? `${formatNumber(Number(workstation.target_quantity), settings)} ${workstation.uom || "units"} / ${workstation.target_duration}h`

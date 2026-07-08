@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useSOP } from "@/hooks/useSOP";
 import { FileText } from "lucide-react";
 import SOPViewer from "@/components/shared/SOPViewer";
+import WorkstationSourceBadge from "./WorkstationSourceBadge";
 
 interface WorkstationCardsProps {
     workstations: Workstation[];
@@ -35,8 +36,11 @@ export default function WorkstationCards({ workstations, onEdit }: WorkstationCa
 
                         {/* Header */}
                         <div className="flex items-start justify-between gap-4">
-                            <div className="flex flex-col gap-1">
-                                <p className="font-semibold text-text">{workstation.name}</p>
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-semibold text-text">{workstation.name}</p>
+                                    <WorkstationSourceBadge workstation={workstation} />
+                                </div>
                                 {workstation.description && (
                                     <p className="text-xs text-muted">{workstation.description}</p>
                                 )}

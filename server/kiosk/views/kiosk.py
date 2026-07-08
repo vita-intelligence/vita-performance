@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -14,6 +16,53 @@ from django.utils.decorators import method_decorator
 from workstations.models import SOP
 from dynamic_forms.models import DynamicForm
 from django.db.models import Q
+
+from psp_sync.client import PspError, client_for_company
+
+
+logger = logging.getLogger(__name__)
+
+
+def operation_description_for(session):
+    """Fetch the PSP operation description for an active session,
+    if the session is MO-attributed on a PSP-linked workstation.
+
+    Returns the plain-text procedure blurb — the same
+    ``operation_description`` string the kiosk picker showed. Returns
+    ``None`` when the session isn't MO-attributed, PSP isn't wired
+    up, the round-trip fails, or the step can't be found; the FE
+    treats ``None`` as "no operation button".
+    """
+    if session is None:
+        return None
+    if getattr(session, "activity_kind", None) != "mo":
+        return None
+    if not session.mo_uuid or not session.mo_step_uuid:
+        return None
+
+    workstation = session.workstation
+    if workstation is None or not workstation.psp_source_of_truth:
+        return None
+
+    company = getattr(workstation, "company", None)
+    if company is None:
+        return None
+
+    try:
+        client = client_for_company(company)
+    except (ValueError, PspError):
+        return None
+
+    try:
+        mo = client.get_manufacturing_order(str(session.mo_uuid))
+    except PspError as e:
+        logger.warning("kiosk operation lookup failed for session %s: %s", session.id, e)
+        return None
+
+    for step in mo.get("steps") or []:
+        if step.get("uuid") == str(session.mo_step_uuid):
+            return step.get("name")
+    return None
 
 
 def check_kiosk_access(workstation):
@@ -81,6 +130,7 @@ class KioskWorkstationView(APIView):
                 'id': active_session.id,
                 'start_time': active_session.start_time.isoformat(),
                 'item_name': active_session.item.name if active_session.item else None,
+                'operation_description': operation_description_for(active_session),
                 'workers': [
                     {'id': w.id, 'name': w.full_name}
                     for w in active_session.workers.all()
@@ -209,6 +259,7 @@ class KioskStartSessionView(APIView):
         return Response({
             'id': session.id,
             'start_time': session.start_time.isoformat(),
+            'operation_description': operation_description_for(session),
             'workers': [
                 {'id': w.id, 'name': w.full_name}
                 for w in session.workers.all()
@@ -244,6 +295,7 @@ class KioskActiveSessionView(APIView):
             'id': session.id,
             'start_time': session.start_time.isoformat(),
             'item_name': session.item.name if session.item else None,
+            'operation_description': operation_description_for(session),
             'workers': [
                 {'id': w.id, 'name': w.full_name}
                 for w in session.workers.all()

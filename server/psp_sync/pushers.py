@@ -45,12 +45,20 @@ def _worker_uuids(session: "WorkSession") -> list[str]:
 
 def build_session_payload(session: "WorkSession") -> dict:
     """Serialize a WorkSession into the JSON PSP's
-    ``create_mo_session`` / ``create_workstation_session`` expects."""
+    ``create_mo_session`` / ``create_workstation_session`` expects.
+
+    Includes ``workstation_uuid`` — PSP-side MO steps route to a
+    workstation *group*, not a specific station, so the kiosk has to
+    tell PSP which physical station the session ran on."""
+    workstation = session.workstation
     return {
         "external_id": str(session.id),
         "activity_kind": session.activity_kind,
         "activity_label": session.activity_label,
         "employee_uuids": _worker_uuids(session),
+        "workstation_uuid": (
+            str(workstation.external_id) if workstation and workstation.external_id else None
+        ),
         "started_at": session.start_time.isoformat() if session.start_time else None,
         "finished_at": session.end_time.isoformat() if session.end_time else None,
         "quantity_produced": _decimal_or_none(session.quantity_produced),

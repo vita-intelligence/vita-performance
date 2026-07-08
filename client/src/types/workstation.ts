@@ -23,6 +23,13 @@ export interface Workstation {
   overtime_multiplier: number | null;
   week_starts_on: 'monday' | 'sunday' | null;
   effective_settings: EffectiveSettings;
+  /** PSP uuid — non-null means the row was mirrored from PSP via the
+   *  integration. When null, the row was created locally and is
+   *  "unmanaged" from PSP's point of view. */
+  external_id: string | null;
+  /** True on rows PSP considers authoritative. FE surfaces this next
+   *  to the badge so operators know sessions here flow back to PSP. */
+  psp_source_of_truth: boolean;
 }
 
 export interface CreateWorkstationPayload {

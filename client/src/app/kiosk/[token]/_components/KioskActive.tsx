@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@heroui/react";
-import { FileText } from "lucide-react";
+import { FileText, ListChecks } from "lucide-react";
 import { KioskActiveSession, KioskWorker } from "@/types/kiosk";
 import PinPad from "./PinPad";
 import SOPViewer from "@/components/shared/SOPViewer";
+import OperationViewer from "./OperationViewer";
 
 type StopStep = "confirm" | "pin" | "quantity";
 
@@ -43,6 +44,7 @@ export default function KioskActive({
     const [quantity, setQuantity] = useState("");
     const [notes, setNotes] = useState("");
     const [showSOP, setShowSOP] = useState(false);
+    const [showOperation, setShowOperation] = useState(false);
 
     useEffect(() => {
         const calc = () => {
@@ -118,6 +120,16 @@ export default function KioskActive({
                     </div>
 
                     <div className="p-4 border-t border-border flex flex-col gap-2 shrink-0">
+                        {session.operation_description && (
+                            <Button
+                                onPress={() => setShowOperation(true)}
+                                variant="bordered"
+                                className="w-full h-10 sm:h-12 rounded-none border-border text-muted text-xs font-semibold uppercase tracking-widest hover:border-text hover:text-text"
+                                startContent={<ListChecks size={14} />}
+                            >
+                                View Operation
+                            </Button>
+                        )}
                         {sop?.content && (
                             <Button
                                 onPress={handleSOPPress}
@@ -138,6 +150,18 @@ export default function KioskActive({
                         </Button>
                     </div>
                 </div>
+
+                {showOperation && session.operation_description && (
+                    <OperationViewer
+                        heading={
+                            (session.item_name ?? "Session") +
+                            " · " +
+                            workstationName
+                        }
+                        body={session.operation_description}
+                        onClose={() => setShowOperation(false)}
+                    />
+                )}
 
                 {showSOP && sop?.content && (
                     <SOPViewer

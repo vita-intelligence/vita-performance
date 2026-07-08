@@ -118,6 +118,45 @@ class PspClient:
     def health(self) -> dict:
         return self.get("/health")
 
+    def create_employee(self, payload: dict) -> dict:
+        """One-shot seed: create a PSP HR Employee from a vp Worker.
+        PSP is idempotent on ``external_id`` — repeated calls for the
+        same vp Worker return the existing Employee. Returns a dict
+        with the Employee payload plus a ``_matched`` flag so callers
+        can distinguish first-create from re-seed. The payload may
+        include ``kiosk_pin_hash`` (Django ``pbkdf2_sha256$...``
+        format) — PSP stores it verbatim; cross-format kiosk auth
+        verification is a deferred piece of work."""
+        result = self.post("/hr/employees", body=payload)
+        employee = result.get("employee", {})
+        # PSP echoes `matched: true` when the row already existed —
+        # surface it so the seed can tally created-vs-matched.
+        employee["_matched"] = bool(result.get("matched"))
+        return employee
+
+    def create_wage(self, employee_uuid: str, payload: dict) -> dict:
+        """Push an initial (or historical) wage row for a PSP Employee.
+        Idempotent via ``external_id`` in the payload — PSP tags the
+        wage row with the external_id so a re-seed returns the existing
+        row rather than opening a new interval."""
+        result = self.post(f"/hr/employees/{employee_uuid}/wages", body=payload)
+        wage = result.get("wage", {})
+        wage["_matched"] = bool(result.get("matched"))
+        return wage
+
+    def create_reputation_event(self, employee_uuid: str, payload: dict) -> dict:
+        """Push a single reputation event for a PSP Employee, preserving
+        the original ``occurred_at`` so the decay math projects the
+        same cached score both sides. Idempotent via ``external_id``
+        (stored on the PSP row as ``session_external_id``)."""
+        result = self.post(
+            f"/hr/employees/{employee_uuid}/reputation-events",
+            body=payload,
+        )
+        event = result.get("event", {})
+        event["_matched"] = bool(result.get("matched"))
+        return event
+
     def list_manufacturing_orders(
         self,
         workstation_uuid: str | None = None,

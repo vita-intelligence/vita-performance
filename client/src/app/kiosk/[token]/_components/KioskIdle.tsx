@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
 import { FileText } from "lucide-react";
-import { KioskWorker, KioskItem, KioskActiveSession } from "@/types/kiosk";
+import { KioskWorker, KioskActiveSession, KioskSelection } from "@/types/kiosk";
 import { kioskService } from "@/services/kiosk.service";
 import PinPad from "./PinPad";
 import ItemStep from "./ItemStep";
@@ -15,7 +15,7 @@ interface KioskIdleProps {
     token: string;
     workstationName: string;
     workers: KioskWorker[];
-    onStart: (workerIds: number[], itemId?: number | null) => void;
+    onStart: (workerIds: number[], selection: KioskSelection | null) => void;
     sop: { content: string; updated_at: string | null } | null;
     isSOPLoading: boolean;
     onFetchSOP: () => void;
@@ -39,7 +39,7 @@ export default function KioskIdle({
     const [step, setStep] = useState<Step>("workers");
     const [checkedIn, setCheckedIn] = useState<{ id: number; name: string }[]>([]);
     const [selectingWorker, setSelectingWorker] = useState<KioskWorker | null>(null);
-    const [selectedItem, setSelectedItem] = useState<KioskItem | null>(null);
+    const [selectedItem, setSelectedItem] = useState<KioskSelection | null>(null);
     const [showSOP, setShowSOP] = useState(false);
 
     const handleWorkerTap = (worker: KioskWorker) => {
@@ -66,7 +66,7 @@ export default function KioskIdle({
     };
 
     const handleStart = () => {
-        onStart(checkedIn.map((w) => w.id), selectedItem?.id ?? null);
+        onStart(checkedIn.map((w) => w.id), selectedItem);
     };
 
     const handleSOPPress = () => {
@@ -233,9 +233,22 @@ export default function KioskIdle({
                         <div className="flex flex-col gap-2">
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Item</p>
                             <div className="px-4 py-3 border border-border">
-                                <span className="text-base sm:text-lg font-black text-text uppercase">
-                                    {selectedItem ? selectedItem.name : <span className="text-muted font-normal text-sm">No item selected</span>}
-                                </span>
+                                {selectedItem ? (
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-base sm:text-lg font-black text-text uppercase">
+                                            {selectedItem.kind === "item"
+                                                ? selectedItem.item.name
+                                                : selectedItem.mo.item_name ?? "MO"}
+                                        </span>
+                                        {selectedItem.kind === "mo" && (
+                                            <span className="text-[10px] uppercase tracking-widest text-muted">
+                                                {selectedItem.mo.step_name ?? "step"} · qty {selectedItem.mo.quantity ?? "—"}
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-muted font-normal text-sm">No item selected</span>
+                                )}
                             </div>
                         </div>
                     </div>

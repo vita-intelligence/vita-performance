@@ -118,9 +118,15 @@ class KioskMOsView(APIView):
             return Response({"psp_source_of_truth": True, "items": []})
 
         try:
+            # Only expose MOs an operator can actually clock into —
+            # that means the supervisor has already hit "Start
+            # production" and the MO is `in_progress` on PSP.
+            # `scheduled` MOs are still on the calendar; showing them
+            # on the kiosk would let operators start work PSP thinks
+            # hasn't kicked off yet, breaking the labour-cost timeline.
             remote_mos = client.list_manufacturing_orders(
                 workstation_uuid=str(workstation.external_id),
-                status="scheduled,in_progress",
+                status="in_progress",
             )
         except PspError as e:
             logger.warning("psp_sync list_manufacturing_orders failed: %s", e)
@@ -135,9 +141,15 @@ class KioskMOsView(APIView):
             item = mo.get("item") or {}
 
             for step in mo.get("steps") or []:
-                ws = step.get("workstation") or {}
-                if ws.get("external_id") != str(workstation.external_id):
+                # Steps are routed at group level on PSP — PSP tags
+                # each step with `for_this_workstation` telling us
+                # whether the step's group matches our station. We
+                # only surface matching steps so the operator doesn't
+                # see the encapsulation step on a bottling kiosk.
+                if not step.get("for_this_workstation"):
                     continue
+
+                group = step.get("workstation_group") or {}
 
                 rows.append({
                     "mo_uuid": mo_uuid,
@@ -148,6 +160,7 @@ class KioskMOsView(APIView):
                     "step_status": step.get("status"),
                     "step_planned_start": step.get("planned_start"),
                     "step_planned_finish": step.get("planned_finish"),
+                    "workstation_group_name": group.get("name"),
                     "item_name": item.get("name"),
                     "quantity": quantity,
                     "due_date": due_date,
