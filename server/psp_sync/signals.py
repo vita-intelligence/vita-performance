@@ -23,7 +23,7 @@ import logging
 import threading
 
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
 from work_sessions.models import WorkSession
@@ -118,6 +118,48 @@ def on_work_session_saved(sender, instance: WorkSession, created: bool, **kwargs
     # Attempt synchronous push after the transaction commits so we
     # don't try to reach PSP with a session row that hasn't landed
     # yet (Postgres would return an FK error for the through-table).
+    transaction.on_commit(lambda: _try_push_now(entry.pk))
+
+
+@receiver(m2m_changed, sender=WorkSession.workers.through)
+def on_work_session_workers_changed(sender, instance, action, **kwargs):
+    """WorkSession.workers is set AFTER the WorkSession row is created,
+    so the ``post_save`` signal above fires with an empty M2M. Without
+    this handler, the very first push to PSP would ship an empty
+    ``employee_uuids`` array and the session on PSP would forever
+    show ``unattributed`` even though the vp side has the worker
+    linked correctly. Every add / remove on the through table
+    re-enqueues the outbox entry with a fresh payload, and the
+    subsequent push overwrites the previous one via the same
+    ``external_id`` idempotency key on the PSP-side upsert."""
+    if action not in ("post_add", "post_remove", "post_clear"):
+        return
+    if not isinstance(instance, WorkSession):
+        return
+    if not _should_push(instance):
+        return
+
+    endpoint_path = _endpoint_path(instance)
+    if endpoint_path is None:
+        return
+
+    # Rebuild the payload against the current M2M so PSP sees the
+    # attribution as it now stands. `update_or_create` on the outbox
+    # keeps a single entry per session id — repeated churns coalesce
+    # into one row that ships the latest snapshot.
+    payload = build_session_payload(instance)
+
+    entry, _ = PspOutboxEntry.objects.update_or_create(
+        company=instance.company,
+        external_id=str(instance.id),
+        defaults={
+            'kind': _push_kind(instance),
+            'endpoint_path': endpoint_path,
+            'payload': payload,
+            'session': instance,
+            'status': 'pending',
+        },
+    )
     transaction.on_commit(lambda: _try_push_now(entry.pk))
 
 

@@ -6,6 +6,20 @@ time to keep the mirror table small).
 Idempotent: everything upserts keyed on ``external_id``. Deleted
 rows on PSP are marked ``is_active=False`` here rather than hard-
 deleted so historical WorkSessions keep resolving.
+
+**Match-or-adopt rule** for every pull path: when the local table
+has no row whose ``external_id`` matches the remote uuid, we look
+for **exactly one** row with the same natural key (``full_name`` /
+``name``) whose ``external_id`` is null and adopt it — stamp its
+``external_id`` with the PSP uuid instead of creating a duplicate.
+This is the load-bearing invariant that keeps a first-time sync on
+a freshly-seeded tenant from doubling up: the seed pushes vp
+workers to PSP, PSP returns uuids the seed stamps back, then the
+next sync's pull matches those uuids and never creates a duplicate.
+Without adopt-fallback, any operation that ever wiped
+``external_id`` (data restore, migration, prod copy for testing)
+would silently pump a new duplicate set into the ledger on the
+very next Sync.
 """
 from __future__ import annotations
 
@@ -76,15 +90,18 @@ def pull_workstations(company: Company, client: "PspClient") -> PullResult:
     remote_uuids = {row["uuid"] for row in remote}
 
     for row in remote:
-        ws, created = Workstation.objects.update_or_create(
+        defaults = {
+            "user_id": company.owner_user_id,
+            "name": row["name"] or f"WS {row['uuid'][:8]}",
+            "is_active": row.get("is_active", True),
+            "psp_source_of_truth": True,
+        }
+        created = _upsert_with_adopt(
+            Workstation,
             company=company,
             external_id=row["uuid"],
-            defaults={
-                "user_id": company.owner_user_id,
-                "name": row["name"] or f"WS {row['uuid'][:8]}",
-                "is_active": row.get("is_active", True),
-                "psp_source_of_truth": True,
-            },
+            natural_key={"name": defaults["name"]},
+            defaults=defaults,
         )
         result.created += int(created)
         result.updated += int(not created)
@@ -123,9 +140,11 @@ def pull_employees(company: Company, client: "PspClient") -> PullResult:
             "hourly_rate": rate if rate is not None else 0,
             "reputation_score": row.get("reputation_score") or 650,
         }
-        _, created = Worker.objects.update_or_create(
+        created = _upsert_with_adopt(
+            Worker,
             company=company,
             external_id=row["uuid"],
+            natural_key={"full_name": defaults["full_name"]},
             defaults=defaults,
         )
         result.created += int(created)
@@ -153,15 +172,72 @@ def pull_items(company: Company, client: "PspClient") -> PullResult:
     remote = client.list_items(item_types=["finished_product", "semi_finished"])
 
     for row in remote:
-        _, created = Item.objects.update_or_create(
+        defaults = {
+            "user_id": company.owner_user_id,
+            "name": row["name"],
+        }
+        created = _upsert_with_adopt(
+            Item,
             company=company,
             external_id=row["uuid"],
-            defaults={
-                "user_id": company.owner_user_id,
-                "name": row["name"],
-            },
+            natural_key={"name": defaults["name"]},
+            defaults=defaults,
         )
         result.created += int(created)
         result.updated += int(not created)
 
     return result
+
+
+# --- match-or-adopt primitive --------------------------------------------
+
+
+def _upsert_with_adopt(model, *, company, external_id, natural_key, defaults):
+    """Idempotent upsert that also prevents duplicate-name pumps.
+
+    Order of resolution:
+
+      1. Row exists with matching ``(company, external_id)`` → update
+         it in place. This is the fast path for every subsequent sync
+         after the seed stamped external_id onto vp rows.
+      2. No external_id match, but exactly one row exists with the same
+         natural key (name / full_name) whose ``external_id`` is null
+         → adopt it. Stamp its external_id with the incoming PSP uuid
+         + apply defaults. This closes the loopback that would
+         otherwise duplicate a full ledger on any tenant where a data
+         restore / migration wiped ``external_id`` between the seed
+         and the next sync.
+      3. Two or more null-external_id namesakes → **not safe** to
+         adopt (would ambiguously pick one), so we fall back to
+         creating a new row. The seed on PSP will then need an
+         operator to reconcile.
+      4. No candidate at all → create new.
+
+    Returns ``True`` when a row was created, ``False`` when updated
+    or adopted. Callers use the boolean to bump their created /
+    updated counters.
+    """
+    qs = model.objects.filter(company=company)
+
+    linked = qs.filter(external_id=external_id).first()
+    if linked is not None:
+        for k, v in defaults.items():
+            setattr(linked, k, v)
+        linked.save()
+        return False
+
+    unlinked_matches = list(
+        qs.filter(external_id__isnull=True).filter(**natural_key)[:2]
+    )
+    if len(unlinked_matches) == 1:
+        adoptee = unlinked_matches[0]
+        adoptee.external_id = external_id
+        for k, v in defaults.items():
+            setattr(adoptee, k, v)
+        adoptee.save()
+        return False
+
+    # Zero or ambiguous — create a fresh row.
+    obj = model(company=company, external_id=external_id, **defaults)
+    obj.save()
+    return True
