@@ -45,6 +45,16 @@ class Worker(models.Model):
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
     is_active = models.BooleanField(default=True)
     is_qa = models.BooleanField(default=False)
+    # Explicit per-worker access list. Stations with `is_general=True`
+    # are visible to every worker regardless of this M2M — those don't
+    # need to be added here. Empty M2M + non-general station = hidden
+    # tile on the personal kiosk. Populated from the Workers detail
+    # page or in bulk via the Workstations settings.
+    authorized_workstations = models.ManyToManyField(
+        'workstations.Workstation',
+        related_name='authorized_workers',
+        blank=True,
+    )
     reputation_score = models.IntegerField(default=REPUTATION_BASE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

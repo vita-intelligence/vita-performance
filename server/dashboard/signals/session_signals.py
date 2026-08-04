@@ -42,6 +42,10 @@ def _sync_auto_reputation_events(session):
             worker.recompute_reputation_score()
         return
     event_type, delta = band
+    # Auto reputation events inherit the session's shift — that's the
+    # worker's shift when they were producing the sample being graded,
+    # not the reviewer's. Nullable so pre-shift sessions still work.
+    session_shift_id = session.shift_id
     for worker in session.workers.all():
         WorkerReputationEvent.objects.create(
             worker=worker,
@@ -49,6 +53,7 @@ def _sync_auto_reputation_events(session):
             event_type=event_type,
             score_delta=delta,
             reason=f'{perf}% on {session.workstation.name}',
+            shift_id=session_shift_id,
         )
         worker.recompute_reputation_score()
 

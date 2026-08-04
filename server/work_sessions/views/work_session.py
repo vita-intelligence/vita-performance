@@ -128,6 +128,16 @@ class WorkSessionStartView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Personal-kiosk provenance — see kiosk.views.kiosk for
+        # rationale. Look up the first worker's active shift and
+        # stamp it on the session so the day-overview can group.
+        from workers.models import WorkerShift
+        shift = (
+            WorkerShift.objects
+            .filter(worker_id=worker_ids[0], status=WorkerShift.STATUS_ACTIVE)
+            .first()
+        )
+
         with transaction.atomic():
             session = WorkSession.objects.create(
                 user=request.user,
@@ -135,6 +145,7 @@ class WorkSessionStartView(APIView):
                 status='active',
                 item_id=item_id,
                 start_time=timezone.now(),
+                shift=shift,
             )
             session.workers.set(worker_ids)
 
