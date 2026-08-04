@@ -2,7 +2,11 @@ import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
 import {
   Worker,
+  WorkerDayOverview,
   WorkerGroup,
+  WorkerShift,
+  WorkerStationsPayload,
+  WorkerTodaySummary,
   CreateWorkerPayload,
   UpdateWorkerPayload,
   CreateWorkerGroupPayload,
@@ -90,6 +94,61 @@ export const workerService = {
 
   deleteGroup: async (id: number): Promise<void> => {
     await api.delete(workers.groupDetail(id));
+  },
+
+  // Personal-kiosk shift methods.
+  getActiveShift: async (workerId: number): Promise<WorkerShift | null> => {
+    const res = await api.get<WorkerShift>(workers.shiftActive, {
+      params: { worker_id: workerId },
+      // 204 means "clocked out" — swallow it here, don't treat as error.
+      validateStatus: (s) => s === 200 || s === 204,
+    });
+    if (res.status === 204) return null;
+    return res.data;
+  },
+
+  startShift: async (
+    workerId: number,
+    pin: string,
+    deviceId?: string,
+  ): Promise<WorkerShift> => {
+    const { data } = await api.post<WorkerShift>(workers.shiftStart, {
+      worker_id: workerId,
+      pin,
+      device_id: deviceId,
+    });
+    return data;
+  },
+
+  endShift: async (shiftId: number, notes?: string): Promise<WorkerShift> => {
+    const { data } = await api.post<WorkerShift>(workers.shiftEnd(shiftId), {
+      notes,
+    });
+    return data;
+  },
+
+  getTodaySummary: async (workerId: number): Promise<WorkerTodaySummary> => {
+    const { data } = await api.get<WorkerTodaySummary>(
+      workers.todaySummary(workerId),
+    );
+    return data;
+  },
+
+  getStations: async (workerId: number): Promise<WorkerStationsPayload> => {
+    const { data } = await api.get<WorkerStationsPayload>(
+      workers.stations(workerId),
+    );
+    return data;
+  },
+
+  getDayOverview: async (
+    workerId: number,
+    date: string,
+  ): Promise<WorkerDayOverview> => {
+    const { data } = await api.get<WorkerDayOverview>(
+      workers.dayOverview(workerId, date),
+    );
+    return data;
   },
 
   getReputationEvents: async (

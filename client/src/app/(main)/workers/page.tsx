@@ -9,6 +9,7 @@ import WorkerCards from "./_components/WorkerCards";
 import WorkerForm from "./_components/WorkerForm";
 import Drawer from "@/components/ui/Drawer";
 import QCLinkCard from "@/components/shared/QCLinkCard";
+import PersonalKioskLinkCard from "@/components/shared/PersonalKioskLinkCard";
 
 export default function WorkersPage() {
     const {
@@ -58,7 +59,10 @@ export default function WorkersPage() {
         <main className="bg-background px-4 py-12 sm:px-8 lg:px-16">
             <div className="max-w-6xl mx-auto flex flex-col gap-10">
                 <WorkersHeader onAdd={handleAdd} />
-                <QCLinkCard />
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <PersonalKioskLinkCard />
+                    <QCLinkCard />
+                </div>
 
                 {isPaginatedWorkersLoading ? (
                     <div className="flex items-center justify-center py-20">

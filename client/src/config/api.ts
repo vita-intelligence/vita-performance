@@ -40,6 +40,15 @@ export const API_CONFIG = {
       groupDetail: (id: number) => `/api/workers/groups/${id}/`,
       leaderboard: '/api/workers/leaderboard/',
       reputationEvents: "/api/workers/reputation/events/",
+      // Personal-kiosk clock-in / clock-out. `active` returns 204
+      // when the worker is clocked out.
+      shiftActive: "/api/workers/shifts/active/",
+      shiftStart: "/api/workers/shifts/start/",
+      shiftEnd: (id: number) => `/api/workers/shifts/${id}/end/`,
+      todaySummary: (id: number) => `/api/workers/${id}/today-summary/`,
+      stations: (id: number) => `/api/workers/${id}/stations/`,
+      dayOverview: (id: number, date: string) =>
+        `/api/workers/${id}/day/${date}/`,
     },
     sessions: {
       base: "/api/sessions/",
@@ -59,6 +68,53 @@ export const API_CONFIG = {
         base: "/api/items/",
         detail: (id: number) => `/api/items/${id}/`,
         search: "/api/items/search/",
+    },
+    personalKiosk: {
+        // Admin-facing: get / regenerate the tablet-pairing token.
+        token: "/api/kiosk/personal/token/",
+        // Public (tenant identified by token in URL, no auth).
+        roster: (token: string) =>
+            `/api/kiosk/personal/${token}/workers/`,
+        activeShift: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/shifts/active/`,
+        todaySummary: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/today-summary/`,
+        stations: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/stations/`,
+        performance: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/performance/`,
+        reputation: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/reputation/`,
+        verifyPin: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/verify-pin/`,
+        liveStatus: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/live-status/`,
+        session: (token: string, sessionToken: string) =>
+            `/api/kiosk/personal/${token}/sessions/${sessionToken}/`,
+        stationContext: (token: string, wsId: number) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/context/`,
+        stationItems: (token: string, wsId: number) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/items/`,
+        stationMOs: (token: string, wsId: number) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/mos/`,
+        qcSessions: (token: string) =>
+            `/api/kiosk/personal/${token}/qc/sessions/`,
+        qcVerifySession: (token: string, sessionId: number) =>
+            `/api/kiosk/personal/${token}/qc/sessions/${sessionId}/verify/`,
+        qcWorkers: (token: string) =>
+            `/api/kiosk/personal/${token}/qc/workers/`,
+        qcFeedback: (token: string) =>
+            `/api/kiosk/personal/${token}/qc/feedback/`,
+        history: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/history/`,
+        startStationSession: (token: string, wsId: number) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/sessions/start/`,
+        stopStationSession: (token: string, sessId: number) =>
+            `/api/kiosk/personal/${token}/work-sessions/${sessId}/stop/`,
+        startShift: (token: string) =>
+            `/api/kiosk/personal/${token}/shifts/start/`,
+        endShift: (token: string, shiftId: number) =>
+            `/api/kiosk/personal/${token}/shifts/${shiftId}/end/`,
     },
     kiosk: {
         base: (token: string) => `/api/kiosk/${token}/`,

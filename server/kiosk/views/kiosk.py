@@ -241,6 +241,20 @@ class KioskStartSessionView(APIView):
             if WorkSession.objects.filter(workstation=workstation, status='active').exists():
                 return Response({'detail': 'A session is already active on this workstation.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Personal-kiosk provenance — if the first checked-in worker
+        # has an open WorkerShift, tag the session with it so the
+        # day-overview can group activity by shift. Only look at the
+        # first worker: sessions are almost always solo, and when
+        # they're not, the shift ownership is ambiguous — pick the
+        # first one and move on (the FE guides users to keep multi-
+        # worker sessions on the same shift anyway).
+        from workers.models import WorkerShift  # local — station kiosk shouldn't hard-depend on workers
+        shift = (
+            WorkerShift.objects
+            .filter(worker_id=worker_ids[0], status=WorkerShift.STATUS_ACTIVE)
+            .first()
+        )
+
         with transaction.atomic():
             session = WorkSession.objects.create(
                 user=workstation.user,
@@ -253,6 +267,7 @@ class KioskStartSessionView(APIView):
                 mo_uuid=mo_uuid if activity_kind == 'mo' else None,
                 mo_step_uuid=mo_step_uuid if activity_kind == 'mo' else None,
                 start_time=parse_requested_at(request.data.get('requested_at')),
+                shift=shift,
             )
             session.workers.set(worker_ids)
 

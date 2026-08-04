@@ -37,6 +37,18 @@ class WorkerReputationEvent(models.Model):
         blank=True,
         related_name='given_feedback',
     )
+    # Personal-kiosk provenance for the QC reviewer's authoring shift.
+    # Nullable — QC review authored from the QA kiosk or admin without
+    # the reviewer being on an open personal-kiosk shift leaves it
+    # blank. Populated so the day-overview timeline can attribute a
+    # QA review to the reviewer's shift, not just the target worker's.
+    shift = models.ForeignKey(
+        'workers.WorkerShift',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='authored_reputation_events',
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

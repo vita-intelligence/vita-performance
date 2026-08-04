@@ -251,6 +251,17 @@ class QCGeneralFeedbackView(APIView):
         except Worker.DoesNotExist:
             return Response({'detail': 'Worker not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Attribute the review to the inspector's current shift if
+        # they've clocked into the personal kiosk — day-overview then
+        # shows "QA reviews done" under the inspector's shift, not
+        # just as a floating reputation event.
+        from workers.models import WorkerShift  # local — qc app shouldn't hard-depend
+        inspector_shift = (
+            WorkerShift.objects
+            .filter(worker=inspector, status=WorkerShift.STATUS_ACTIVE)
+            .first()
+        )
+
         with transaction.atomic():
             WorkerReputationEvent.objects.create(
                 worker=worker,
@@ -259,6 +270,7 @@ class QCGeneralFeedbackView(APIView):
                 score_delta=MANUAL_DELTAS[mark],
                 reason=reason,
                 created_by=inspector,
+                shift=inspector_shift,
             )
             worker.recompute_reputation_score()
 
@@ -335,6 +347,17 @@ class QCVerifySessionView(APIView):
                 )
             cleaned_feedback.append({'worker_id': worker_id, 'mark': mark, 'reason': reason})
 
+        # Attribute feedback rows to the inspector's active shift so
+        # QA reviews land in the reviewer's day-overview.
+        from workers.models import WorkerShift
+        inspector_shift = None
+        if inspector:
+            inspector_shift = (
+                WorkerShift.objects
+                .filter(worker=inspector, status=WorkerShift.STATUS_ACTIVE)
+                .first()
+            )
+
         with transaction.atomic():
             session.quantity_rejected = quantity_rejected
             session.status = 'verified'
@@ -350,6 +373,7 @@ class QCVerifySessionView(APIView):
                     score_delta=MANUAL_DELTAS[item['mark']],
                     reason=item['reason'],
                     created_by=inspector,
+                    shift=inspector_shift,
                 )
                 touched_worker_ids.add(item['worker_id'])
 

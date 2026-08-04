@@ -69,6 +69,19 @@ class WorkSession(models.Model):
     )
     workers = models.ManyToManyField(Worker, through='SessionWorker', related_name='work_sessions')
     workstation = models.ForeignKey(Workstation, on_delete=models.CASCADE, related_name='sessions')
+    # Personal-kiosk provenance. When the session is started from a
+    # worker who has an open WorkerShift, we stamp the shift here so
+    # the day-overview page can reconstruct the whole shift as one
+    # narrative. Nullable — sessions started from a per-station kiosk
+    # without any active worker shift leave this blank (backward
+    # compat + station kiosks never had shifts before).
+    shift = models.ForeignKey(
+        'workers.WorkerShift',
+        on_delete=models.SET_NULL,
+        related_name='work_sessions',
+        null=True,
+        blank=True,
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)

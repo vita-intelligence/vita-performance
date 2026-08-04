@@ -200,6 +200,24 @@ class PspClient:
             body=payload,
         )
 
+    def workstation_group_costs(self, group_uuids: list[str]) -> list[dict]:
+        """Bulk cost + throughput lookup for a set of workstation groups.
+
+        PSP's `Backend.Production.WorkstationCosts.bulk_costs` returns
+        one dict per group with `machine_hourly_rate`,
+        `avg_labour_hourly_rate`, `avg_seconds_per_unit`, `session_count`.
+        The personal kiosk uses `avg_seconds_per_unit` to derive a per-hour
+        production target so PSP-mirrored stations can compute a
+        performance % even though their local ``target_quantity`` /
+        ``target_duration`` fields are unset."""
+        if not group_uuids:
+            return []
+        result = self.post(
+            "/workstation-groups/costs",
+            body={"workstation_group_uuids": list(group_uuids)},
+        )
+        return result.get("items", [])
+
 
 def client_for_company(company) -> PspClient:
     """Build a PspClient from a Company row's stored credentials.
