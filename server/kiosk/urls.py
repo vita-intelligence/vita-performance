@@ -32,6 +32,7 @@ from workers.views import (
     PublicPersonalKioskWorkstationContextView,
     PublicPersonalKioskWorkstationItemsView,
     PublicPersonalKioskWorkstationMOsView,
+    PublicPersonalKioskJobsView,
     PublicPersonalKioskStartWorkstationSessionView,
     PublicPersonalKioskStopWorkstationSessionView,
     PublicPersonalKioskQCSessionsView,
@@ -69,6 +70,9 @@ urlpatterns = [
     path('personal/<uuid:token>/workstations/<int:ws_id>/context/', PublicPersonalKioskWorkstationContextView.as_view()),
     path('personal/<uuid:token>/workstations/<int:ws_id>/items/', PublicPersonalKioskWorkstationItemsView.as_view()),
     path('personal/<uuid:token>/workstations/<int:ws_id>/mos/', PublicPersonalKioskWorkstationMOsView.as_view()),
+    # Cross-workstation "what can I work on right now" — every PSP MO
+    # in_progress AND wired to a station this worker can open.
+    path('personal/<uuid:token>/jobs/', PublicPersonalKioskJobsView.as_view()),
     path('personal/<uuid:token>/workstations/<int:ws_id>/sessions/start/', PublicPersonalKioskStartWorkstationSessionView.as_view()),
     path('personal/<uuid:token>/work-sessions/<int:sess_id>/stop/', PublicPersonalKioskStopWorkstationSessionView.as_view()),
 

@@ -14,6 +14,7 @@ import {
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { WorkerStationsPayload, WorkerStationTile } from "@/types/worker";
 import { useDebounce } from "@/hooks/useDebounce";
+import { ClockInGate } from "./JobsPage";
 
 interface StationsPageProps {
     token: string;
@@ -46,6 +47,11 @@ export default function StationsPage({
     onOpenStation,
     onOpenQC,
 }: StationsPageProps) {
+    // Hard gate — no shift, no station browsing. Prevents a worker
+    // from landing on StationView + firing Start against a null shift.
+    if (!isClockedIn) {
+        return <ClockInGate title="Stations" workerName={workerName} />;
+    }
     const [query, setQuery] = useState("");
     // Debounce so typing doesn't hammer the endpoint at every keystroke
     // but still feels live — 300ms is the sweet spot between "responsive"
@@ -142,21 +148,6 @@ export default function StationsPage({
                 title="Stations"
                 subtitle={`${workerName} — pick a station to open its kiosk`}
             />
-
-            {!isClockedIn && (
-                <div className="flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning/5 p-4 text-sm text-warning">
-                    <Info className="mt-0.5 size-4 shrink-0" />
-                    <div>
-                        <p className="font-semibold">
-                            You’re not clocked in yet.
-                        </p>
-                        <p className="mt-0.5 text-xs opacity-90">
-                            Go back and clock in first so today’s sessions
-                            attach to your shift.
-                        </p>
-                    </div>
-                </div>
-            )}
 
             {/* QA tile — inline QC review inbox. */}
             {meta.qaEnabled && (

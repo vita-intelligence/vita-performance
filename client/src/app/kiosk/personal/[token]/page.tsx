@@ -15,6 +15,7 @@ import StationsPage from "./_components/StationsPage";
 import StationView from "./_components/StationView";
 import QCPage from "./_components/QCPage";
 import HistoryPage from "./_components/HistoryPage";
+import JobsPage from "./_components/JobsPage";
 import AppShell from "./_components/AppShell";
 
 /**
@@ -48,7 +49,8 @@ type Screen =
     | "stations"
     | "station"
     | "qc"
-    | "history";
+    | "history"
+    | "jobs";
 
 interface CachedSession {
     session_token: string;
@@ -69,6 +71,12 @@ export default function PersonalKioskTokenPage() {
     // Which workstation the StationView is currently pointing at.
     // Cleared when we navigate away.
     const [openStationId, setOpenStationId] = useState<number | null>(null);
+    // When the worker jumped to StationView from the Jobs list, remember
+    // the MO step so PspStartPanel can preselect + auto-start.
+    const [preselectedJob, setPreselectedJob] = useState<{
+        mo_uuid: string;
+        step_uuid: string;
+    } | null>(null);
 
     const [activeShift, setActiveShift] = useState<WorkerShift | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
@@ -346,10 +354,12 @@ export default function PersonalKioskTokenPage() {
                             onOpenReputation={() => setScreen("reputation")}
                             onOpenStations={() => setScreen("stations")}
                             onOpenStation={(id) => {
+                                setPreselectedJob(null);
                                 setOpenStationId(id);
                                 setScreen("station");
                             }}
                             onOpenHistory={() => setScreen("history")}
+                            onOpenJobs={() => setScreen("jobs")}
                         />
                     );
                 case "performance":
@@ -376,10 +386,29 @@ export default function PersonalKioskTokenPage() {
                             workerName={selectedWorker.full_name}
                             isClockedIn={!!activeShift}
                             onOpenStation={(id) => {
+                                setPreselectedJob(null);
                                 setOpenStationId(id);
                                 setScreen("station");
                             }}
                             onOpenQC={() => setScreen("qc")}
+                        />
+                    );
+                case "jobs":
+                    if (!sessionToken) return null;
+                    return (
+                        <JobsPage
+                            token={token}
+                            sessionToken={sessionToken}
+                            workerName={selectedWorker.full_name}
+                            isClockedIn={!!activeShift}
+                            onOpenJob={(row) => {
+                                setPreselectedJob({
+                                    mo_uuid: row.mo_uuid,
+                                    step_uuid: row.step_uuid,
+                                });
+                                setOpenStationId(row.workstation_id);
+                                setScreen("station");
+                            }}
                         />
                     );
                 case "qc":
@@ -409,7 +438,14 @@ export default function PersonalKioskTokenPage() {
                             token={token}
                             sessionToken={sessionToken}
                             workstationId={openStationId}
-                            onBack={() => setScreen("stations")}
+                            preselectedMoUuid={preselectedJob?.mo_uuid ?? null}
+                            preselectedStepUuid={
+                                preselectedJob?.step_uuid ?? null
+                            }
+                            isClockedIn={!!activeShift}
+                            onBack={() =>
+                                setScreen(preselectedJob ? "jobs" : "stations")
+                            }
                         />
                     );
                 default:

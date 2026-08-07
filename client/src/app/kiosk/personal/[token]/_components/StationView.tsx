@@ -9,6 +9,7 @@ import {
     Clipboard,
     ClipboardList,
     Factory,
+    Info,
     Loader2,
     Maximize2,
     Package,
@@ -32,6 +33,17 @@ interface StationViewProps {
     sessionToken: string;
     workstationId: number;
     onBack: () => void;
+    /** When the worker landed here from the Jobs list, we know which
+     *  MO step they intended to start. We visually highlight + scroll
+     *  to that card so it's the obvious next tap — but we don't auto-
+     *  fire Start. The worker confirms by pressing Start themselves.
+     *  If the row isn't in the current list (e.g. MO finished between
+     *  clicks), the highlight just falls through silently. */
+    preselectedMoUuid?: string | null;
+    preselectedStepUuid?: string | null;
+    /** When null (worker hasn't clocked in), Start is disabled + a
+     *  banner nudges them to clock in first. */
+    isClockedIn: boolean;
 }
 
 /**
@@ -52,6 +64,9 @@ export default function StationView({
     sessionToken,
     workstationId,
     onBack,
+    preselectedMoUuid,
+    preselectedStepUuid,
+    isClockedIn,
 }: StationViewProps) {
     const [context, setContext] = useState<StationContextPayload | null>(null);
     const [loading, setLoading] = useState(true);
@@ -129,6 +144,9 @@ export default function StationView({
                     token={token}
                     sessionToken={sessionToken}
                     workstationId={workstationId}
+                    preselectedMoUuid={preselectedMoUuid}
+                    preselectedStepUuid={preselectedStepUuid}
+                    isClockedIn={isClockedIn}
                     onStarted={() => {
                         addToast({
                             title: "Session started",
@@ -144,6 +162,7 @@ export default function StationView({
                     sessionToken={sessionToken}
                     workstationId={workstationId}
                     initialItems={context.items}
+                    isClockedIn={isClockedIn}
                     onStarted={() => {
                         addToast({
                             title: "Session started",
@@ -229,16 +248,23 @@ function PspStartPanel({
     token,
     sessionToken,
     workstationId,
+    preselectedMoUuid,
+    preselectedStepUuid,
+    isClockedIn,
     onStarted,
 }: {
     token: string;
     sessionToken: string;
     workstationId: number;
+    preselectedMoUuid?: string | null;
+    preselectedStepUuid?: string | null;
+    isClockedIn: boolean;
     onStarted: () => void;
 }) {
     const [mos, setMOs] = useState<StationMORow[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [startingKey, setStartingKey] = useState<string | null>(null);
+    const preselectedRowRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -261,6 +287,20 @@ function PspStartPanel({
             cancelled = true;
         };
     }, [token, workstationId, sessionToken]);
+
+    // Scroll the preselected MO into view so the worker sees the
+    // highlighted card immediately — but do NOT auto-fire Start. The
+    // worker confirms by tapping Start themselves.
+    useEffect(() => {
+        if (!preselectedMoUuid || !mos) return;
+        const el = preselectedRowRef.current;
+        if (!el) return;
+        try {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch {
+            el.scrollIntoView();
+        }
+    }, [mos, preselectedMoUuid, preselectedStepUuid]);
 
     if (error) {
         return (
@@ -304,16 +344,24 @@ function PspStartPanel({
                 </h2>
                 <p className="mt-0.5 text-xs text-muted">
                     Only MOs approved and running on the floor are
-                    shown. Tap one to start.
+                    shown. Tap Start when you're ready.
                 </p>
             </div>
+            {!isClockedIn && <ClockInNotice />}
             {mos.map((row) => {
                 const key = `${row.mo_uuid}:${row.step_uuid}`;
+                const isPreselected =
+                    preselectedMoUuid === row.mo_uuid &&
+                    (!preselectedStepUuid ||
+                        preselectedStepUuid === row.step_uuid);
                 return (
                     <MOCard
                         key={key}
                         row={row}
                         busy={startingKey === key}
+                        preselected={isPreselected}
+                        rowRef={isPreselected ? preselectedRowRef : undefined}
+                        disabled={!isClockedIn}
                         onStart={() =>
                             startPspMO({
                                 token,
@@ -327,6 +375,21 @@ function PspStartPanel({
                     />
                 );
             })}
+        </div>
+    );
+}
+
+function ClockInNotice() {
+    return (
+        <div className="flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning/5 p-4 text-sm text-warning">
+            <Info className="mt-0.5 size-4 shrink-0" />
+            <div>
+                <p className="font-semibold">Clock in to start work.</p>
+                <p className="mt-0.5 text-xs opacity-90">
+                    Sessions must attach to a shift. Go back to the hub
+                    and tap “Clock in”.
+                </p>
+            </div>
         </div>
     );
 }
@@ -382,14 +445,47 @@ async function startPspMO({
 function MOCard({
     row,
     busy,
+    preselected,
+    rowRef,
+    disabled,
     onStart,
 }: {
     row: StationMORow;
     busy: boolean;
+    preselected?: boolean;
+    rowRef?: React.RefObject<HTMLDivElement | null>;
+    disabled?: boolean;
     onStart: () => void;
 }) {
+    const target = toNumberOrNull(row.quantity);
+    const produced = toNumberOrNull(row.quantity_produced) ?? 0;
+    const hasProgress = target != null && target > 0;
+    const ratio = hasProgress ? Math.min(1, produced / target) : 0;
+    const percent = Math.round(ratio * 100);
+    const trimmed = (n: number) => {
+        const s = n.toFixed(4);
+        return s.replace(/\.?0+$/, "");
+    };
+    const qtyLabel = hasProgress
+        ? `Qty ${trimmed(produced)} / ${trimmed(target)}`
+        : row.quantity != null
+          ? `Qty ${row.quantity}`
+          : null;
+
     return (
-        <div className="rounded-3xl border-2 border-border bg-background p-4 transition-colors hover:border-primary/40">
+        <div
+            ref={rowRef}
+            className={`rounded-3xl border-2 bg-background p-4 transition-colors ${
+                preselected
+                    ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/20"
+                    : "border-border hover:border-primary/40"
+            }`}
+        >
+            {preselected && (
+                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-primary">
+                    From your Jobs list
+                </p>
+            )}
             <div className="flex items-start gap-4">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <Clipboard className="size-5" />
@@ -398,16 +494,20 @@ function MOCard({
                     <p className="text-sm font-black text-text truncate">
                         {row.item_name ?? "MO"}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted truncate">
-                        {row.step_name}
-                        {row.workstation_group_name && (
-                            <> · {row.workstation_group_name}</>
-                        )}
-                    </p>
+                    {row.workstation_group_name && (
+                        <p className="mt-0.5 text-xs text-muted truncate">
+                            {row.workstation_group_name}
+                        </p>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                        {row.quantity != null && (
+                        {row.step_sort_order != null && (
                             <span className="rounded-full bg-surface px-2 py-0.5 font-semibold tabular-nums">
-                                Qty {row.quantity}
+                                Step {row.step_sort_order + 1}
+                            </span>
+                        )}
+                        {qtyLabel && (
+                            <span className="rounded-full bg-surface px-2 py-0.5 font-semibold tabular-nums">
+                                {qtyLabel}
                             </span>
                         )}
                         {row.due_date && (
@@ -420,10 +520,30 @@ function MOCard({
                             </span>
                         )}
                     </div>
+                    {hasProgress && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <div
+                                className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface"
+                                role="progressbar"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={percent}
+                            >
+                                <div
+                                    className="h-full rounded-full bg-primary transition-all"
+                                    style={{ width: `${percent}%` }}
+                                />
+                            </div>
+                            <span className="text-[10px] font-semibold text-muted tabular-nums">
+                                {percent}%
+                            </span>
+                        </div>
+                    )}
                 </div>
                 <Button
                     color="primary"
                     isLoading={busy}
+                    isDisabled={disabled}
                     startContent={!busy ? <Play className="size-4" /> : undefined}
                     onPress={onStart}
                     className="shrink-0"
@@ -435,6 +555,12 @@ function MOCard({
     );
 }
 
+function toNumberOrNull(v: string | number | null | undefined): number | null {
+    if (v == null) return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
 /* ------------------------ START ------------------------ */
 
 function StartPanel({
@@ -442,12 +568,14 @@ function StartPanel({
     sessionToken,
     workstationId,
     initialItems,
+    isClockedIn,
     onStarted,
 }: {
     token: string;
     sessionToken: string;
     workstationId: number;
     initialItems: StationItem[];
+    isClockedIn: boolean;
     onStarted: () => void;
 }) {
     const [selectedItem, setSelectedItem] = useState<StationItem | null>(null);
@@ -482,6 +610,7 @@ function StartPanel({
 
     return (
         <>
+            {!isClockedIn && <ClockInNotice />}
             <div className="rounded-3xl border border-border bg-surface p-5">
                 <div className="mb-4">
                     <h2 className="text-sm font-black uppercase tracking-widest text-text">
@@ -560,6 +689,7 @@ function StartPanel({
                 color="primary"
                 size="lg"
                 isLoading={busy}
+                isDisabled={!isClockedIn}
                 startContent={!busy ? <Play className="size-5" /> : undefined}
                 onPress={handleStart}
                 className="h-16 w-full text-base font-black"
@@ -895,58 +1025,46 @@ function OperationDescriptionCard({
     if (!text) return null;
 
     const isMoSpecific = !!session.operation_description;
-    // Long-content threshold — anything past 4 lines / ~350 chars
-    // gets a "Read full" affordance so the running screen doesn't
-    // scroll for 20 seconds to reach the Stop button.
-    const isLong = text.length > 350 || text.split("\n").length > 4;
     const title = isMoSpecific ? "Operation" : "Station notes";
     const subtitle = isMoSpecific
         ? "From the PSP MO step"
         : "Default instructions for this workstation";
+    // 2-line snippet mirrors the SOP card — the running screen stays
+    // scannable no matter how long the operation text is.
+    const snippet = text.trim().split("\n").slice(0, 2).join("\n");
+    const buttonLabel = isMoSpecific ? "Open full operation" : "Open full notes";
 
     return (
         <>
-            <div className="rounded-3xl border-2 border-primary/30 bg-primary/5 p-5">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                            <ClipboardList className="size-4" />
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-primary">
-                                {title}
-                            </p>
-                            <p className="text-[10px] text-muted">{subtitle}</p>
-                        </div>
+            <button
+                type="button"
+                onClick={() => setReaderOpen(true)}
+                className="group flex w-full flex-col gap-3 rounded-3xl border-2 border-primary/30 bg-primary/5 p-4 text-left transition-all hover:border-primary/50 hover:shadow-md active:scale-[0.99]"
+                aria-label={`Open ${title.toLowerCase()} reader`}
+            >
+                <div className="flex items-center gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                        <ClipboardList className="size-5" />
                     </div>
-                    {isLong && (
-                        <button
-                            type="button"
-                            onClick={() => setReaderOpen(true)}
-                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary hover:bg-primary/25"
-                        >
-                            <Maximize2 className="size-3" />
-                            Full
-                        </button>
-                    )}
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black uppercase tracking-widest text-primary">
+                            {title}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                            {subtitle}
+                        </p>
+                    </div>
                 </div>
-                {/* Cap inline preview at ~4 lines with a fade so long
-                    text is obvious there's more to read. */}
-                <div
-                    className={
-                        isLong
-                            ? "relative max-h-24 overflow-hidden"
-                            : "relative"
-                    }
-                >
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                        {text}
-                    </p>
-                    {isLong && (
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-primary/5 to-transparent" />
-                    )}
+
+                <p className="line-clamp-2 whitespace-pre-wrap text-xs leading-relaxed text-text">
+                    {snippet}
+                </p>
+
+                <div className="flex items-center justify-center gap-1.5 rounded-2xl bg-primary/15 py-2 text-[11px] font-black uppercase tracking-wider text-primary transition-colors group-hover:bg-primary/25">
+                    <Maximize2 className="size-3.5" />
+                    {buttonLabel}
                 </div>
-            </div>
+            </button>
 
             {readerOpen && (
                 <FullscreenReader

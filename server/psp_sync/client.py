@@ -157,6 +157,20 @@ class PspClient:
         event["_matched"] = bool(result.get("matched"))
         return event
 
+    def upsert_shift(self, employee_uuid: str, payload: dict) -> dict:
+        """Push one clock-in / clock-out window for a PSP Employee.
+        Idempotent via ``external_id`` (the vp ``WorkerShift.pk``) —
+        the "open shift" push and the later "closed shift" push both
+        target the same PSP row via upsert. Requires ``hr:write:shift``
+        on the token."""
+        result = self.post(
+            f"/hr/employees/{employee_uuid}/shifts",
+            body=payload,
+        )
+        shift = result.get("shift", {})
+        shift["_matched"] = bool(result.get("matched"))
+        return shift
+
     def list_manufacturing_orders(
         self,
         workstation_uuid: str | None = None,
@@ -173,6 +187,33 @@ class PspClient:
     def get_manufacturing_order(self, uuid: str) -> dict:
         result = self.get(f"/manufacturing-orders/{uuid}")
         return result.get("manufacturing_order", {})
+
+    def list_manufacturing_orders_for_workstations(
+        self,
+        workstation_uuids: list[str],
+        statuses: list[str] | None = None,
+    ) -> list[dict]:
+        """Bulk MO lookup across many workstations in ONE round-trip.
+
+        PSP handles the cross-product server-side (two SQL queries no
+        matter how long the input list is) and returns a flat list of
+        ``{workstation_uuid, mo, step}`` rows. The caller maps each
+        workstation_uuid back to its local Workstation.id and renders.
+
+        Replaces the fan-out pattern (one HTTP call per workstation)
+        used by the personal-kiosk Jobs list. Scales to millions of
+        MOs because the aggregation runs on PSP's DB, not here.
+        """
+        if not workstation_uuids:
+            return []
+        body: dict = {"workstation_uuids": list(workstation_uuids)}
+        if statuses:
+            body["statuses"] = list(statuses)
+        result = self.post(
+            "/manufacturing-orders/for-workstations",
+            body=body,
+        )
+        return result.get("items", [])
 
     def list_workstations(self, source_of_truth_only: bool = True) -> list[dict]:
         params = {"source_of_truth_only": "true"} if source_of_truth_only else None

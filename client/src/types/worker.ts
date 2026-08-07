@@ -297,12 +297,50 @@ export interface StationMORow {
   workstation_group_name: string | null;
   item_name: string | null;
   quantity: string | number | null;
+  /** Running total from every session already booked against this step
+   *  (SUM(quantity_produced) on PSP). Null when nothing's been logged.
+   *  Powers the progress bar on the MO picker row. */
+  quantity_produced: string | number | null;
   due_date: string | null;
 }
 
 export interface StationMOsPayload {
   psp_source_of_truth: boolean;
   items: StationMORow[];
+}
+
+/** One row on the cross-workstation Jobs list. Server pre-resolves the
+ *  workstation the worker should route to for this MO, so the FE just
+ *  navigates into StationView with `mo_uuid` + `step_uuid` pre-selected. */
+export interface JobRow {
+  mo_uuid: string;
+  mo_status: string;
+  step_uuid: string;
+  step_name: string;
+  step_sort_order: number | null;
+  step_status: string;
+  step_planned_start: string | null;
+  step_planned_finish: string | null;
+  workstation_group_uuid: string | null;
+  workstation_group_name: string | null;
+  workstation_id: number;
+  workstation_name: string;
+  workstation_kiosk_token: string;
+  item_uuid: string | null;
+  item_code: string | null;
+  item_name: string | null;
+  quantity: string | number | null;
+  quantity_produced: string | number | null;
+  due_date: string | null;
+}
+
+export interface JobsPayload {
+  psp_source_of_truth: boolean;
+  items: JobRow[];
+  /** Server truncated to a hard row cap — the FE renders a "showing
+   *  first N" hint so operators know to filter down. Absent when the
+   *  full list fit. */
+  truncated?: boolean;
 }
 
 /** Slim session row on the QC list. */

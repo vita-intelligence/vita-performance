@@ -16,6 +16,7 @@ from .client import PspClient, PspError, client_for_company
 
 if TYPE_CHECKING:
     from work_sessions.models import WorkSession
+    from workers.models import WorkerShift
 
 logger = logging.getLogger(__name__)
 
@@ -112,3 +113,57 @@ def push_session(session: "WorkSession", client: PspClient | None = None) -> dic
         except PspError:
             logger.exception("push_session (off-MO) failed for session %s", session.id)
             raise
+
+
+def build_shift_payload(shift: "WorkerShift") -> dict:
+    """Serialize a WorkerShift into the JSON PSP's
+    ``upsert_shift`` expects.
+
+    ``external_id`` is the vp PK so the same row updates in place
+    across the open-push → closed-push lifecycle. ``ended_at`` is
+    None for open shifts; PSP stores nil and materialises the
+    duration only when we later post the close.
+    """
+    ended_iso = shift.clocked_out_at.isoformat() if shift.clocked_out_at else None
+    duration = shift.duration_seconds if shift.clocked_out_at else None
+
+    return {
+        "external_id": str(shift.pk),
+        "started_at": shift.clocked_in_at.isoformat(),
+        "ended_at": ended_iso,
+        "duration_seconds": duration,
+        "device_id": shift.device_id or "",
+        "notes": shift.notes or "",
+    }
+
+
+def push_shift(shift: "WorkerShift", client: PspClient | None = None) -> dict | None:
+    """Send `shift` upstream to PSP. Silent-fail on missing PSP creds
+    or an unlinked worker — clock-in / clock-out mustn't block the
+    kiosk if PSP happens to be down."""
+    worker = shift.worker
+    if not worker.external_id:
+        return None  # worker not linked to a PSP employee — nothing to push
+
+    if client is None:
+        if not shift.company:
+            logger.warning("push_shift skipped: shift %s has no company", shift.id)
+            return None
+        try:
+            client = client_for_company(shift.company)
+        except ValueError:
+            # Company not configured for PSP — silent skip so kiosk
+            # keeps functioning in local-only mode.
+            return None
+
+    payload = build_shift_payload(shift)
+
+    try:
+        return client.upsert_shift(
+            employee_uuid=str(worker.external_id),
+            payload=payload,
+        )
+    except PspError:
+        logger.exception("push_shift failed for shift %s", shift.id)
+        # Never re-raise — a PSP outage must not block a clock-out.
+        return None

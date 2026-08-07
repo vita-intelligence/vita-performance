@@ -1512,10 +1512,172 @@ class PublicPersonalKioskWorkstationMOsView(APIView):
                     'workstation_group_name': group.get('name'),
                     'item_name': item.get('name'),
                     'quantity': quantity,
+                    'quantity_produced': step.get('quantity_produced'),
                     'due_date': due_date,
                 })
 
         return Response({'psp_source_of_truth': True, 'items': rows})
+
+
+class PublicPersonalKioskJobsView(APIView):
+    """GET /api/kiosk/personal/<token>/jobs/?session_token=…[&nocache=1]
+
+    Cross-workstation "what can I work on right now" list. Every PSP MO
+    with ``status = in_progress`` that routes to a station this worker
+    can open shows up here, one row per (MO, workstation), so clicking
+    a row can open StationView with the MO preselected.
+
+    Returns ``{psp_source_of_truth: false, items: []}`` for non-PSP
+    tenants — the personal kiosk stays useful without PSP, the Jobs
+    tab just goes empty.
+
+    Performance — the ONE-CALL path:
+      * Sends every station's PSP uuid in a single POST to
+        ``/manufacturing-orders/for-workstations``. PSP does the cross
+        product server-side in two SQL queries (uuid→group_id, then
+        MOs whose step targets any of those groups). ONE round-trip,
+        regardless of station count. Scales to millions of MOs because
+        the aggregation runs on PSP's DB.
+      * Response is Redis-cached for ~10s keyed by (kiosk, worker).
+      * ``?nocache=1`` bypasses the cache so Refresh always fetches
+        fresh.
+      * Hard row cap protects against pathological tenants; the FE
+        renders a "showing top jobs only" hint when truncated.
+    """
+
+    permission_classes = [AllowAny]
+
+    JOBS_MAX_ROWS = 500
+    CACHE_TTL_SECONDS = 10
+
+    def get(self, request, token):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        tok = _resolve_token(token)
+        if not tok:
+            return Response(
+                {'detail': 'Invalid kiosk link.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response(
+                {'detail': 'Session expired.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        tenant_psp = _tenant_is_psp_integrated(tok.user)
+        if not tenant_psp:
+            return Response({'psp_source_of_truth': False, 'items': []})
+
+        company = _tenant_company(tok.user)
+        if not company:
+            return Response({'psp_source_of_truth': True, 'items': []})
+
+        from django.core.cache import cache
+        cache_key = f'jobs:{tok.pk}:{worker.pk}'
+        nocache = request.query_params.get('nocache') in ('1', 'true')
+        if not nocache:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
+        # PSP-linked workstations the worker can open on this tablet.
+        from workstations.models import Workstation
+        stations = list(
+            Workstation.objects
+            .filter(user=tok.user, is_active=True)
+            .filter(Q(is_general=True) | Q(authorized_workers=worker))
+            .exclude(external_id__isnull=True)
+            .only('id', 'name', 'external_id', 'kiosk_token')
+            .distinct()
+        )
+        if not stations:
+            payload = {'psp_source_of_truth': True, 'items': []}
+            cache.set(cache_key, payload, self.CACHE_TTL_SECONDS)
+            return Response(payload)
+
+        # Local ws.external_id → Workstation, so we can map the PSP
+        # response back to local ids in O(1).
+        stations_by_uuid = {str(ws.external_id): ws for ws in stations}
+
+        # Deferred import — psp_sync only loaded for PSP tenants.
+        from psp_sync.client import PspError, client_for_company
+
+        try:
+            client = client_for_company(company)
+        except (ValueError, PspError):
+            return Response({'psp_source_of_truth': True, 'items': []})
+
+        # ONE call. PSP returns the flat cross-product already.
+        try:
+            psp_items = client.list_manufacturing_orders_for_workstations(
+                workstation_uuids=list(stations_by_uuid.keys()),
+                statuses=['in_progress'],
+            )
+        except PspError as e:
+            logger.warning('personal_kiosk jobs list failed: %s', e)
+            payload = {'psp_source_of_truth': True, 'items': []}
+            cache.set(cache_key, payload, self.CACHE_TTL_SECONDS)
+            return Response(payload)
+
+        rows: list[dict] = []
+        for entry in psp_items:
+            if len(rows) >= self.JOBS_MAX_ROWS:
+                break
+            ws_uuid = entry.get('workstation_uuid')
+            ws = stations_by_uuid.get(ws_uuid)
+            if not ws:
+                continue
+            mo = entry.get('mo') or {}
+            step = entry.get('step') or {}
+            mo_uuid = mo.get('uuid')
+            step_uuid = step.get('uuid')
+            if not mo_uuid or not step_uuid:
+                continue
+
+            group = step.get('workstation_group') or {}
+            item = mo.get('item') or {}
+            rows.append({
+                'mo_uuid': mo_uuid,
+                'mo_status': mo.get('status'),
+                'step_uuid': step_uuid,
+                'step_name': step.get('name'),
+                'step_sort_order': step.get('sort_order'),
+                'step_status': step.get('status'),
+                'step_planned_start': step.get('planned_start'),
+                'step_planned_finish': step.get('planned_finish'),
+                'workstation_group_uuid': group.get('uuid'),
+                'workstation_group_name': group.get('name'),
+                'workstation_id': ws.id,
+                'workstation_name': ws.name,
+                'workstation_kiosk_token': str(ws.kiosk_token),
+                'item_uuid': item.get('uuid'),
+                'item_code': item.get('code'),
+                'item_name': item.get('name'),
+                'quantity': mo.get('quantity'),
+                'quantity_produced': step.get('quantity_produced'),
+                'due_date': mo.get('due_date'),
+            })
+
+        # Stable ordering — soonest due first, then step_sort_order,
+        # so the FE list feels deterministic across refreshes.
+        rows.sort(
+            key=lambda r: (
+                r.get('due_date') or '9999-12-31',
+                r.get('step_sort_order') if r.get('step_sort_order') is not None else 9999,
+                r.get('mo_uuid') or '',
+            )
+        )
+
+        payload = {
+            'psp_source_of_truth': True,
+            'items': rows,
+            'truncated': len(rows) >= self.JOBS_MAX_ROWS,
+        }
+        cache.set(cache_key, payload, self.CACHE_TTL_SECONDS)
+        return Response(payload)
 
 
 # =============================================================================

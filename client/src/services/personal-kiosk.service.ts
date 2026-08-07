@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
 import {
     HistoryPayload,
+    JobsPayload,
     PersonalKioskAuthSessionPayload,
     QCFeedbackItem,
     QCRosterWorker,
@@ -323,6 +324,29 @@ export const personalKioskService = {
         const qs = `?session_token=${encodeURIComponent(sessionToken)}`;
         const res = await fetch(
             `${base}${personalKiosk.stationMOs(token, wsId)}${qs}`,
+        );
+        return unwrap(res);
+    },
+
+    /**
+     * Cross-workstation "available jobs" — every PSP MO currently
+     * in_progress that routes to a station this worker can open.
+     * One row per (MO, workstation) so the click-through knows which
+     * station to launch StationView on.
+     *
+     * Server caches for ~10s; pass `bypassCache=true` on the Refresh
+     * button so the operator can force a fresh fetch after a
+     * supervisor's edit hasn't propagated yet.
+     */
+    getJobs: async (
+        token: string,
+        sessionToken: string,
+        opts: { bypassCache?: boolean } = {},
+    ): Promise<JobsPayload> => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        if (opts.bypassCache) p.set('nocache', '1');
+        const res = await fetch(
+            `${base}${personalKiosk.jobs(token)}?${p.toString()}`,
         );
         return unwrap(res);
     },

@@ -97,6 +97,8 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/workstations/${wsId}/items/`,
         stationMOs: (token: string, wsId: number) =>
             `/api/kiosk/personal/${token}/workstations/${wsId}/mos/`,
+        jobs: (token: string) =>
+            `/api/kiosk/personal/${token}/jobs/`,
         qcSessions: (token: string) =>
             `/api/kiosk/personal/${token}/qc/sessions/`,
         qcVerifySession: (token: string, sessionId: number) =>

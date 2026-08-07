@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
+    ClipboardList,
     Clock,
     ExternalLink,
     Factory,
@@ -35,6 +36,7 @@ interface WorkerHomeProps {
     onOpenStations: () => void;
     onOpenStation: (workstationId: number) => void;
     onOpenHistory: () => void;
+    onOpenJobs: () => void;
     /** Optional live reputation snapshot for the hero — parent may
      *  omit and we still render happily from the roster payload. */
     liveScore?: number;
@@ -62,6 +64,7 @@ export default function WorkerHome({
     onOpenStations,
     onOpenStation,
     onOpenHistory,
+    onOpenJobs,
     liveScore,
     liveTier,
 }: WorkerHomeProps) {
@@ -126,7 +129,31 @@ export default function WorkerHome({
                 <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-muted">
                     Explore
                 </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <NavTile
+                        title="Jobs"
+                        subtitle={
+                            shift
+                                ? "MOs running right now"
+                                : "Clock in to unlock"
+                        }
+                        icon={<ClipboardList className="size-6" />}
+                        accent="jobs"
+                        disabled={!shift}
+                        onClick={onOpenJobs}
+                    />
+                    <NavTile
+                        title="Stations"
+                        subtitle={
+                            shift
+                                ? "Pick a station to start work"
+                                : "Clock in to unlock"
+                        }
+                        icon={<Factory className="size-6" />}
+                        accent="stations"
+                        disabled={!shift}
+                        onClick={onOpenStations}
+                    />
                     <NavTile
                         title="Performance"
                         subtitle="14-day trend & recent sessions"
@@ -140,17 +167,6 @@ export default function WorkerHome({
                         icon={<TrendingUp className="size-6" />}
                         accent="reputation"
                         onClick={onOpenReputation}
-                    />
-                    <NavTile
-                        title="Stations"
-                        subtitle={
-                            shift
-                                ? "Pick a station to start work"
-                                : "Clock in first to log time"
-                        }
-                        icon={<Factory className="size-6" />}
-                        accent="stations"
-                        onClick={onOpenStations}
                     />
                     <NavTile
                         title="History"
@@ -474,12 +490,14 @@ function NavTile({
     icon,
     accent,
     onClick,
+    disabled,
 }: {
     title: string;
     subtitle: string;
     icon: React.ReactNode;
-    accent: "performance" | "reputation" | "stations" | "history";
+    accent: "performance" | "reputation" | "stations" | "history" | "jobs";
     onClick: () => void;
+    disabled?: boolean;
 }) {
     const styles = {
         performance:
@@ -490,6 +508,8 @@ function NavTile({
             "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:border-emerald-500/50",
         history:
             "bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border-violet-500/30 text-violet-600 dark:text-violet-400 hover:border-violet-500/50",
+        jobs:
+            "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:border-rose-500/50",
     }[accent];
 
     const iconBg = {
@@ -497,13 +517,20 @@ function NavTile({
         reputation: "bg-amber-500/15",
         stations: "bg-emerald-500/15",
         history: "bg-violet-500/15",
+        jobs: "bg-rose-500/15",
     }[accent];
 
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`group flex min-h-32 flex-col items-start gap-3 rounded-3xl border-2 p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] sm:p-5 ${styles}`}
+            disabled={disabled}
+            aria-disabled={disabled}
+            className={`group flex min-h-32 flex-col items-start gap-3 rounded-3xl border-2 p-4 text-left transition-all sm:p-5 ${styles} ${
+                disabled
+                    ? "cursor-not-allowed opacity-40 grayscale hover:translate-y-0 hover:shadow-none"
+                    : "hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
+            }`}
         >
             <div
                 className={`flex size-11 shrink-0 items-center justify-center rounded-2xl sm:size-12 ${iconBg}`}

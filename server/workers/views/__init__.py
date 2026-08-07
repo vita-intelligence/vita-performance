@@ -26,6 +26,7 @@ from .personal_kiosk import (
     PublicPersonalKioskWorkstationContextView,
     PublicPersonalKioskWorkstationItemsView,
     PublicPersonalKioskWorkstationMOsView,
+    PublicPersonalKioskJobsView,
     PublicPersonalKioskStartWorkstationSessionView,
     PublicPersonalKioskStopWorkstationSessionView,
     PublicPersonalKioskQCSessionsView,
