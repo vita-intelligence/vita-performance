@@ -332,6 +332,12 @@ export interface JobRow {
   quantity: string | number | null;
   quantity_produced: string | number | null;
   due_date: string | null;
+  /** PSP stream: ``production`` (commercial), ``trial`` (R&D
+   *  scientist batch), or ``sample`` (customer sample kit). Drives
+   *  the R&D chip on the job card so the operator knows to expect
+   *  R&D-flavoured quality cadence + separate stock pool. May be
+   *  ``null`` if PSP omitted the field (older responses). */
+  project_type: string | null;
 }
 
 export interface JobsPayload {

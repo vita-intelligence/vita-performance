@@ -6,6 +6,7 @@ import {
     ClipboardList,
     Clock,
     Factory,
+    FlaskConical,
     Info,
     Loader2,
     RefreshCw,
@@ -90,7 +91,17 @@ export default function JobsPage({
         const q = query.trim().toLowerCase();
         if (!q) return rows;
         return rows.filter((r) => {
+            // Convenience synonyms for the R&D chip so "r&d" / "rnd" /
+            // "sample" / "trial" all filter down to the right stream
+            // without the operator having to know the exact wire value.
+            const streamMatches =
+                (q === "r&d" || q === "rnd" || q === "trial") &&
+                r.project_type === "trial";
+            const sampleMatches =
+                q === "sample" && r.project_type === "sample";
             return (
+                streamMatches ||
+                sampleMatches ||
                 (r.item_name ?? "").toLowerCase().includes(q) ||
                 (r.item_code ?? "").toLowerCase().includes(q) ||
                 (r.workstation_name ?? "").toLowerCase().includes(q) ||
@@ -234,6 +245,13 @@ function JobCard({ row, onOpen }: { row: JobRow; onOpen: () => void }) {
         : row.quantity != null
           ? `Qty ${row.quantity}`
           : null;
+    // R&D chip when the job feeds a trial batch or a sample kit. Both
+    // upstream flows land outputs in a segregated R&D stock pool + get
+    // a different QC cadence than commercial production; the chip
+    // primes the operator on what to expect before they open the job.
+    const isRnd =
+        row.project_type === "trial" || row.project_type === "sample";
+    const rndLabel = row.project_type === "sample" ? "Sample" : "R&D";
 
     return (
         <button
@@ -241,13 +259,31 @@ function JobCard({ row, onOpen }: { row: JobRow; onOpen: () => void }) {
             onClick={onOpen}
             className="group flex w-full items-start gap-4 rounded-3xl border-2 border-border bg-background p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
         >
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <ClipboardList className="size-6" />
+            <div
+                className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${
+                    isRnd
+                        ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                        : "bg-primary/10 text-primary"
+                }`}
+            >
+                {isRnd ? (
+                    <FlaskConical className="size-6" />
+                ) : (
+                    <ClipboardList className="size-6" />
+                )}
             </div>
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-black text-text">
-                    {row.item_name ?? row.item_code ?? "MO"}
-                </p>
+                <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-black text-text">
+                        {row.item_name ?? row.item_code ?? "MO"}
+                    </p>
+                    {isRnd && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                            <FlaskConical className="size-3" />
+                            {rndLabel}
+                        </span>
+                    )}
+                </div>
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <Factory className="size-3.5 shrink-0" />
                     <span className="truncate">{row.workstation_name}</span>

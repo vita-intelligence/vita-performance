@@ -1659,6 +1659,16 @@ class PublicPersonalKioskJobsView(APIView):
                 'quantity': mo.get('quantity'),
                 'quantity_produced': step.get('quantity_produced'),
                 'due_date': mo.get('due_date'),
+                # Stream marker so the FE can badge R&D vs production
+                # jobs distinctly. PSP already emits this on the MO
+                # payload (see BackendWeb.IntegrationReadController's
+                # ``manufacturing_orders_for_workstations``). Operators
+                # scanning the Jobs list can tell at a glance whether
+                # a job feeds R&D output (trial batch / sample kit)
+                # vs commercial production, which matters for
+                # quality-check cadence + which stock pool the outputs
+                # land in.
+                'project_type': mo.get('project_type'),
             })
 
         # Stable ordering — soonest due first, then step_sort_order,
