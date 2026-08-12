@@ -156,9 +156,17 @@ class WorkstationStatsView(APIView):
                 'item_name': s.item.name if s.item else None,
                 'worker_count': len(s.workers.all()),
                 'status': s.status,
+                'mo_uuid': s.mo_uuid,
             }
             for s in reversed(sessions[-20:])
         ]
+
+        # PSP stream badge — see ``mo_meta.enrich_rows_with_project_type``
+        # for the caching / silent-degrade contract.
+        from companies.models import Company
+        from psp_sync.mo_meta import enrich_rows_with_project_type
+        _company = Company.objects.filter(owner_user=request.user).first()
+        enrich_rows_with_project_type(recent, _company)
 
         return Response({
             'workstation': {

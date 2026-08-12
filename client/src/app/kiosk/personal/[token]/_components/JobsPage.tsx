@@ -14,6 +14,7 @@ import {
     X,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge, isRndProjectType } from "@/components/RndBadge";
 import { JobRow } from "@/types/worker";
 
 interface JobsPageProps {
@@ -245,13 +246,10 @@ function JobCard({ row, onOpen }: { row: JobRow; onOpen: () => void }) {
         : row.quantity != null
           ? `Qty ${row.quantity}`
           : null;
-    // R&D chip when the job feeds a trial batch or a sample kit. Both
-    // upstream flows land outputs in a segregated R&D stock pool + get
-    // a different QC cadence than commercial production; the chip
-    // primes the operator on what to expect before they open the job.
-    const isRnd =
-        row.project_type === "trial" || row.project_type === "sample";
-    const rndLabel = row.project_type === "sample" ? "Sample" : "R&D";
+    // R&D chip when the job feeds a trial batch or a sample kit —
+    // shared component so every session/MO surface uses the same
+    // visual + wording.
+    const isRnd = isRndProjectType(row.project_type);
 
     return (
         <button
@@ -277,12 +275,7 @@ function JobCard({ row, onOpen }: { row: JobRow; onOpen: () => void }) {
                     <p className="truncate text-sm font-black text-text">
                         {row.item_name ?? row.item_code ?? "MO"}
                     </p>
-                    {isRnd && (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                            <FlaskConical className="size-3" />
-                            {rndLabel}
-                        </span>
-                    )}
+                    <RndBadge projectType={row.project_type} />
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <Factory className="size-3.5 shrink-0" />

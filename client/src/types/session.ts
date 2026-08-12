@@ -9,6 +9,11 @@ export interface WorkSession {
   start_time: string;
   item?: number | null;
   item_name?: string | null;
+  mo_uuid?: string | null;
+  /** PSP MO stream ("production" / "trial" / "sample" / null) so the
+   *  session-list surfaces can badge R&D rows. Populated by the
+   *  ``mo_meta`` resolver server-side. */
+  project_type?: string | null;
   end_time: string | null;
   quantity_produced: number | null;
   quantity_rejected: number | null;

@@ -20,6 +20,7 @@ import {
     X,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge } from "@/components/RndBadge";
 import {
     StationContextPayload,
     StationItem,
@@ -491,9 +492,12 @@ function MOCard({
                     <Clipboard className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-text truncate">
-                        {row.item_name ?? "MO"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm font-black text-text truncate">
+                            {row.item_name ?? "MO"}
+                        </p>
+                        <RndBadge projectType={row.project_type} />
+                    </div>
                     {row.workstation_group_name && (
                         <p className="mt-0.5 text-xs text-muted truncate">
                             {row.workstation_group_name}

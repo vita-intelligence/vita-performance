@@ -1,4 +1,5 @@
 import { RealtimeSession } from "@/types/realtime";
+import { RndBadge } from "@/components/RndBadge";
 import SessionTimer from "@/app/(main)/sessions/active/_components/SessionTimer";
 
 interface ActiveSessionsSceneProps {
@@ -43,7 +44,10 @@ export default function ActiveSessionsScene({ sessions }: ActiveSessionsScenePro
                                 </div>
                                 <div className="flex flex-col gap-0.5">
                                     <p className="text-xs font-semibold uppercase tracking-widest text-muted">Workstation</p>
-                                    <p className="text-sm text-text">{session.workstation_name}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm text-text">{session.workstation_name}</p>
+                                        <RndBadge projectType={session.project_type} />
+                                    </div>
                                 </div>
                                 {session.item_name && (
                                     <div className="flex flex-col gap-0.5">

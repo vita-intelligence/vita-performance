@@ -5,6 +5,9 @@ export interface RealtimeSession {
   item_name?: string | null;
   start_time: string;
   status: string;
+  /** PSP MO stream ("production" / "trial" / "sample" / null) so the
+   *  realtime dashboard can badge R&D rows without a second call. */
+  project_type?: string | null;
 }
 
 export interface WorkstationStatus {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@heroui/react";
 import { FileText, ListChecks } from "lucide-react";
 import { KioskActiveSession, KioskWorker } from "@/types/kiosk";
+import { RndBadge } from "@/components/RndBadge";
 import PinPad from "./PinPad";
 import SOPViewer from "@/components/shared/SOPViewer";
 import OperationViewer from "./OperationViewer";
@@ -100,7 +101,10 @@ export default function KioskActive({
                         {session.item_name && (
                             <div className="flex flex-col items-center gap-1">
                                 <p className="text-xs font-semibold uppercase tracking-widest text-muted">Item</p>
-                                <p className="text-lg sm:text-2xl font-black text-text uppercase">{session.item_name}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-lg sm:text-2xl font-black text-text uppercase">{session.item_name}</p>
+                                    <RndBadge projectType={session.project_type} />
+                                </div>
                             </div>
                         )}
 

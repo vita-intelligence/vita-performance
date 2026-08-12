@@ -9,6 +9,7 @@ import {
     TrendingUp,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge } from "@/components/RndBadge";
 import {
     WorkerPerformancePayload,
     WorkerPerformanceRecentSession,
@@ -393,9 +394,12 @@ function SessionRow({ session }: { session: WorkerPerformanceRecentSession }) {
     return (
         <li className="flex items-center gap-3 p-4">
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-text">
-                    {session.workstation_name ?? "—"}
-                </p>
+                <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-semibold text-text">
+                        {session.workstation_name ?? "—"}
+                    </p>
+                    <RndBadge projectType={session.project_type} compact />
+                </div>
                 <p className="mt-0.5 truncate text-xs text-muted">
                     {session.item_name ?? "No item"} ·{" "}
                     {sessionWhen(session)}

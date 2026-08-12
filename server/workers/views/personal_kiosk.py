@@ -649,9 +649,15 @@ class PublicPersonalKioskPerformanceView(APIView):
                 'performance_percentage': s.performance_percentage,
                 'quantity_produced': float(s.quantity_produced) if s.quantity_produced else None,
                 'status': s.status,
+                'mo_uuid': s.mo_uuid,
             }
             for s in recent
         ]
+
+        # R&D chip data — cached PSP lookup, silent-degrade if PSP is
+        # down or the tenant isn't integrated.
+        from psp_sync.mo_meta import enrich_rows_with_project_type
+        enrich_rows_with_project_type(recent_payload, _tenant_company(tok.user))
 
         return Response({
             'worker': {
@@ -788,6 +794,16 @@ class PublicPersonalKioskLiveStatusView(APIView):
             or session.get_activity_kind_display()
         )
 
+        # Resolve PSP project_type for the R&D chip. Single-row lookup;
+        # cached so ticker refreshes don't re-hit PSP.
+        from psp_sync.mo_meta import resolve_project_types_for_uuids
+        _project_type = None
+        if session.mo_uuid:
+            _lookup = resolve_project_types_for_uuids(
+                _tenant_company(tok.user), [session.mo_uuid]
+            )
+            _project_type = _lookup.get(session.mo_uuid)
+
         return Response({
             'active_session': {
                 'id': session.id,
@@ -803,6 +819,7 @@ class PublicPersonalKioskLiveStatusView(APIView):
                 'activity_kind': session.activity_kind,
                 'started_at': session.start_time.isoformat() if session.start_time else None,
                 'mo_uuid': session.mo_uuid,
+                'project_type': _project_type,
             }
         })
 
@@ -951,6 +968,18 @@ def _session_snapshot(session):
     display_item_name = (
         session.item.name if session.item else (session.override_task_name or None)
     )
+    # PSP stream marker for the R&D chip. Only fires the lookup for
+    # MO-attributed sessions with a mo_uuid — cleaning / other
+    # activities never carry one. Cached so the start / stop /
+    # context calls a worker fires in rapid succession only hit PSP
+    # once per unique MO per hour.
+    project_type = None
+    if session.mo_uuid and session.company_id:
+        from psp_sync.mo_meta import resolve_project_types_for_uuids
+        _lookup = resolve_project_types_for_uuids(
+            session.company, [session.mo_uuid]
+        )
+        project_type = _lookup.get(session.mo_uuid)
     return {
         'id': session.id,
         'workstation_id': session.workstation_id,
@@ -970,6 +999,8 @@ def _session_snapshot(session):
         'duration_hours': session.duration_hours,
         'workstation_uom': session.workstation.uom if session.workstation else None,
         'worker_name': _first_worker_name(session),
+        'mo_uuid': session.mo_uuid,
+        'project_type': project_type,
     }
 
 
@@ -1371,6 +1402,16 @@ class PublicPersonalKioskHistoryView(APIView):
         for s in sessions_qs:
             sessions_by_shift.setdefault(s.shift_id, []).append(s)
 
+        # Resolve project_type in one shot for every session in this
+        # window so the per-row R&D badge doesn't fan out N PSP calls.
+        from psp_sync.mo_meta import resolve_project_types_for_uuids
+        _mo_uuids = [s.mo_uuid for s in sessions_qs if s.mo_uuid]
+        _project_types = (
+            resolve_project_types_for_uuids(_tenant_company(tok.user), _mo_uuids)
+            if _mo_uuids
+            else {}
+        )
+
         def _session_row(s):
             return {
                 'id': s.id,
@@ -1386,6 +1427,8 @@ class PublicPersonalKioskHistoryView(APIView):
                 'quantity_produced': float(s.quantity_produced) if s.quantity_produced else None,
                 'performance_percentage': s.performance_percentage,
                 'status': s.status,
+                'mo_uuid': s.mo_uuid,
+                'project_type': _project_types.get(s.mo_uuid) if s.mo_uuid else None,
             }
 
         shift_rows = []
@@ -1514,6 +1557,10 @@ class PublicPersonalKioskWorkstationMOsView(APIView):
                     'quantity': quantity,
                     'quantity_produced': step.get('quantity_produced'),
                     'due_date': due_date,
+                    # PSP already returns project_type on the MO
+                    # payload — surface it so the R&D chip lights up
+                    # on the station's MO picker too.
+                    'project_type': mo.get('project_type'),
                 })
 
         return Response({'psp_source_of_truth': True, 'items': rows})
@@ -1774,9 +1821,15 @@ class PublicPersonalKioskQCSessionsView(APIView):
                     {'id': w.id, 'name': w.full_name}
                     for w in s.workers.all()
                 ],
+                'mo_uuid': s.mo_uuid,
             }
             for s in sessions
         ]
+
+        # R&D chip enrichment — batched PSP lookup, silent-degrade.
+        from psp_sync.mo_meta import enrich_rows_with_project_type
+        enrich_rows_with_project_type(results, _tenant_company(tok.user))
+
         return Response({
             'count': total,
             'page': page,

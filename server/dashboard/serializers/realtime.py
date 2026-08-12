@@ -1,7 +1,7 @@
 import uuid
 
 
-def serialize_active_session(session):
+def serialize_active_session(session, project_type=None):
     worker_names = ", ".join(w.full_name for w in session.workers.all())
     return {
         'id': session.id,
@@ -10,6 +10,13 @@ def serialize_active_session(session):
         'item_name': session.item.name if session.item else None,
         'start_time': session.start_time.isoformat(),
         'status': session.status,
+        # PSP MO stream ("production" / "trial" / "sample" / null). FE
+        # badges R&D rows so operators can tell R&D work from
+        # commercial production at a glance without reading item
+        # names. Resolved via the ``mo_meta`` cached batch lookup so
+        # a list refresh is at most one PSP call per unique MO uuid
+        # per hour.
+        'project_type': project_type,
     }
 
 
@@ -154,9 +161,30 @@ def build_dashboard_payload(user, event_alerts=None):
     state_alerts = build_alerts(user, active_sessions, today_sessions, workstations)
     all_alerts = (event_alerts or []) + state_alerts
 
+    # Resolve PSP project_type for every unique MO across the active
+    # sessions in one batched call. Deferred import so tenants without
+    # PSP don't pay the module load. Silent-degrades to ``{}`` on any
+    # PSP outage — the FE just doesn't badge the rows.
+    from psp_sync.mo_meta import resolve_project_types_for_uuids
+
+    active_mo_uuids = [s.mo_uuid for s in active_sessions if s.mo_uuid]
+    project_types = {}
+    if active_mo_uuids:
+        company = next(
+            (s.company for s in active_sessions if s.company_id),
+            None,
+        )
+        if company:
+            project_types = resolve_project_types_for_uuids(
+                company, active_mo_uuids
+            )
+
     return {
         'type': 'dashboard_update',
-        'active_sessions': [serialize_active_session(s) for s in active_sessions],
+        'active_sessions': [
+            serialize_active_session(s, project_types.get(s.mo_uuid))
+            for s in active_sessions
+        ],
         'workstation_statuses': [
             serialize_workstation_status(w, active_sessions)
             for w in workstations

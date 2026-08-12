@@ -99,9 +99,18 @@ class WorkerStatsView(APIView):
                 'item_name': s.item.name if s.item else None,
                 'worker_count': len(s.workers.all()),  # prefetched, no DB hit
                 'status': s.status,
+                'mo_uuid': s.mo_uuid,
             }
             for s in reversed(sessions[-20:])
         ]
+
+        # PSP stream badge (production / trial / sample). Batched
+        # against the ``mo_meta`` cache so a page refresh is at most
+        # one PSP call per unique MO per hour.
+        from companies.models import Company
+        from psp_sync.mo_meta import enrich_rows_with_project_type
+        _company = Company.objects.filter(owner_user=request.user).first()
+        enrich_rows_with_project_type(recent, _company)
 
         reputation_events = (
             WorkerReputationEvent.objects

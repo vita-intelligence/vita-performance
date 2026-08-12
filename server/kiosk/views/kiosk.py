@@ -119,6 +119,17 @@ class KioskWorkstationView(APIView):
                 status='active',
             ).prefetch_related('workers').first()
 
+        # PSP stream marker so the kiosk's active-session banner
+        # shows a purple R&D chip when the station is running a trial
+        # or sample batch. Cached lookup, silent-degrade.
+        active_project_type = None
+        if active_session and active_session.mo_uuid and active_session.company_id:
+            from psp_sync.mo_meta import resolve_project_types_for_uuids
+            _lookup = resolve_project_types_for_uuids(
+                active_session.company, [active_session.mo_uuid]
+            )
+            active_project_type = _lookup.get(active_session.mo_uuid)
+
         return Response({
             'workstation': {
                 'id': workstation.id,
@@ -135,6 +146,8 @@ class KioskWorkstationView(APIView):
                     {'id': w.id, 'name': w.full_name}
                     for w in active_session.workers.all()
                 ],
+                'mo_uuid': active_session.mo_uuid,
+                'project_type': active_project_type,
             } if active_session else None,
         })
 
@@ -306,6 +319,15 @@ class KioskActiveSessionView(APIView):
         if not session:
             return Response(None)
 
+        # PSP stream marker for the R&D chip on active-session cards.
+        _project_type = None
+        if session.mo_uuid and session.company_id:
+            from psp_sync.mo_meta import resolve_project_types_for_uuids
+            _lookup = resolve_project_types_for_uuids(
+                session.company, [session.mo_uuid]
+            )
+            _project_type = _lookup.get(session.mo_uuid)
+
         return Response({
             'id': session.id,
             'start_time': session.start_time.isoformat(),
@@ -315,6 +337,8 @@ class KioskActiveSessionView(APIView):
                 {'id': w.id, 'name': w.full_name}
                 for w in session.workers.all()
             ],
+            'mo_uuid': session.mo_uuid,
+            'project_type': _project_type,
         })
 
 

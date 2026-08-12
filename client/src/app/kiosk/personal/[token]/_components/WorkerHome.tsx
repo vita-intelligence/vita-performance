@@ -16,6 +16,7 @@ import {
     TrendingUp,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge } from "@/components/RndBadge";
 import {
     ReputationTier,
     Worker,
@@ -286,9 +287,12 @@ function LiveSessionCard({
                     <p className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
                         Now running · {elapsed}
                     </p>
-                    <p className="mt-1 text-lg font-black text-text truncate">
-                        {session.workstation_name ?? "Unknown station"}
-                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                        <p className="text-lg font-black text-text truncate">
+                            {session.workstation_name ?? "Unknown station"}
+                        </p>
+                        <RndBadge projectType={session.project_type} />
+                    </div>
                     <p className="mt-0.5 text-sm text-muted truncate">
                         {session.task_label ?? "Live session"}
                     </p>

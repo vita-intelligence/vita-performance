@@ -16,6 +16,7 @@ import {
     X,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge } from "@/components/RndBadge";
 import {
     QCFeedbackItem,
     QCPendingSession,
@@ -306,9 +307,12 @@ function SessionRow({
                 <Factory className="size-6" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-text truncate">
-                    {session.workstation_name ?? "—"}
-                </p>
+                <div className="flex items-center gap-2">
+                    <p className="text-sm font-black text-text truncate">
+                        {session.workstation_name ?? "—"}
+                    </p>
+                    <RndBadge projectType={session.project_type} />
+                </div>
                 <p className="mt-0.5 truncate text-xs text-muted">
                     {session.item_name ?? "No item"}
                     {" · "}

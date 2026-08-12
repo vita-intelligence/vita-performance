@@ -203,9 +203,17 @@ class QCSessionsView(APIView):
                 'quantity_produced': float(s.quantity_produced) if s.quantity_produced else None,
                 'item_name': s.item.name if s.item else None,
                 'workers': [{'id': w.id, 'name': w.full_name} for w in s.workers.all()],
+                'mo_uuid': s.mo_uuid,
             }
             for s in sessions
         ]
+
+        # PSP stream badge — see ``mo_meta.enrich_rows_with_project_type``
+        # for the caching / silent-degrade contract.
+        from companies.models import Company
+        from psp_sync.mo_meta import enrich_rows_with_project_type
+        _company = Company.objects.filter(owner_user=qc.user).first()
+        enrich_rows_with_project_type(results, _company)
 
         return Response({
             'count': total,

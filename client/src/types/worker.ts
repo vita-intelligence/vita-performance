@@ -174,6 +174,10 @@ export interface HistorySessionRow {
   quantity_produced: number | null;
   performance_percentage: number | null;
   status: 'active' | 'completed' | 'verified';
+  mo_uuid?: string | null;
+  /** PSP MO stream ("production" / "trial" / "sample" / null). Drives
+   *  the RndBadge on personal-kiosk history rows. */
+  project_type?: string | null;
 }
 
 export interface HistoryShiftRow {
@@ -211,6 +215,9 @@ export interface WorkerPerformanceRecentSession {
   performance_percentage: number | null;
   quantity_produced: number | null;
   status: string;
+  mo_uuid?: string | null;
+  /** PSP MO stream — drives the RndBadge on performance-page recent rows. */
+  project_type?: string | null;
 }
 
 export interface WorkerPerformancePayload {
@@ -277,6 +284,10 @@ export interface StationSession {
   /** First worker name attached to the session — used on the celebration
    *  screen as "Well done, {name}". Null when no worker is linked yet. */
   worker_name: string | null;
+  mo_uuid?: string | null;
+  /** PSP MO stream — drives the RndBadge on the station embed's
+   *  active-session card + completion celebration. */
+  project_type?: string | null;
 }
 
 /** MO row surfaced on a PSP-linked station. `step_uuid` +
@@ -302,6 +313,8 @@ export interface StationMORow {
    *  Powers the progress bar on the MO picker row. */
   quantity_produced: string | number | null;
   due_date: string | null;
+  /** PSP MO stream — drives the RndBadge on station MO picker rows. */
+  project_type?: string | null;
 }
 
 export interface StationMOsPayload {
@@ -361,6 +374,9 @@ export interface QCPendingSession {
   quantity_produced: number | null;
   item_name: string | null;
   workers: { id: number; name: string }[];
+  mo_uuid?: string | null;
+  /** PSP MO stream — drives the RndBadge on the personal-kiosk QC list. */
+  project_type?: string | null;
 }
 
 export interface QCSessionsPayload {
@@ -418,6 +434,8 @@ export interface WorkerLiveSession {
   activity_kind: 'mo' | 'cleaning' | 'maintenance' | 'other';
   started_at: string | null;
   mo_uuid: string | null;
+  /** PSP MO stream — drives the RndBadge on the worker-home live ticker. */
+  project_type?: string | null;
 }
 
 export interface WorkerLiveStatusPayload {
@@ -468,6 +486,9 @@ export interface WorkerDaySession {
   quantity_produced: number | null;
   status: string;
   shift_id: number | null;
+  mo_uuid?: string | null;
+  /** PSP MO stream — drives the RndBadge on shift-day session rows. */
+  project_type?: string | null;
 }
 
 export interface WorkerDayReview {

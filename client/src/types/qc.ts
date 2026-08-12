@@ -20,6 +20,9 @@ export interface QCSession {
     quantity_produced: number | null;
     item_name: string | null;
     workers: { id: number; name: string }[];
+    mo_uuid?: string | null;
+    /** PSP MO stream — drives the R&D badge on the QC session list. */
+    project_type?: string | null;
 }
 
 export interface QCSessionPage {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { WorkstationStatsSession } from "@/types/workstation";
 import { useSettings } from "@/hooks/useSettings";
 import { formatDate } from "@/lib/utils/date.utils";
+import { RndBadge } from "@/components/RndBadge";
 import WorkstationSessionDetailsDrawer from "./WorkstationSessionDetailsDrawer";
 
 interface WorkstationSessionsTableProps {
@@ -53,7 +54,12 @@ export default function WorkstationSessionsTable({ sessions }: WorkstationSessio
                                     <td className="px-4 py-3 text-text truncate" title={session.worker_names.join(", ")}>
                                         {session.worker_names.join(", ")}
                                     </td>
-                                    <td className="px-4 py-3 text-muted truncate">{session.item_name || "—"}</td>
+                                    <td className="px-4 py-3 text-muted truncate">
+                                        <span className="inline-flex items-center gap-1.5">
+                                            {session.item_name || "—"}
+                                            <RndBadge projectType={session.project_type} compact />
+                                        </span>
+                                    </td>
                                     <td className="px-4 py-3">
                                         {session.performance_percentage !== null ? (
                                             <span className={`text-xs font-semibold ${session.performance_percentage >= 100

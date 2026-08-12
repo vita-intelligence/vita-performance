@@ -17,6 +17,7 @@ import {
     Package,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
+import { RndBadge } from "@/components/RndBadge";
 import {
     HistoryPayload,
     HistorySessionRow,
@@ -412,9 +413,12 @@ function SessionMiniRow({ session }: { session: HistorySessionRow }) {
                 <Factory className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className="text-xs font-black text-text truncate">
-                    {session.workstation_name ?? "—"}
-                </p>
+                <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-black text-text truncate">
+                        {session.workstation_name ?? "—"}
+                    </p>
+                    <RndBadge projectType={session.project_type} compact />
+                </div>
                 <p className="mt-0.5 text-[11px] text-muted truncate">
                     {session.item_name ??
                         session.activity_label ??

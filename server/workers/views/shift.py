@@ -442,11 +442,28 @@ class DayOverviewView(APIView):
             else:
                 unattached_reviews.append(r)
 
+        # Resolve PSP project_type across every unique mo_uuid on this
+        # day's sessions in one batched call. Feeds the R&D badge on
+        # both the per-shift sessions and the unattached sessions.
+        from psp_sync.mo_meta import resolve_project_types_for_uuids
+        all_sessions_today = list(unattached_sessions) + [
+            s
+            for shift_sessions in sessions_by_shift.values()
+            for s in shift_sessions
+        ]
+        _mo_uuids = [s.mo_uuid for s in all_sessions_today if s.mo_uuid]
+        _project_types = (
+            resolve_project_types_for_uuids(worker.company, _mo_uuids)
+            if worker.company and _mo_uuids
+            else {}
+        )
+
         shift_payload = [
             _serialize_shift_day(
                 shift,
                 sessions_by_shift.get(shift.id, []),
                 reviews_by_shift.get(shift.id, []),
+                _project_types,
             )
             for shift in shifts
         ]
@@ -459,12 +476,15 @@ class DayOverviewView(APIView):
                 'is_qa': worker.is_qa,
             },
             'shifts': shift_payload,
-            'unattached_sessions': [_serialize_session(s) for s in unattached_sessions],
+            'unattached_sessions': [
+                _serialize_session(s, _project_types.get(s.mo_uuid))
+                for s in unattached_sessions
+            ],
             'unattached_reviews': [_serialize_review(r) for r in unattached_reviews],
         })
 
 
-def _serialize_session(s):
+def _serialize_session(s, project_type=None):
     return {
         'id': s.id,
         'workstation_name': s.workstation.name if s.workstation else None,
@@ -476,6 +496,11 @@ def _serialize_session(s):
         'quantity_produced': float(s.quantity_produced) if s.quantity_produced else None,
         'status': s.status,
         'shift_id': s.shift_id,
+        'mo_uuid': s.mo_uuid,
+        # PSP stream ("production" / "trial" / "sample" / null) so the
+        # FE renders the R&D badge. Populated by the shared
+        # ``mo_meta`` resolver upstream of this serializer.
+        'project_type': project_type,
     }
 
 
@@ -493,7 +518,7 @@ def _serialize_review(r):
     }
 
 
-def _serialize_shift_day(shift, sessions, reviews):
+def _serialize_shift_day(shift, sessions, reviews, project_types=None):
     # On-station seconds = sum of session durations that have ended.
     on_station = 0
     for s in sessions:
@@ -502,6 +527,7 @@ def _serialize_shift_day(shift, sessions, reviews):
 
     shift_seconds = shift.duration_seconds
     idle_seconds = max(0, shift_seconds - on_station)
+    project_types = project_types or {}
 
     return {
         'id': shift.id,
@@ -514,7 +540,9 @@ def _serialize_shift_day(shift, sessions, reviews):
         'sessions_count': len(sessions),
         'qa_reviews_count': len(reviews),
         'notes': shift.notes,
-        'sessions': [_serialize_session(s) for s in sessions],
+        'sessions': [
+            _serialize_session(s, project_types.get(s.mo_uuid)) for s in sessions
+        ],
         'qa_reviews': [_serialize_review(r) for r in reviews],
     }
 

@@ -106,6 +106,9 @@ export interface WorkstationStatsSession {
     item_name: string | null;
     worker_count: number;
     status: "completed" | "verified";
+    mo_uuid?: string | null;
+    /** PSP MO stream — drives the R&D badge on workstation-history rows. */
+    project_type?: string | null;
 }
 
 export interface WorkstationStatsInfo {

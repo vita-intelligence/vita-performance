@@ -20,6 +20,11 @@ export interface KioskActiveSession {
      *  maintenance / other) or the workstation isn't PSP-linked. */
     operation_description: string | null;
     workers: { id: number; name: string }[];
+    mo_uuid?: string | null;
+    /** PSP MO stream ("production" / "trial" / "sample" / null).
+     *  Drives the RndBadge chip when the active session is running an
+     *  R&D or sample-kit batch. */
+    project_type?: string | null;
 }
 
 export interface KioskState {
@@ -55,6 +60,8 @@ export interface KioskMO {
     item_name: string | null;
     quantity: string | null;
     due_date: string | null;
+    /** PSP MO stream — drives the RndBadge on kiosk MO pickers. */
+    project_type?: string | null;
 }
 
 export interface KioskMOsResponse {
