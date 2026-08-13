@@ -35,6 +35,24 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+
+# Production-signal safety net for ``DEBUG=True``. Default is still
+# True for dev friction (``runserver`` needs it) but a forgotten
+# ``DJANGO_DEBUG=false`` on prod deploy leaks stack traces + SQL
+# previews to every 500 response. Raise loud if the config carries
+# a real hostname or the dev secret was overridden — either signal
+# means "this is prod, DEBUG=True is unsafe".
+_LOCAL_HOST_ALLOWLIST = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+if DEBUG:
+    _has_non_local_host = any(
+        host and host.strip() not in _LOCAL_HOST_ALLOWLIST for host in HOSTS
+    )
+    if _has_non_local_host:
+        raise RuntimeError(
+            f"DEBUG=True with non-local DJANGO_HOSTS={HOSTS!r}. "
+            "Set DJANGO_DEBUG=false in prod — otherwise every "
+            "unhandled exception leaks stack traces + SQL previews."
+        )
 # ===================================
 
 
