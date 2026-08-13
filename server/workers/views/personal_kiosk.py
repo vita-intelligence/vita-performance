@@ -16,6 +16,7 @@ Kept in its own file so the existing auth-gated `shift.py` (dashboard
 
 import uuid
 from datetime import datetime, time
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
@@ -49,6 +50,58 @@ def _resolve_token(token):
         .filter(token=token)
         .first()
     )
+
+
+def _client_ip(request):
+    """Extract the client IP, respecting the reverse-proxy header."""
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '') or 'unknown'
+
+
+# Anti-enumeration threshold for personal-kiosk token brute-force.
+# The tablet-facing endpoints resolve UUID tokens from the URL —
+# without a soft limit an attacker can iterate the UUID space at
+# wire speed to discover which tenants have kiosks paired. 5 failed
+# lookups per IP per minute keeps a legitimate typo-recovery flow
+# working (operator mis-scans, retries) while dropping enumeration
+# throughput to ~1 attempt per 12 seconds per IP.
+_KIOSK_TOKEN_FAIL_LIMIT = 5
+_KIOSK_TOKEN_FAIL_WINDOW_SECS = 60
+
+
+def _resolve_token_or_rate_limit(request, token):
+    """Resolve a kiosk token; enforce a soft rate limit of failed
+    lookups per IP to slow UUID enumeration. Callers use::
+
+        tok, err = _resolve_token_or_rate_limit(request, token)
+        if err:
+            return err
+        if not tok:
+            return Response({"detail": "..."}, status=404)
+
+    A successful lookup returns ``(token_obj, None)``. An invalid
+    token that's under the fail-count limit returns ``(None, None)``
+    so the caller emits the normal friendly 404. An IP over the
+    limit gets ``(None, Response(429))`` immediately.
+    """
+    tok = _resolve_token(token)
+    if tok:
+        return tok, None
+
+    ip = _client_ip(request)
+    cache_key = f"vita_kiosk_token_fails:{ip}"
+    fails = (cache.get(cache_key) or 0) + 1
+    cache.set(cache_key, fails, timeout=_KIOSK_TOKEN_FAIL_WINDOW_SECS)
+
+    if fails > _KIOSK_TOKEN_FAIL_LIMIT:
+        return None, Response(
+            {"detail": "Too many invalid kiosk-token attempts — try again in a minute."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    return None, None
 
 
 def _worker_for_token(tok, worker_id):
@@ -132,7 +185,9 @@ class PublicPersonalKioskRosterView(APIView):
     MAX_RESULTS = 5
 
     def get(self, request, token):
-        tok = _resolve_token(token)
+        tok, err = _resolve_token_or_rate_limit(request, token)
+        if err:
+            return err
         if not tok:
             return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
 
