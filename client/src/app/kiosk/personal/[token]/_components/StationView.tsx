@@ -22,12 +22,14 @@ import {
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { RndBadge } from "@/components/RndBadge";
 import {
+    JobPreviewPart,
     StationContextPayload,
     StationItem,
     StationMORow,
     StationSession,
 } from "@/types/worker";
 import SessionCompletedScreen from "./SessionCompletedScreen";
+import BomCard from "./BomCard";
 
 interface StationViewProps {
     token: string;
@@ -127,6 +129,7 @@ export default function StationView({
                 <RunningPanel
                     token={token}
                     sessionToken={sessionToken}
+                    workstationId={workstationId}
                     session={context.active_session}
                     uom={context.workstation.uom}
                     sopContent={context.workstation.sop_content}
@@ -828,6 +831,7 @@ function ItemPicker({
 function RunningPanel({
     token,
     sessionToken,
+    workstationId,
     session,
     uom,
     sopContent,
@@ -837,6 +841,7 @@ function RunningPanel({
 }: {
     token: string;
     sessionToken: string;
+    workstationId: number;
     session: StationSession;
     uom: string;
     sopContent: string;
@@ -855,6 +860,44 @@ function RunningPanel({
     // unmount the animation mid-count-up.
     const [completedSession, setCompletedSession] =
         useState<StationSession | null>(null);
+
+    // BOM parts for the running MO — hits the same job-preview endpoint
+    // the Jobs modal uses so operators see the same numbers before AND
+    // after Start. Non-MO sessions (cleaning etc.) skip the fetch and
+    // BomCard doesn't render.
+    const moUuid = session.mo_uuid ?? null;
+    const [bomParts, setBomParts] = useState<JobPreviewPart[] | null>(null);
+    const [bomLoading, setBomLoading] = useState(false);
+    const [bomError, setBomError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!moUuid) {
+            setBomParts(null);
+            return;
+        }
+        let cancelled = false;
+        setBomLoading(true);
+        setBomError(null);
+        (async () => {
+            try {
+                const res = await personalKioskService.getJobPreview(
+                    token,
+                    workstationId,
+                    moUuid,
+                    sessionToken,
+                );
+                if (!cancelled) setBomParts(res.parts);
+            } catch (err) {
+                if (!cancelled)
+                    setBomError(err instanceof Error ? err.message : "Load failed");
+            } finally {
+                if (!cancelled) setBomLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [token, workstationId, moUuid, sessionToken]);
 
     useEffect(() => {
         const id = setInterval(() => setNowMs(Date.now()), 1000);
@@ -931,6 +974,16 @@ function RunningPanel({
             />
 
             <SopCard content={sopContent} updatedAt={sopUpdatedAt} />
+
+            {moUuid && (
+                <BomCard
+                    parts={bomParts ?? []}
+                    loading={bomLoading}
+                    error={bomError}
+                    token={token}
+                    sessionToken={sessionToken}
+                />
+            )}
 
             {!confirmingStop ? (
                 <Button
@@ -1223,8 +1276,11 @@ function FullscreenReader({
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
-            <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
+        <div
+            className="fixed inset-0 z-50 flex flex-col bg-background"
+            style={{ height: "100dvh" }}
+        >
+            <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <BookOpen className="size-5" />
                 </div>
@@ -1247,17 +1303,22 @@ function FullscreenReader({
                     <X className="size-5" />
                 </button>
             </header>
-            <div className="flex-1 overflow-y-auto px-4 py-6 pb-24">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
                 <div className="mx-auto max-w-2xl">
                     <p className="whitespace-pre-wrap text-base leading-7 text-text">
                         {content}
                     </p>
                 </div>
             </div>
-            {/* Persistent close bar at the bottom — thumb-reachable
-                on tall phones so an operator doesn't have to reach up
-                for the top-right X. */}
-            <div className="sticky bottom-0 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur">
+            {/* Persistent close bar at the bottom — thumb-reachable on
+                tall phones so an operator doesn't have to reach up for
+                the top-right X. Edge-to-edge: the container hugs the
+                viewport bottom; only the iPad home-indicator safe area
+                gets extra room. */}
+            <div
+                className="shrink-0 border-t border-border bg-surface/95 px-4 pt-3 backdrop-blur"
+                style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            >
                 <Button
                     color="primary"
                     size="lg"

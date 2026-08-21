@@ -362,6 +362,49 @@ export interface JobsPayload {
   truncated?: boolean;
 }
 
+/** One BOM row on the Jobs modal + Running-panel BOM card. `required_qty`
+ *  is `line.qty × mo.quantity` — the total the operator actually needs
+ *  to grab for this MO. Fixed-cost lines (cleaning consumables etc.)
+ *  return `line.qty` unchanged. Nullable fields fall through gracefully
+ *  when PSP omits them (e.g. UoM not set on the line). */
+export interface JobPreviewPart {
+  uuid: string;
+  sort_order: number | null;
+  is_fixed: boolean;
+  line_qty: string | null;
+  required_qty: string | null;
+  uom_symbol: string | null;
+  uom_name: string | null;
+  notes: string | null;
+  /** UUID of the latest movement-photo across every lot of this part.
+   *  The kiosk builds a proxy URL of shape
+   *  `/api/kiosk/personal/<token>/movement-photos/<uuid>/file/` to
+   *  render the thumbnail. Null when no photo'd movement exists. */
+  last_photo_uuid: string | null;
+  part: {
+    uuid: string;
+    code: string | null;
+    name: string | null;
+  } | null;
+}
+
+export interface JobPreviewPayload {
+  workstation: {
+    id: number;
+    name: string;
+    description: string;
+    sop_content: string;
+    sop_updated_at: string | null;
+  };
+  mo: {
+    uuid?: string;
+    quantity?: string | null;
+    item_name?: string | null;
+    item_code?: string | null;
+  };
+  parts: JobPreviewPart[];
+}
+
 /** Slim session row on the QC list. */
 export interface QCPendingSession {
   id: number;

@@ -16,6 +16,7 @@ import {
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { RndBadge, isRndProjectType } from "@/components/RndBadge";
 import { JobRow } from "@/types/worker";
+import JobPreviewModal from "./JobPreviewModal";
 
 interface JobsPageProps {
     token: string;
@@ -49,6 +50,13 @@ export default function JobsPage({
     if (!isClockedIn) {
         return <ClockInGate title="Jobs" workerName={workerName} />;
     }
+    // Preview modal — tapping a job card opens this instead of jumping
+    // straight to StationView so the operator can read SOP + BOM before
+    // committing. The Start button on the modal calls
+    // startStationSession itself; on success we still hand off to the
+    // parent's onOpenJob so the tablet lands on the RunningPanel that
+    // now shows the freshly-created active session.
+    const [previewJob, setPreviewJob] = useState<JobRow | null>(null);
     const [rows, setRows] = useState<JobRow[] | null>(null);
     const [pspIntegrated, setPspIntegrated] = useState<boolean>(true);
     const [truncated, setTruncated] = useState<boolean>(false);
@@ -204,10 +212,28 @@ export default function JobsPage({
                         <JobCard
                             key={`${row.mo_uuid}:${row.workstation_id}`}
                             row={row}
-                            onOpen={() => onOpenJob(row)}
+                            onOpen={() => setPreviewJob(row)}
                         />
                     ))}
                 </div>
+            )}
+
+            {previewJob && (
+                <JobPreviewModal
+                    token={token}
+                    sessionToken={sessionToken}
+                    job={previewJob}
+                    isClockedIn={isClockedIn}
+                    onClose={() => setPreviewJob(null)}
+                    onStarted={(job) => {
+                        setPreviewJob(null);
+                        // Hand off to the parent so it can navigate into
+                        // StationView — its context load will see the
+                        // active session we just created and render the
+                        // RunningPanel directly.
+                        onOpenJob(job);
+                    }}
+                />
             )}
         </div>
     );

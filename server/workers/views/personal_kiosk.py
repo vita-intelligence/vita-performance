@@ -1792,6 +1792,188 @@ class PublicPersonalKioskJobsView(APIView):
         return Response(payload)
 
 
+class PublicPersonalKioskMovementPhotoView(APIView):
+    """GET /api/kiosk/personal/<token>/movement-photos/<uuid>/file?session_token=…
+
+    Proxies a PSP movement-photo binary to the tablet. The upstream
+    /api/stock/movement-photos endpoint on PSP is UI-JWT-gated so the
+    kiosk browser can't hit it directly; we fetch it here with the
+    company's integration bearer and stream the bytes back.
+
+    Cached ~10 minutes via a Cache-Control header so the kiosk's HTTP
+    cache spares us the round-trip when a worker re-opens the same
+    modal — photos are effectively immutable (a new snap creates a new
+    UUID; the URL never changes what it points to).
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, uuid):
+        from django.http import HttpResponse
+        import logging
+        logger = logging.getLogger(__name__)
+
+        tok = _resolve_token(token)
+        if not tok:
+            return Response(
+                {'detail': 'Invalid kiosk link.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response(
+                {'detail': 'Session expired.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        company = _tenant_company(tok.user)
+        if not company:
+            return Response(
+                {'detail': 'PSP integration not configured.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from psp_sync.client import PspClientError, PspError, client_for_company
+        try:
+            client = client_for_company(company)
+        except (ValueError, PspError):
+            return Response(
+                {'detail': 'PSP integration not configured.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            body, content_type = client.get_movement_photo_bytes(str(uuid))
+        except PspClientError as e:
+            code = getattr(e, 'status_code', 502)
+            if code == 404:
+                return Response(
+                    {'detail': 'Photo not found.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            logger.warning('movement photo proxy client-error: %s', e)
+            return Response(
+                {'detail': 'Photo unavailable.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except PspError as e:
+            logger.warning('movement photo proxy failed: %s', e)
+            return Response(
+                {'detail': 'Photo unavailable.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        response = HttpResponse(body, content_type=content_type)
+        # Photos are effectively immutable — the URL uuid maps 1:1 to
+        # a specific snapshot. Let the browser cache aggressively.
+        response['Cache-Control'] = 'private, max-age=600'
+        return response
+
+
+class PublicPersonalKioskJobPreviewView(APIView):
+    """GET /api/kiosk/personal/<token>/workstations/<ws_id>/jobs/<mo_uuid>/preview/?session_token=…
+
+    "Everything the Jobs modal + Running-panel BOM card need to render"
+    in one round-trip: the target workstation's SOP + the MO's scaled
+    BOM parts. Called from two surfaces:
+
+      1. Jobs tab — when the operator taps a job card, we open a modal
+         showing SOP + operation description + BOM before they hit
+         Start. Fetched with the workstation the JobRow was routed to
+         (server pre-resolves that on the Jobs list).
+      2. Running session — the RunningPanel already has SOP + operation
+         description locally, but calls this endpoint to load the BOM
+         parts section. Server-side we return everything so the same
+         hook works for both callers.
+
+    Non-PSP tenants / missing PSP creds / PSP round-trip failures
+    degrade the ``parts`` list to ``[]`` and let the modal still render
+    SOP — the operator can still Start the session without the BOM.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, ws_id, mo_uuid):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        tok = _resolve_token(token)
+        if not tok:
+            return Response(
+                {'detail': 'Invalid kiosk link.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response(
+                {'detail': 'Session expired.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        ws = _resolve_workstation_for_tenant(tok, ws_id)
+        if not ws:
+            return Response(
+                {'detail': 'Workstation not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not _worker_authorized_on(ws, worker):
+            return Response(
+                {'detail': 'Not authorised on this station.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # SOP payload matches the shape already returned by the
+        # workstation-context endpoint so the FE can reuse SopCard.
+        from workstations.models import SOP
+        try:
+            sop_row = SOP.objects.get(workstation=ws)
+            sop_content = sop_row.content or ''
+            sop_updated_at = (
+                sop_row.updated_at.isoformat() if sop_row.updated_at else None
+            )
+        except SOP.DoesNotExist:
+            sop_content = ''
+            sop_updated_at = None
+
+        workstation_payload = {
+            'id': ws.id,
+            'name': ws.name,
+            'description': ws.description or '',
+            'sop_content': sop_content,
+            'sop_updated_at': sop_updated_at,
+        }
+
+        # BOM parts + MO header from PSP. Only attempted for PSP tenants;
+        # otherwise we return an empty parts list (the modal still
+        # renders SOP + operation description, and Start still works —
+        # local-item sessions don't have a BOM concept anyway).
+        parts_mo: dict = {}
+        parts: list[dict] = []
+        company = _tenant_company(tok.user)
+        if company:
+            from psp_sync.client import PspError, client_for_company
+            try:
+                client = client_for_company(company)
+            except (ValueError, PspError):
+                client = None
+            if client is not None:
+                try:
+                    result = client.get_manufacturing_order_parts(str(mo_uuid))
+                    parts_mo = result.get('mo') or {}
+                    parts = result.get('parts') or []
+                except PspError as e:
+                    # Log + degrade to empty BOM so the modal still opens.
+                    logger.warning(
+                        'personal_kiosk job preview parts failed: %s', e
+                    )
+
+        return Response({
+            'workstation': workstation_payload,
+            'mo': parts_mo,
+            'parts': parts,
+        })
+
+
 # =============================================================================
 # Embedded QC endpoints
 # -----------------------------------------------------------------------------
