@@ -188,6 +188,45 @@ class PspClient:
         result = self.get(f"/manufacturing-orders/{uuid}")
         return result.get("manufacturing_order", {})
 
+    def get_manufacturing_order_parts(self, uuid: str) -> dict:
+        """Slim BOM breakdown for one MO — parts + required_qty scaled
+        to the MO's output quantity. Powers the personal-kiosk Jobs
+        modal + Running-session BOM card. Returns
+        ``{"mo": {...}, "parts": [...]}``; on any HTTP miss the caller
+        should degrade to hiding the BOM section rather than blocking
+        the flow — the operator can still Start / Stop without it."""
+        return self.get(f"/manufacturing-orders/{uuid}/parts")
+
+    def get_movement_photo_bytes(self, photo_uuid: str) -> tuple[bytes, str]:
+        """Fetch a movement-photo binary for the kiosk BOM thumbnail.
+
+        Returns ``(bytes, content_type)``. Raises ``PspClientError``
+        on 404 (photo missing) or the usual transient/network
+        variants. The caller proxies these bytes back to the tablet —
+        the raw PSP URL is UI-JWT-gated so the browser can't hit it
+        directly."""
+        url = f"{self.base_url}/api/integration/movement-photos/{photo_uuid}/file"
+        try:
+            response = self._session.get(url, timeout=self._timeout)
+        except requests.RequestException as e:
+            raise PspTransientError(
+                f"network error fetching movement photo {photo_uuid}: {e}"
+            ) from e
+
+        if 500 <= response.status_code < 600:
+            raise PspTransientError(
+                f"PSP returned HTTP {response.status_code} fetching movement photo {photo_uuid}"
+            )
+        if response.status_code >= 400:
+            raise PspClientError(
+                response.status_code,
+                "movement_photo_error",
+                f"PSP returned {response.status_code} for movement photo {photo_uuid}",
+                response.text,
+            )
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
+        return response.content, content_type
+
     def list_manufacturing_orders_for_workstations(
         self,
         workstation_uuids: list[str],

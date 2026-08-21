@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
 import {
     HistoryPayload,
+    JobPreviewPayload,
     JobsPayload,
     PersonalKioskAuthSessionPayload,
     QCFeedbackItem,
@@ -349,6 +350,41 @@ export const personalKioskService = {
             `${base}${personalKiosk.jobs(token)}?${p.toString()}`,
         );
         return unwrap(res);
+    },
+
+    /**
+     * "Everything the Jobs modal + Running-panel BOM card need" in
+     * one round-trip: target-workstation SOP + the MO's scaled BOM
+     * parts. Used both from the Jobs tab preview modal and from the
+     * running session's BomCard.
+     */
+    getJobPreview: async (
+        token: string,
+        wsId: number,
+        moUuid: string,
+        sessionToken: string,
+    ): Promise<JobPreviewPayload> => {
+        const qs = `?session_token=${encodeURIComponent(sessionToken)}`;
+        const res = await fetch(
+            `${base}${personalKiosk.jobPreview(token, wsId, moUuid)}${qs}`,
+        );
+        return unwrap(res);
+    },
+
+    /**
+     * Absolute URL for a movement-photo thumbnail proxied through the
+     * vita-performance backend. Returns a string (not a fetch) so it
+     * can drop straight into `<img src>`; the browser handles the
+     * request + caching. Session token travels in the query string
+     * because <img> can't set headers.
+     */
+    movementPhotoUrl: (
+        token: string,
+        photoUuid: string,
+        sessionToken: string,
+    ): string => {
+        const qs = `?session_token=${encodeURIComponent(sessionToken)}`;
+        return `${base}${personalKiosk.movementPhoto(token, photoUuid)}${qs}`;
     },
 
     /* --------- embedded QC --------- */

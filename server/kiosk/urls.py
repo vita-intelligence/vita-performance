@@ -33,6 +33,8 @@ from workers.views import (
     PublicPersonalKioskWorkstationItemsView,
     PublicPersonalKioskWorkstationMOsView,
     PublicPersonalKioskJobsView,
+    PublicPersonalKioskJobPreviewView,
+    PublicPersonalKioskMovementPhotoView,
     PublicPersonalKioskStartWorkstationSessionView,
     PublicPersonalKioskStopWorkstationSessionView,
     PublicPersonalKioskQCSessionsView,
@@ -73,6 +75,21 @@ urlpatterns = [
     # Cross-workstation "what can I work on right now" — every PSP MO
     # in_progress AND wired to a station this worker can open.
     path('personal/<uuid:token>/jobs/', PublicPersonalKioskJobsView.as_view()),
+    # Modal preview for one job — workstation SOP + MO BOM parts.
+    # Called from the Jobs tab BEFORE Start so the operator sees the
+    # SOP + what to grab from the shelf. Same endpoint feeds the
+    # Running-session BOM card.
+    path(
+        'personal/<uuid:token>/workstations/<int:ws_id>/jobs/<uuid:mo_uuid>/preview/',
+        PublicPersonalKioskJobPreviewView.as_view(),
+    ),
+    # Proxy for a PSP movement-photo binary. Called from the kiosk
+    # BOM thumbnail — the raw PSP URL is UI-JWT-gated so the tablet
+    # browser can't hit it directly.
+    path(
+        'personal/<uuid:token>/movement-photos/<uuid:uuid>/file/',
+        PublicPersonalKioskMovementPhotoView.as_view(),
+    ),
     path('personal/<uuid:token>/workstations/<int:ws_id>/sessions/start/', PublicPersonalKioskStartWorkstationSessionView.as_view()),
     path('personal/<uuid:token>/work-sessions/<int:sess_id>/stop/', PublicPersonalKioskStopWorkstationSessionView.as_view()),
 

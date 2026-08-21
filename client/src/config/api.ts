@@ -99,6 +99,10 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/workstations/${wsId}/mos/`,
         jobs: (token: string) =>
             `/api/kiosk/personal/${token}/jobs/`,
+        jobPreview: (token: string, wsId: number, moUuid: string) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/jobs/${moUuid}/preview/`,
+        movementPhoto: (token: string, uuid: string) =>
+            `/api/kiosk/personal/${token}/movement-photos/${uuid}/file/`,
         qcSessions: (token: string) =>
             `/api/kiosk/personal/${token}/qc/sessions/`,
         qcVerifySession: (token: string, sessionId: number) =>
