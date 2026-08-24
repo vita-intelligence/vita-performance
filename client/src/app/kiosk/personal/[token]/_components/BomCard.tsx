@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageOff, Loader2, Package, X } from "lucide-react";
+import { ImageOff, Loader2, MapPin, Package, X } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { JobPreviewPart } from "@/types/worker";
 
@@ -149,6 +149,7 @@ function BomRow({
                         </span>
                     )}
                 </div>
+                <LocationChip location={part.location} />
             </div>
             <div className="shrink-0 text-right">
                 <p className="text-sm font-black tabular-nums text-text">
@@ -159,6 +160,42 @@ function BomRow({
                 )}
             </div>
         </li>
+    );
+}
+
+/** Renders "Cell · Location · Floor" for the picked-and-waiting
+ *  material. Highlighted green when the picker parked it at the
+ *  production-feed cell (i.e. it's right by the workstation);
+ *  neutral otherwise (the material is still on a reserve shelf). */
+function LocationChip({
+    location,
+}: {
+    location: JobPreviewPart["location"];
+}) {
+    if (!location) return null;
+
+    const bits = [
+        location.cell_name,
+        location.location_code || location.location_name,
+        location.floor_name,
+    ].filter((s): s is string => !!s && s.trim().length > 0);
+
+    if (bits.length === 0) return null;
+
+    const isFeed = location.cell_purpose === "production_feed";
+    const wrapperClass = isFeed
+        ? "mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
+        : "mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary";
+    const label = isFeed ? "At feed cell" : "Reserved at";
+
+    return (
+        <div className={wrapperClass}>
+            <MapPin className="size-3" aria-hidden="true" />
+            <span className="uppercase tracking-wider">{label}</span>
+            <span className="font-normal normal-case tracking-normal">
+                {bits.join(" · ")}
+            </span>
+        </div>
     );
 }
 

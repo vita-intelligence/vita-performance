@@ -381,6 +381,20 @@ export interface JobPreviewPart {
    *  `/api/kiosk/personal/<token>/movement-photos/<uuid>/file/` to
    *  render the thumbnail. Null when no photo'd movement exists. */
   last_photo_uuid: string | null;
+  /** Where the booked material for this line sits right now. Filled
+   *  from PSP's booking → stock_lot → placement chain, preferring the
+   *  production-feed cell the picker parked it at. Null when nothing
+   *  is booked yet (operator has to book / pick to see a location). */
+  location: {
+    cell_name: string | null;
+    cell_purpose: string | null;
+    location_name: string | null;
+    location_code: string | null;
+    floor_name: string | null;
+    warehouse_name: string | null;
+    qty: string | null;
+    snapshot_at: string | null;
+  } | null;
   part: {
     uuid: string;
     code: string | null;
