@@ -7,7 +7,10 @@ export type FieldType =
     | "rating"
     | "signature"
     | "qc_approval"
-    | "task_select";
+    | "task_select"
+    // Single-tick attestation. Kiosk blocks Submit until it's ticked.
+    // Answer value is a boolean (true = confirmed).
+    | "acknowledgement";
 
 export interface FieldOption {
     id: string;

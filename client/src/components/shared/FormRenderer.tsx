@@ -372,6 +372,48 @@ function QCApprovalField({ field, value, onChange, error, token }: FieldProps & 
     );
 }
 
+function AcknowledgementField({ field, value, onChange, error }: FieldProps) {
+    const checked = value === true;
+    return (
+        <button
+            type="button"
+            onClick={() => onChange(!checked)}
+            className={`flex w-full items-center gap-3 px-4 py-3 border-2 text-sm font-semibold text-left transition-colors ${
+                checked
+                    ? "border-success bg-success/10 text-success"
+                    : error
+                        ? "border-error text-text"
+                        : "border-border text-text hover:border-text"
+            }`}
+        >
+            <span
+                className={`flex size-6 shrink-0 items-center justify-center border-2 transition-colors ${
+                    checked
+                        ? "border-success bg-success text-background"
+                        : "border-border"
+                }`}
+            >
+                {checked && (
+                    <svg
+                        className="size-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 011.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                )}
+            </span>
+            <span className="min-w-0 flex-1">
+                {field.label || "I confirm the above."}
+            </span>
+        </button>
+    );
+}
+
 function TaskSelectField({ field, value, onChange, error }: FieldProps) {
     return (
         <div className="flex flex-col gap-2">
@@ -424,6 +466,10 @@ export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSub
                 isEmpty = !val?.approved;
             } else if (field.type === "task_select") {
                 isEmpty = !val?.label;
+            } else if (field.type === "acknowledgement") {
+                // Must be explicitly ticked. `true` is the only
+                // shape we accept as "confirmed".
+                isEmpty = val !== true;
             } else {
                 isEmpty =
                     val === undefined ||
@@ -465,6 +511,7 @@ export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSub
             case "signature": return <SignatureField {...props} />;
             case "qc_approval": return <QCApprovalField {...props} token={token || ""} />;
             case "task_select": return <TaskSelectField {...props} />;
+            case "acknowledgement": return <AcknowledgementField {...props} />;
             default: return null;
         }
     };
@@ -487,18 +534,22 @@ export default function FormRenderer({ form, onSubmit, onClose, sessionId, isSub
                 <div className="max-w-lg mx-auto flex flex-col gap-6">
                     {visibleFields.map((field) => (
                         <div key={field.id} className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                                <p className="text-sm font-black text-text uppercase tracking-wide">
-                                    {field.label}
-                                </p>
-                                {field.required && (
-                                    <span className="text-error text-sm">*</span>
-                                )}
-                            </div>
+                            {field.type !== "acknowledgement" && (
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-black text-text uppercase tracking-wide">
+                                        {field.label}
+                                    </p>
+                                    {field.required && (
+                                        <span className="text-error text-sm">*</span>
+                                    )}
+                                </div>
+                            )}
                             {renderField(field)}
                             {errors[field.id] && (
                                 <p className="text-xs text-error font-semibold uppercase tracking-widest">
-                                    This field is required.
+                                    {field.type === "acknowledgement"
+                                        ? "You must tick the box to continue."
+                                        : "This field is required."}
                                 </p>
                             )}
                         </div>

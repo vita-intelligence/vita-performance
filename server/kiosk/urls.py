@@ -23,6 +23,10 @@ from workers.views import (
     PublicPersonalKioskEndShiftView,
     PublicPersonalKioskTodaySummaryView,
     PublicPersonalKioskStationsView,
+    PublicPersonalKioskCleaningWorkstationsView,
+    PublicPersonalKioskStartCleaningSessionView,
+    PublicPersonalKioskCompleteCleaningSessionView,
+    PublicPersonalKioskPendingSessionFormView,
     PublicPersonalKioskPerformanceView,
     PublicPersonalKioskReputationView,
     PublicPersonalKioskSessionView,
@@ -55,6 +59,18 @@ urlpatterns = [
     path('personal/<uuid:token>/workers/<int:worker_id>/shifts/active/', PublicPersonalKioskActiveShiftView.as_view()),
     path('personal/<uuid:token>/workers/<int:worker_id>/today-summary/', PublicPersonalKioskTodaySummaryView.as_view()),
     path('personal/<uuid:token>/workers/<int:worker_id>/stations/', PublicPersonalKioskStationsView.as_view()),
+    path(
+        'personal/<uuid:token>/workers/<int:worker_id>/cleaning-workstations/',
+        PublicPersonalKioskCleaningWorkstationsView.as_view(),
+    ),
+    # Pre / post session-form gate. `?trigger=start` before a session
+    # start, `?trigger=end` before a stop. Returns null when there's
+    # nothing to render (no form assigned, or worker is outside the
+    # form's audience allowlist). Worker resolves from session_token.
+    path(
+        'personal/<uuid:token>/workstations/<int:ws_id>/pending-form/',
+        PublicPersonalKioskPendingSessionFormView.as_view(),
+    ),
     path('personal/<uuid:token>/workers/<int:worker_id>/performance/', PublicPersonalKioskPerformanceView.as_view()),
     path('personal/<uuid:token>/workers/<int:worker_id>/reputation/', PublicPersonalKioskReputationView.as_view()),
     path('personal/<uuid:token>/workers/<int:worker_id>/verify-pin/', PublicPersonalKioskVerifyPinView.as_view()),
@@ -92,6 +108,14 @@ urlpatterns = [
     ),
     path('personal/<uuid:token>/workstations/<int:ws_id>/sessions/start/', PublicPersonalKioskStartWorkstationSessionView.as_view()),
     path('personal/<uuid:token>/work-sessions/<int:sess_id>/stop/', PublicPersonalKioskStopWorkstationSessionView.as_view()),
+    path(
+        'personal/<uuid:token>/cleaning-sessions/start/',
+        PublicPersonalKioskStartCleaningSessionView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/cleaning-sessions/<int:sess_id>/complete/',
+        PublicPersonalKioskCompleteCleaningSessionView.as_view(),
+    ),
 
     # Embedded QC — is_qa workers verify sessions inside the personal kiosk.
     path('personal/<uuid:token>/qc/sessions/', PublicPersonalKioskQCSessionsView.as_view()),

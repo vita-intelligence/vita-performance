@@ -81,6 +81,14 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/workers/${workerId}/today-summary/`,
         stations: (token: string, workerId: number) =>
             `/api/kiosk/personal/${token}/workers/${workerId}/stations/`,
+        cleaningWorkstations: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/cleaning-workstations/`,
+        startCleaningSession: (token: string) =>
+            `/api/kiosk/personal/${token}/cleaning-sessions/start/`,
+        completeCleaningSession: (token: string, sessId: number) =>
+            `/api/kiosk/personal/${token}/cleaning-sessions/${sessId}/complete/`,
+        pendingSessionForm: (token: string, wsId: number) =>
+            `/api/kiosk/personal/${token}/workstations/${wsId}/pending-form/`,
         performance: (token: string, workerId: number) =>
             `/api/kiosk/personal/${token}/workers/${workerId}/performance/`,
         reputation: (token: string, workerId: number) =>

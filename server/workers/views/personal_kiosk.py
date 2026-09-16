@@ -627,6 +627,113 @@ class PublicPersonalKioskStationsView(APIView):
         })
 
 
+class PublicPersonalKioskCleaningWorkstationsView(APIView):
+    """GET /api/kiosk/personal/<token>/workers/<id>/cleaning-workstations/
+    — workstations with a live cleaning form for the Cleaning entry point.
+
+    Returns every active workstation the worker can open that has an
+    active `DynamicForm(trigger='cleaning')` assigned. Includes the
+    mirrored `next_cleaning_due_at` + `last_cleaning_at` so the kiosk
+    picker can render due-soon chips without a second round-trip.
+
+    Sorted overdue-first, then due-soon-first, then A→Z on name so an
+    operator with three overdue cells sees them at the top.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, worker_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        worker = _worker_for_token(tok, worker_id)
+        if not worker:
+            return Response({'detail': 'Worker not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Same PSP self-heal as the stations endpoint so a first-load
+        # doesn't 404 while the mirror catches up.
+        _sync_psp_if_stale(tok.user, block_when_empty=False)
+
+        from dynamic_forms.models import DynamicForm
+        from workstations.models import Workstation
+
+        # Active cleaning forms with a workstation attached. The publish
+        # endpoint always sets workstation on cleaning-trigger rows, so
+        # nulls here mean the WS mirror row is still catching up — skip
+        # those cleanly.
+        cleaning_forms = (
+            DynamicForm.objects
+            .filter(
+                user=tok.user,
+                is_active=True,
+                trigger=DynamicForm.TRIGGER_CLEANING,
+                workstation__isnull=False,
+            )
+            .select_related('workstation')
+        )
+
+        # Filter down to workstations this worker is authorised on
+        # (mirrors the /stations gate). Uses one DB scan.
+        allowed_ids = set(
+            Workstation.objects
+            .filter(user=tok.user, is_active=True)
+            .filter(Q(is_general=True) | Q(authorized_workers=worker))
+            .values_list('id', flat=True)
+        )
+
+        # Dedupe by workstation: a WS with several cleaning forms
+        # still shows up once here. The count + first-form name feed
+        # the picker chip; the full form list is fetched on session
+        # start.
+        seen: dict[int, dict] = {}
+        for cf in cleaning_forms:
+            ws = cf.workstation
+            if ws is None or ws.id not in allowed_ids or not ws.is_active:
+                continue
+            row = seen.get(ws.id)
+            if row is None:
+                row = {
+                    'workstation_id': ws.id,
+                    'workstation_name': ws.name,
+                    'kiosk_token': str(ws.kiosk_token),
+                    'form_id': cf.id,
+                    'form_name': cf.name,
+                    'form_count': 1,
+                    'last_cleaning_at': (
+                        ws.last_cleaning_at.isoformat()
+                        if ws.last_cleaning_at else None
+                    ),
+                    'next_cleaning_due_at': (
+                        ws.next_cleaning_due_at.isoformat()
+                        if ws.next_cleaning_due_at else None
+                    ),
+                }
+                seen[ws.id] = row
+            else:
+                row['form_count'] += 1
+        rows = list(seen.values())
+
+        # Sort: overdue first (past dates), then earliest due, then
+        # nulls (no schedule), tiebreak by name.
+        from datetime import date
+        today = date.today()
+
+        def sort_key(r):
+            raw = r['next_cleaning_due_at']
+            if not raw:
+                return (2, r['workstation_name'].lower())
+            due = date.fromisoformat(raw[:10])
+            bucket = 0 if due <= today else 1
+            return (bucket, due.toordinal(), r['workstation_name'].lower())
+
+        rows.sort(key=sort_key)
+
+        return Response({
+            'items': rows,
+            'total': len(rows),
+        })
+
+
 class PublicPersonalKioskPerformanceView(APIView):
     """GET /api/kiosk/personal/<token>/workers/<id>/performance/
     — sessions + trend for the worker's own detail page.
@@ -1277,6 +1384,20 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
                     _psp_group_throughput(company, workstation_group_uuid)
                 )
 
+        # Prefer the new array shape (`start_form_responses`); fall
+        # back to the legacy single-form fields so the older kiosk
+        # build doesn't break during a rolling update.
+        start_form_responses = request.data.get('start_form_responses')
+        if start_form_responses is None:
+            legacy_id = request.data.get('start_form_id')
+            legacy_answers = request.data.get('start_form_answers')
+            if legacy_id and isinstance(legacy_answers, dict):
+                start_form_responses = [
+                    {'form_id': legacy_id, 'answers': legacy_answers}
+                ]
+            else:
+                start_form_responses = []
+
         with transaction.atomic():
             ws_session = WorkSession.objects.create(
                 user=tok.user,
@@ -1303,6 +1424,13 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
                 shift=shift,
             )
             ws_session.workers.set([worker.id])
+
+            # Persist every pre-session form response (workstation_start
+            # trigger) alongside the WorkSession creation so timeline
+            # readers see them atomically. Silent-degrade on bad refs.
+            _persist_session_form_responses(
+                ws_session, start_form_responses, tok.user
+            )
 
         # Reload with select_related so the snapshot has item / workstation.
         ws_session = (
@@ -1350,6 +1478,16 @@ class PublicPersonalKioskStopWorkstationSessionView(APIView):
 
         qty_raw = request.data.get('quantity_produced')
         notes = request.data.get('notes') or ''
+        end_form_responses = request.data.get('end_form_responses')
+        if end_form_responses is None:
+            legacy_id = request.data.get('end_form_id')
+            legacy_answers = request.data.get('end_form_answers')
+            if legacy_id and isinstance(legacy_answers, dict):
+                end_form_responses = [
+                    {'form_id': legacy_id, 'answers': legacy_answers}
+                ]
+            else:
+                end_form_responses = []
 
         with transaction.atomic():
             ws_session.end_time = _parse_iso(request.data.get('requested_at')) or timezone.now()
@@ -1372,6 +1510,12 @@ class PublicPersonalKioskStopWorkstationSessionView(APIView):
                 ws_session.save_performance()
             except Exception:  # noqa: BLE001 — never fail the stop over a perf calc.
                 pass
+
+            # Persist every post-session form response (workstation_end
+            # trigger) inside the same transaction.
+            _persist_session_form_responses(
+                ws_session, end_form_responses, tok.user
+            )
         ws_session.refresh_from_db()
         return Response(_session_snapshot(ws_session))
 
@@ -1383,6 +1527,421 @@ def _parse_iso(raw):
         return parse_datetime(raw)
     except (TypeError, ValueError):
         return None
+
+
+class PublicPersonalKioskPendingSessionFormView(APIView):
+    """GET /api/kiosk/personal/<token>/workstations/<ws_id>/pending-form/?trigger=start|end&session_token=...
+
+    Returns every active DynamicForm assigned to this workstation for
+    the given trigger, filtered by audience allowlist (empty list =
+    everyone; non-empty = only workers whose uuid matches). Kiosk
+    walks the returned list sequentially in `sort_order`; empty list
+    = start / stop the session immediately.
+
+    Trigger param uses vita-perf's local enum values (`start` / `end`)
+    — PSP's workstation_start / workstation_end are already remapped
+    at the publish boundary.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, ws_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        trigger = (request.query_params.get('trigger') or '').strip().lower()
+        from dynamic_forms.models import DynamicForm
+        if trigger not in (DynamicForm.TRIGGER_START, DynamicForm.TRIGGER_END):
+            return Response(
+                {'detail': "trigger must be 'start' or 'end'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ws = _resolve_workstation_for_tenant(tok, ws_id)
+        if not ws:
+            return Response({'detail': 'Workstation not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not _worker_authorized_on(ws, worker):
+            return Response(
+                {'detail': 'Not authorised on this station.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        worker_uuid = getattr(worker, 'uuid', None)
+        worker_uuid_str = str(worker_uuid) if worker_uuid else None
+
+        rows = (
+            DynamicForm.objects
+            .filter(
+                user=tok.user,
+                is_active=True,
+                trigger=trigger,
+                workstation=ws,
+            )
+            .order_by('sort_order', 'id')
+        )
+
+        forms_out = []
+        for form in rows:
+            allowlist = form.worker_uuids or []
+            if allowlist:
+                if worker_uuid_str is None:
+                    continue
+                if worker_uuid_str not in [str(u) for u in allowlist]:
+                    continue
+
+            schema_raw = form.schema
+            if isinstance(schema_raw, dict):
+                schema_flat = schema_raw.get('fields') or []
+            elif isinstance(schema_raw, list):
+                schema_flat = schema_raw
+            else:
+                schema_flat = []
+
+            forms_out.append({
+                'id': form.id,
+                'name': form.name,
+                'trigger': form.trigger,
+                'sort_order': form.sort_order,
+                'schema': schema_flat,
+            })
+
+        return Response({'forms': forms_out})
+
+
+def _persist_session_form_responses(session, entries, tok_user):
+    """Save every entry in `entries` as a FormResponse tied to
+    `session`. Silent-degrade — bad refs / malformed entries log and
+    skip. `entries` may be either a legacy `[form_id, answers]` pair
+    (single response) or a list of `{form_id, answers}` dicts."""
+    if not entries:
+        return
+    if isinstance(entries, dict):
+        entries = [entries]
+    if not isinstance(entries, list):
+        return
+    from dynamic_forms.models import DynamicForm, FormResponse
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        form_id = entry.get('form_id')
+        answers = entry.get('answers')
+        if not form_id or not isinstance(answers, dict):
+            continue
+        form = (
+            DynamicForm.objects
+            .filter(pk=form_id, user=tok_user, is_active=True)
+            .first()
+        )
+        if not form:
+            continue
+        FormResponse.objects.create(session=session, form=form, answers=answers)
+
+
+def _persist_session_form_response(session, form_id, answers, tok_user):
+    """Legacy single-form entry point kept for the cleaning-session
+    completion view (task #10) which still submits one form at a time.
+    New callers should use `_persist_session_form_responses`."""
+    if not form_id or not isinstance(answers, dict):
+        return
+    from dynamic_forms.models import DynamicForm, FormResponse
+    form = (
+        DynamicForm.objects
+        .filter(pk=form_id, user=tok_user, is_active=True)
+        .first()
+    )
+    if not form:
+        return
+    FormResponse.objects.create(session=session, form=form, answers=answers)
+
+
+class PublicPersonalKioskStartCleaningSessionView(APIView):
+    """POST /api/kiosk/personal/<token>/cleaning-sessions/start/
+
+    body: {session_token, workstation_id}
+
+    Opens a cleaning WorkSession + returns the full ordered list of
+    cleaning DynamicForms assigned to that workstation (filtered by
+    audience allowlist). Kiosk walks them sequentially. `form_id` in
+    the body is accepted but no longer required — legacy callers can
+    still send it; new callers omit it.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, token):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        ws_id = request.data.get('workstation_id')
+        if not ws_id:
+            return Response(
+                {'detail': 'workstation_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ws = _resolve_workstation_for_tenant(tok, ws_id)
+        if not ws:
+            return Response({'detail': 'Workstation not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not _worker_authorized_on(ws, worker):
+            return Response(
+                {'detail': 'Not authorised on this station.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from dynamic_forms.models import DynamicForm
+        form_rows = list(
+            DynamicForm.objects
+            .filter(
+                user=tok.user,
+                is_active=True,
+                trigger=DynamicForm.TRIGGER_CLEANING,
+                workstation=ws,
+            )
+            .order_by('sort_order', 'id')
+        )
+        if not form_rows:
+            return Response(
+                {'detail': 'No cleaning forms assigned to this workstation.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Audience filter per-form. Workstation surfaces only if at
+        # least one form applies to this worker.
+        worker_uuid = getattr(worker, 'uuid', None)
+        worker_uuid_str = str(worker_uuid) if worker_uuid else None
+        applicable = []
+        for form in form_rows:
+            allowlist = form.worker_uuids or []
+            if allowlist:
+                if worker_uuid_str is None:
+                    continue
+                if worker_uuid_str not in [str(u) for u in allowlist]:
+                    continue
+            applicable.append(form)
+
+        if not applicable:
+            return Response(
+                {'detail': 'No cleaning forms apply to you on this workstation.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from work_sessions.models import WorkSession
+        if WorkSession.objects.filter(
+            workstation=ws,
+            status='active',
+            activity_kind='cleaning',
+        ).exists():
+            return Response(
+                {'detail': 'A cleaning session is already active on this workstation.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        shift = (
+            WorkerShift.objects
+            .filter(worker=worker, status=WorkerShift.STATUS_ACTIVE)
+            .first()
+        )
+
+        with transaction.atomic():
+            ws_session = WorkSession.objects.create(
+                user=tok.user,
+                company=ws.company,
+                workstation=ws,
+                status='active',
+                activity_kind='cleaning',
+                start_time=_parse_iso(request.data.get('requested_at')) or timezone.now(),
+                shift=shift,
+                override_task_name=f'Cleaning · {ws.name}',
+            )
+            ws_session.workers.set([worker.id])
+
+        def _flatten_schema(schema_raw):
+            if isinstance(schema_raw, dict):
+                return schema_raw.get('fields') or []
+            if isinstance(schema_raw, list):
+                return schema_raw
+            return []
+
+        forms_out = [
+            {
+                'id': f.id,
+                'name': f.name,
+                'sort_order': f.sort_order,
+                'schema': _flatten_schema(f.schema),
+            }
+            for f in applicable
+        ]
+
+        return Response(
+            {
+                'session_id': ws_session.id,
+                'workstation_id': ws.id,
+                'workstation_name': ws.name,
+                'start_time': ws_session.start_time.isoformat(),
+                'forms': forms_out,
+                # Legacy single-form field — first form of the list so
+                # older kiosk builds don't break during a rolling update.
+                'form': forms_out[0] if forms_out else None,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PublicPersonalKioskCompleteCleaningSessionView(APIView):
+    """POST /api/kiosk/personal/<token>/cleaning-sessions/<sess_id>/complete/
+
+    body: {session_token, form_id, answers}
+
+    Persists the form response, closes the WorkSession, and fires the
+    PSP cleaning-complete callback (silent-degrade). Callback landing
+    on PSP is what recomputes `next_cleaning_due_at` and drops the
+    equipment audit events — see task #11.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, token, sess_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from work_sessions.models import WorkSession
+        try:
+            ws_session = (
+                WorkSession.objects
+                .select_related('workstation')
+                .prefetch_related('workers')
+                .get(pk=sess_id, user=tok.user, activity_kind='cleaning')
+            )
+        except WorkSession.DoesNotExist:
+            return Response(
+                {'detail': 'Cleaning session not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not ws_session.workers.filter(pk=worker.pk).exists():
+            return Response({'detail': 'Not your session.'}, status=status.HTTP_403_FORBIDDEN)
+        if ws_session.status != 'active':
+            return Response(
+                {'detail': 'Session already closed.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Prefer the new array shape (`responses`); fall back to the
+        # legacy single-form fields so older kiosk builds don't break
+        # during a rolling update.
+        responses = request.data.get('responses')
+        if responses is None:
+            legacy_form_id = request.data.get('form_id')
+            legacy_answers = request.data.get('answers')
+            if legacy_form_id and isinstance(legacy_answers, dict):
+                responses = [
+                    {'form_id': legacy_form_id, 'answers': legacy_answers}
+                ]
+            else:
+                responses = []
+        if not isinstance(responses, list):
+            return Response(
+                {'detail': '`responses` must be an array of {form_id, answers}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            _persist_session_form_responses(ws_session, responses, tok.user)
+
+            ws_session.end_time = _parse_iso(request.data.get('requested_at')) or timezone.now()
+            ws_session.status = 'completed'
+            ws_session.save(update_fields=['end_time', 'status'])
+
+        # Duration for the PSP callback + client rendering.
+        start = ws_session.start_time
+        end = ws_session.end_time
+        duration_seconds = int((end - start).total_seconds()) if start and end else 0
+
+        # Fire PSP callback — silent-degrade so a bad callback never
+        # blocks the operator from closing their session.
+        _post_cleaning_complete_to_psp(
+            tok.user,
+            workstation=ws_session.workstation,
+            worker=worker,
+            session_id=ws_session.id,
+            duration_seconds=duration_seconds,
+            started_at=start,
+            ended_at=end,
+        )
+
+        return Response({
+            'session_id': ws_session.id,
+            'duration_seconds': duration_seconds,
+            'ended_at': end.isoformat() if end else None,
+        })
+
+
+def _post_cleaning_complete_to_psp(user, workstation, worker, session_id, duration_seconds, started_at, ended_at):
+    """POST cleaning-complete summary to PSP so it can recompute the
+    workstation's `next_cleaning_due_at` and drop the per-equipment
+    audit events. Silent-degrade — any failure logs a warning and the
+    kiosk carries on."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if not workstation or not workstation.external_id:
+        logger.info(
+            'cleaning callback skipped: workstation %s has no external_id',
+            getattr(workstation, 'id', None),
+        )
+        return
+
+    company = getattr(workstation, 'company', None) or getattr(user, 'company', None)
+    base_url = getattr(company, 'psp_base_url', None) if company else None
+    token = getattr(company, 'psp_integration_token', None) if company else None
+    if not base_url or not token:
+        logger.info(
+            'cleaning callback skipped: PSP integration not configured '
+            'on company %s', getattr(company, 'id', None)
+        )
+        return
+
+    import requests
+    url = (
+        f"{base_url.rstrip('/')}"
+        f"/api/integration/workstations/{workstation.external_id}/cleaning-complete/"
+    )
+    body = {
+        'session_id': session_id,
+        'worker_id': worker.id if worker else None,
+        'worker_name': getattr(worker, 'full_name', None),
+        'duration_seconds': duration_seconds,
+        'started_at': started_at.isoformat() if started_at else None,
+        'ended_at': ended_at.isoformat() if ended_at else None,
+    }
+    try:
+        resp = requests.post(
+            url,
+            json=body,
+            headers={'X-Integration-Token': token},
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            logger.warning(
+                'PSP cleaning-complete callback rejected (%s): %s',
+                resp.status_code,
+                resp.text[:400],
+            )
+    except requests.RequestException as exc:
+        logger.warning(
+            'PSP cleaning-complete callback transport failure: %s', exc,
+        )
 
 
 class PublicPersonalKioskHistoryView(APIView):

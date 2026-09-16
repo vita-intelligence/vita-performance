@@ -15,7 +15,9 @@ type Screen =
     | "station"
     | "qc"
     | "history"
-    | "jobs";
+    | "jobs"
+    | "cleaning-picker"
+    | "cleaning-session";
 
 interface AppShellProps {
     worker: Worker;
@@ -35,6 +37,8 @@ const SCREEN_TITLE: Record<Exclude<Screen, "search" | "pin">, string> = {
     qc: "QC review",
     history: "History",
     jobs: "Jobs",
+    "cleaning-picker": "Cleaning",
+    "cleaning-session": "Cleaning",
 };
 
 /**

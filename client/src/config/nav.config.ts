@@ -55,11 +55,10 @@ export const NAV_ITEMS = [
     href: "/items",
     icon: Package,
   },
-  {
-    label: "Forms",
-    href: "/forms",
-    icon: ClipboardList,
-  },
+  // Forms authoring moved to PSP (see `/forms` on the PSP side). The
+  // legacy `/forms` route here still exists as a redirect + "moved
+  // to PSP" notice so bookmarks land somewhere sane; it's no longer
+  // surfaced in the nav.
   {
     label: "Billing",
     href: "/billing",

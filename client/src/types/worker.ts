@@ -145,6 +145,78 @@ export interface WorkerStationTile {
   is_authorized: boolean;
 }
 
+/** One workstation on the Cleaning entry point picker. Mirrors from
+ *  PSP's cleaning-schedule cache — see backend
+ *  `PublicPersonalKioskCleaningWorkstationsView`. */
+export interface CleaningWorkstationTile {
+  workstation_id: number;
+  workstation_name: string;
+  /** Per-workstation kiosk URL token — reserved for scan-based entry
+   *  later; not consumed by the current picker flow. */
+  kiosk_token: string;
+  form_id: number;
+  form_name: string;
+  last_cleaning_at: string | null;
+  next_cleaning_due_at: string | null;
+}
+
+export interface CleaningWorkstationsPayload {
+  items: CleaningWorkstationTile[];
+  total: number;
+}
+
+/** Payload returned when a cleaning session opens. `forms` is the
+ *  ordered list the kiosk walks through — one form at a time,
+ *  starting from `forms[0]`. `form` is kept as a legacy alias for
+ *  the first form so older kiosk builds don't break during a
+ *  rolling deploy. */
+export interface CleaningSessionStart {
+  session_id: number;
+  workstation_id: number;
+  workstation_name: string;
+  start_time: string;
+  forms: Array<{
+    id: number;
+    name: string;
+    sort_order: number;
+    /** Flattened `FormField[]` — PSP-resolved (cleaning templates
+     *  already have equipment sections expanded) or a passthrough of
+     *  the legacy authoring shape. */
+    schema: unknown[];
+  }>;
+  form: {
+    id: number;
+    name: string;
+    schema: unknown[];
+  } | null;
+}
+
+export interface CleaningSessionComplete {
+  session_id: number;
+  duration_seconds: number;
+  ended_at: string | null;
+}
+
+/** One pending session form. Kiosk walks the returned list in
+ *  `sort_order` before the session actually starts / stops. */
+export interface PendingSessionForm {
+  id: number;
+  name: string;
+  /** 'start' or 'end' — vita-perf's local trigger enum, remapped
+   *  from PSP's workstation_start / workstation_end at publish. */
+  trigger: string;
+  sort_order: number;
+  /** Flat `FormField[]` (matches the `KioskForm` shape the
+   *  `FormRenderer` component expects). */
+  schema: unknown[];
+}
+
+/** Response of the pending session-form probe. Empty list = nothing
+ *  to render, kiosk starts / stops immediately. */
+export interface PendingSessionFormPayload {
+  forms: PendingSessionForm[];
+}
+
 export interface WorkerStationsPayload {
   stations: WorkerStationTile[];
   qa_enabled: boolean;

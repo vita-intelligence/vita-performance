@@ -1,7 +1,11 @@
 import api from "@/lib/api";
 import { API_CONFIG } from "@/config/api";
 import {
+    CleaningSessionComplete,
+    CleaningSessionStart,
+    CleaningWorkstationsPayload,
     HistoryPayload,
+    PendingSessionFormPayload,
     JobPreviewPayload,
     JobsPayload,
     PersonalKioskAuthSessionPayload,
@@ -158,6 +162,65 @@ export const personalKioskService = {
         return unwrap(res);
     },
 
+    getCleaningWorkstations: async (
+        token: string,
+        workerId: number,
+    ): Promise<CleaningWorkstationsPayload> => {
+        const res = await fetch(
+            `${base}${personalKiosk.cleaningWorkstations(token, workerId)}`,
+        );
+        return unwrap(res);
+    },
+
+    startCleaningSession: async (
+        token: string,
+        params: {
+            sessionToken: string;
+            workstationId: number;
+        },
+    ): Promise<CleaningSessionStart> => {
+        const res = await fetch(
+            `${base}${personalKiosk.startCleaningSession(token)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_token: params.sessionToken,
+                    workstation_id: params.workstationId,
+                }),
+            },
+        );
+        return unwrap(res);
+    },
+
+    completeCleaningSession: async (
+        token: string,
+        sessionId: number,
+        params: {
+            sessionToken: string;
+            responses: Array<{
+                formId: number;
+                answers: Record<string, unknown>;
+            }>;
+        },
+    ): Promise<CleaningSessionComplete> => {
+        const res = await fetch(
+            `${base}${personalKiosk.completeCleaningSession(token, sessionId)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_token: params.sessionToken,
+                    responses: params.responses.map((r) => ({
+                        form_id: r.formId,
+                        answers: r.answers,
+                    })),
+                }),
+            },
+        );
+        return unwrap(res);
+    },
+
     getPerformance: async (
         token: string,
         workerId: number,
@@ -289,6 +352,13 @@ export const personalKioskService = {
             moStepUuid?: string | null;
             itemName?: string | null;
             workstationGroupUuid?: string | null;
+            /** Ordered list of responses for `workstation_start`-
+             *  trigger forms — one entry per form the operator
+             *  filled during the pre-session walk-through. */
+            startFormResponses?: Array<{
+                formId: number;
+                answers: Record<string, unknown>;
+            }>;
         } = {},
     ): Promise<StationSession> => {
         const body: Record<string, unknown> = {
@@ -302,6 +372,12 @@ export const personalKioskService = {
         if (opts.itemName) body.item_name = opts.itemName;
         if (opts.workstationGroupUuid)
             body.workstation_group_uuid = opts.workstationGroupUuid;
+        if (opts.startFormResponses && opts.startFormResponses.length > 0) {
+            body.start_form_responses = opts.startFormResponses.map((r) => ({
+                form_id: r.formId,
+                answers: r.answers,
+            }));
+        }
         const res = await fetch(
             `${base}${personalKiosk.startStationSession(token, wsId)}`,
             {
@@ -309,6 +385,22 @@ export const personalKioskService = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             },
+        );
+        return unwrap(res);
+    },
+
+    getPendingSessionForm: async (
+        token: string,
+        wsId: number,
+        sessionToken: string,
+        trigger: "start" | "end",
+    ): Promise<PendingSessionFormPayload> => {
+        const qs = new URLSearchParams({
+            session_token: sessionToken,
+            trigger,
+        });
+        const res = await fetch(
+            `${base}${personalKiosk.pendingSessionForm(token, wsId)}?${qs.toString()}`,
         );
         return unwrap(res);
     },
@@ -494,7 +586,17 @@ export const personalKioskService = {
         token: string,
         sessId: number,
         sessionToken: string,
-        opts: { quantityProduced?: number | null; notes?: string } = {},
+        opts: {
+            quantityProduced?: number | null;
+            notes?: string;
+            /** Ordered list of responses for `workstation_end`-
+             *  trigger forms — one entry per form the operator filled
+             *  during the pre-stop walk-through. */
+            endFormResponses?: Array<{
+                formId: number;
+                answers: Record<string, unknown>;
+            }>;
+        } = {},
     ): Promise<StationSession> => {
         const body: Record<string, unknown> = {
             session_token: sessionToken,
@@ -502,6 +604,12 @@ export const personalKioskService = {
         if (opts.quantityProduced != null)
             body.quantity_produced = opts.quantityProduced;
         if (opts.notes) body.notes = opts.notes;
+        if (opts.endFormResponses && opts.endFormResponses.length > 0) {
+            body.end_form_responses = opts.endFormResponses.map((r) => ({
+                form_id: r.formId,
+                answers: r.answers,
+            }));
+        }
         const res = await fetch(
             `${base}${personalKiosk.stopStationSession(token, sessId)}`,
             {

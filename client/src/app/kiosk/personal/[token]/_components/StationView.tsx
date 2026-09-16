@@ -28,6 +28,8 @@ import {
     StationMORow,
     StationSession,
 } from "@/types/worker";
+import type { FormField, KioskForm } from "@/types/dynamic-form";
+import FormRenderer from "@/components/shared/FormRenderer";
 import SessionCompletedScreen from "./SessionCompletedScreen";
 import BomCard from "./BomCard";
 
@@ -589,8 +591,22 @@ function StartPanel({
     const [pickerOpen, setPickerOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [activityLabel, setActivityLabel] = useState("");
+    // Walk-through state when one or more `workstation_start` forms
+    // are attached: Start → probe for the ordered list → open
+    // FormRenderer for `pendingStartQueue[0]` → capture answers →
+    // move to next → when the queue is empty, start the session with
+    // the accumulated responses. Empty probe = fall through to
+    // `startNow(...)` immediately.
+    const [pendingStartQueue, setPendingStartQueue] = useState<
+        KioskForm[]
+    >([]);
+    const [pendingStartResponses, setPendingStartResponses] = useState<
+        Array<{ formId: number; answers: Record<string, unknown> }>
+    >([]);
 
-    const handleStart = async () => {
+    const startNow = async (
+        responses: Array<{ formId: number; answers: Record<string, unknown> }> = [],
+    ) => {
         setBusy(true);
         try {
             await personalKioskService.startStationSession(
@@ -601,6 +617,7 @@ function StartPanel({
                     itemId: selectedItem?.id ?? null,
                     activityKind: selectedItem ? "mo" : "other",
                     activityLabel: selectedItem ? null : activityLabel || null,
+                    startFormResponses: responses,
                 },
             );
             onStarted();
@@ -613,6 +630,34 @@ function StartPanel({
         } finally {
             setBusy(false);
         }
+    };
+
+    const handleStart = async () => {
+        setBusy(true);
+        try {
+            const probe = await personalKioskService.getPendingSessionForm(
+                token,
+                workstationId,
+                sessionToken,
+                "start",
+            );
+            if (probe.forms && probe.forms.length > 0) {
+                setPendingStartQueue(
+                    probe.forms.map((f) => ({
+                        id: f.id,
+                        name: f.name,
+                        schema: f.schema as FormField[],
+                    })),
+                );
+                setPendingStartResponses([]);
+                setBusy(false);
+                return;
+            }
+        } catch {
+            // Probe failure is non-blocking — proceed to start without
+            // a form (matches pre-forms-integration behaviour).
+        }
+        void startNow();
     };
 
     return (
@@ -715,6 +760,41 @@ function StartPanel({
                         setPickerOpen(false);
                     }}
                     onClose={() => setPickerOpen(false)}
+                />
+            )}
+
+            {pendingStartQueue.length > 0 && (
+                <FormRenderer
+                    key={pendingStartQueue[0].id}
+                    form={{
+                        ...pendingStartQueue[0],
+                        name: `${pendingStartQueue[0].name} · ${pendingStartResponses.length + 1} of ${pendingStartResponses.length + pendingStartQueue.length}`,
+                    }}
+                    sessionId={0}
+                    token={token}
+                    isSubmitting={busy}
+                    onSubmit={async (answers) => {
+                        const current = pendingStartQueue[0];
+                        const rest = pendingStartQueue.slice(1);
+                        const nextResponses = [
+                            ...pendingStartResponses,
+                            { formId: current.id, answers },
+                        ];
+                        if (rest.length === 0) {
+                            // Last form in the queue — fire the start
+                            // with the full response set.
+                            setPendingStartQueue([]);
+                            setPendingStartResponses([]);
+                            await startNow(nextResponses);
+                        } else {
+                            setPendingStartResponses(nextResponses);
+                            setPendingStartQueue(rest);
+                        }
+                    }}
+                    onClose={() => {
+                        setPendingStartQueue([]);
+                        setPendingStartResponses([]);
+                    }}
                 />
             )}
         </>
@@ -854,6 +934,14 @@ function RunningPanel({
     const [notes, setNotes] = useState("");
     const [busy, setBusy] = useState(false);
     const [confirmingStop, setConfirmingStop] = useState(false);
+    // Two-step stop when a `workstation_end` form is assigned to the
+    // station — Stop probes for the form, opens FormRenderer if
+    // found, and only then calls the stop endpoint with the answers
+    // piggybacked on the same payload.
+    const [pendingEndQueue, setPendingEndQueue] = useState<KioskForm[]>([]);
+    const [pendingEndResponses, setPendingEndResponses] = useState<
+        Array<{ formId: number; answers: Record<string, unknown> }>
+    >([]);
     // Populated on successful Stop — triggers the fullscreen celebration
     // overlay. `onStopped()` fires only when the operator (or the 8s
     // auto-dismiss) closes the overlay, so context reload doesn't
@@ -904,7 +992,9 @@ function RunningPanel({
         return () => clearInterval(id);
     }, []);
 
-    const handleStop = async () => {
+    const stopNow = async (
+        responses: Array<{ formId: number; answers: Record<string, unknown> }> = [],
+    ) => {
         setBusy(true);
         try {
             const parsed = qty.trim() === "" ? null : Number(qty);
@@ -918,6 +1008,7 @@ function RunningPanel({
                 {
                     quantityProduced: parsed,
                     notes: notes.trim() || undefined,
+                    endFormResponses: responses,
                 },
             );
             setCompletedSession(done);
@@ -930,6 +1021,33 @@ function RunningPanel({
         } finally {
             setBusy(false);
         }
+    };
+
+    const handleStop = async () => {
+        setBusy(true);
+        try {
+            const probe = await personalKioskService.getPendingSessionForm(
+                token,
+                workstationId,
+                sessionToken,
+                "end",
+            );
+            if (probe.forms && probe.forms.length > 0) {
+                setPendingEndQueue(
+                    probe.forms.map((f) => ({
+                        id: f.id,
+                        name: f.name,
+                        schema: f.schema as FormField[],
+                    })),
+                );
+                setPendingEndResponses([]);
+                setBusy(false);
+                return;
+            }
+        } catch {
+            // Probe failure is non-blocking.
+        }
+        void stopNow();
     };
 
     if (completedSession) {
@@ -1054,6 +1172,39 @@ function RunningPanel({
                         </Button>
                     </div>
                 </div>
+            )}
+
+            {pendingEndQueue.length > 0 && (
+                <FormRenderer
+                    key={pendingEndQueue[0].id}
+                    form={{
+                        ...pendingEndQueue[0],
+                        name: `${pendingEndQueue[0].name} · ${pendingEndResponses.length + 1} of ${pendingEndResponses.length + pendingEndQueue.length}`,
+                    }}
+                    sessionId={session.id}
+                    token={token}
+                    isSubmitting={busy}
+                    onSubmit={async (answers) => {
+                        const current = pendingEndQueue[0];
+                        const rest = pendingEndQueue.slice(1);
+                        const nextResponses = [
+                            ...pendingEndResponses,
+                            { formId: current.id, answers },
+                        ];
+                        if (rest.length === 0) {
+                            setPendingEndQueue([]);
+                            setPendingEndResponses([]);
+                            await stopNow(nextResponses);
+                        } else {
+                            setPendingEndResponses(nextResponses);
+                            setPendingEndQueue(rest);
+                        }
+                    }}
+                    onClose={() => {
+                        setPendingEndQueue([]);
+                        setPendingEndResponses([]);
+                    }}
+                />
             )}
         </div>
     );

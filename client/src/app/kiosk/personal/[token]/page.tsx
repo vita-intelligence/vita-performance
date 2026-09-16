@@ -16,7 +16,10 @@ import StationView from "./_components/StationView";
 import QCPage from "./_components/QCPage";
 import HistoryPage from "./_components/HistoryPage";
 import JobsPage from "./_components/JobsPage";
+import CleaningPickerPage from "./_components/CleaningPickerPage";
+import CleaningSessionView from "./_components/CleaningSessionView";
 import AppShell from "./_components/AppShell";
+import type { CleaningWorkstationTile } from "@/types/worker";
 
 /**
  * Public personal-kiosk landing.
@@ -50,7 +53,9 @@ type Screen =
     | "station"
     | "qc"
     | "history"
-    | "jobs";
+    | "jobs"
+    | "cleaning-picker"
+    | "cleaning-session";
 
 interface CachedSession {
     session_token: string;
@@ -77,6 +82,10 @@ export default function PersonalKioskTokenPage() {
         mo_uuid: string;
         step_uuid: string;
     } | null>(null);
+    // The workstation the worker is currently cleaning. Wire to the
+    // session view (task #10 renders the form + timer).
+    const [cleaningTarget, setCleaningTarget] =
+        useState<CleaningWorkstationTile | null>(null);
 
     const [activeShift, setActiveShift] = useState<WorkerShift | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
@@ -360,6 +369,7 @@ export default function PersonalKioskTokenPage() {
                             }}
                             onOpenHistory={() => setScreen("history")}
                             onOpenJobs={() => setScreen("jobs")}
+                            onOpenCleaning={() => setScreen("cleaning-picker")}
                         />
                     );
                 case "performance":
@@ -427,6 +437,36 @@ export default function PersonalKioskTokenPage() {
                             sessionToken={sessionToken}
                             workerId={selectedWorker.id}
                             workerName={selectedWorker.full_name}
+                        />
+                    );
+                case "cleaning-picker":
+                    return (
+                        <CleaningPickerPage
+                            token={token}
+                            workerId={selectedWorker.id}
+                            workerName={selectedWorker.full_name}
+                            isClockedIn={!!activeShift}
+                            onOpenCleaning={(row) => {
+                                setCleaningTarget(row);
+                                setScreen("cleaning-session");
+                            }}
+                        />
+                    );
+                case "cleaning-session":
+                    if (!cleaningTarget || !sessionToken) return null;
+                    return (
+                        <CleaningSessionView
+                            token={token}
+                            sessionToken={sessionToken}
+                            target={cleaningTarget}
+                            onFinished={() => {
+                                setCleaningTarget(null);
+                                setScreen("home");
+                            }}
+                            onBack={() => {
+                                setCleaningTarget(null);
+                                setScreen("cleaning-picker");
+                            }}
                         />
                     );
                 case "station":

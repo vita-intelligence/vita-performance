@@ -13,6 +13,7 @@ import {
     LogOut,
     Radio,
     Sparkles,
+    SprayCan,
     TrendingUp,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
@@ -38,6 +39,7 @@ interface WorkerHomeProps {
     onOpenStation: (workstationId: number) => void;
     onOpenHistory: () => void;
     onOpenJobs: () => void;
+    onOpenCleaning: () => void;
     /** Optional live reputation snapshot for the hero — parent may
      *  omit and we still render happily from the roster payload. */
     liveScore?: number;
@@ -66,6 +68,7 @@ export default function WorkerHome({
     onOpenStation,
     onOpenHistory,
     onOpenJobs,
+    onOpenCleaning,
     liveScore,
     liveTier,
 }: WorkerHomeProps) {
@@ -154,6 +157,18 @@ export default function WorkerHome({
                         accent="stations"
                         disabled={!shift}
                         onClick={onOpenStations}
+                    />
+                    <NavTile
+                        title="Cleaning"
+                        subtitle={
+                            shift
+                                ? "Clean a station on the schedule"
+                                : "Clock in to unlock"
+                        }
+                        icon={<SprayCan className="size-6" />}
+                        accent="cleaning"
+                        disabled={!shift}
+                        onClick={onOpenCleaning}
                     />
                     <NavTile
                         title="Performance"
@@ -499,7 +514,13 @@ function NavTile({
     title: string;
     subtitle: string;
     icon: React.ReactNode;
-    accent: "performance" | "reputation" | "stations" | "history" | "jobs";
+    accent:
+        | "performance"
+        | "reputation"
+        | "stations"
+        | "history"
+        | "jobs"
+        | "cleaning";
     onClick: () => void;
     disabled?: boolean;
 }) {
@@ -514,6 +535,8 @@ function NavTile({
             "bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border-violet-500/30 text-violet-600 dark:text-violet-400 hover:border-violet-500/50",
         jobs:
             "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:border-rose-500/50",
+        cleaning:
+            "bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:border-cyan-500/50",
     }[accent];
 
     const iconBg = {
@@ -522,6 +545,7 @@ function NavTile({
         stations: "bg-emerald-500/15",
         history: "bg-violet-500/15",
         jobs: "bg-rose-500/15",
+        cleaning: "bg-cyan-500/15",
     }[accent];
 
     return (
