@@ -92,6 +92,12 @@ class WorkSession(models.Model):
     notes = models.TextField(null=True, blank=True)
     override_target_quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     override_target_duration = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    # Setup seconds snapshotted from the PSP routing target at start-
+    # time. ``compute_performance`` subtracts this from the session's
+    # duration before working out the expected quantity so an operator
+    # isn't punished for legitimate setup time. Null = no setup override
+    # (legacy sessions + non-PSP tenants unchanged).
+    override_setup_seconds = models.PositiveIntegerField(null=True, blank=True)
     override_task_name = models.CharField(max_length=200, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -99,6 +105,21 @@ class WorkSession(models.Model):
     class Meta:
         db_table = 'work_sessions'
         ordering = ['-start_time']
+        indexes = [
+            # `status='active'` + ORDER BY start_time drives every kiosk
+            # "what's running now" view. This composite lets the planner
+            # answer both parts from the index instead of a bitmap scan
+            # + filesort at scale.
+            models.Index(
+                fields=['status', 'start_time'],
+                name='ws_status_starttime_idx',
+            ),
+            # Per-tenant filters (kiosk endpoints scoped by user).
+            models.Index(
+                fields=['user', 'status'],
+                name='ws_user_status_idx',
+            ),
+        ]
 
     def __str__(self):
         worker_names = ", ".join(w.full_name for w in self.workers.all())
@@ -189,6 +210,14 @@ class WorkSession(models.Model):
         # Use raw seconds instead of the rounded duration_hours property so
         # sub-minute sessions still produce a meaningful percentage.
         duration_seconds = (self.end_time - self.start_time).total_seconds()
+        # Subtract the setup snapshot so the "expected quantity" formula
+        # below scores against production-only minutes. Null / zero =
+        # unchanged behaviour (legacy sessions + non-PSP tenants).
+        # `max(0, ...)` guards against a session that stopped inside
+        # setup — we treat it as zero productive time and let it score
+        # 0% instead of blowing up on a negative expected qty.
+        if self.override_setup_seconds:
+            duration_seconds = max(0.0, duration_seconds - float(self.override_setup_seconds))
         if duration_seconds <= 0:
             return None
         duration = duration_seconds / 3600.0

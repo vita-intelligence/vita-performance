@@ -116,6 +116,12 @@ class PublicPersonalKioskLiveMOsView(APIView):
             return err
 
         company = getattr(session.worker, 'company', None)
+        # Hard safety cap — a floor with more than ~500 concurrent MO
+        # sessions is unrealistic but the query must never scan the
+        # whole `work_sessions` table for a QC refresh (polled every
+        # 20-30s across every QA tablet). `.only()` trims the payload
+        # to just the columns the group-by loop below touches.
+        MAX_ACTIVE_SESSIONS = 500
         active = (
             WorkSession.objects
             .select_related('user', 'workstation', 'item')
@@ -129,6 +135,7 @@ class PublicPersonalKioskLiveMOsView(APIView):
         )
         if company is not None:
             active = active.filter(company=company)
+        active = active[:MAX_ACTIVE_SESSIONS]
 
         # Group by mo_uuid. `sessions` inside each row lists every
         # active session on that MO across workstations, so the QC
@@ -266,7 +273,10 @@ class PublicPersonalKioskQCNotesListView(APIView):
         if err:
             return err
 
-        notes = (
+        # Materialise once, then serialise + count from the same list —
+        # avoids the second `SELECT COUNT(*)` round-trip Django's
+        # queryset `.count()` would fire even against a sliced queryset.
+        notes = list(
             QCNote.objects
             .select_related('author_worker', 'workstation')
             .filter(mo_uuid=str(mo_uuid))
@@ -274,7 +284,7 @@ class PublicPersonalKioskQCNotesListView(APIView):
         )
         return Response({
             'results': [_serialise_note(n) for n in notes],
-            'count': notes.count() if hasattr(notes, 'count') else len(notes),
+            'count': len(notes),
         })
 
 

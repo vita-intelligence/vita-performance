@@ -619,34 +619,33 @@ class PublicPersonalKioskStationsView(APIView):
         # jump straight to their usual spots. Only include stations the
         # worker is still authorised on today (in case supervisors have
         # since revoked access).
+        #
+        # DB-side aggregation — the old implementation loaded every
+        # ``WorkSession`` this worker ever ran (unbounded, order by
+        # start_time). At 10K+ sessions/worker that materialises the
+        # full history over the wire just to find three station ids.
+        # Now we let Postgres do the grouping and only ship 3 rows.
         from work_sessions.models import WorkSession
+        from django.db.models import Max
         recent_ids = list(
             WorkSession.objects
-            .filter(workers=worker, user=tok.user)
-            .order_by('-start_time')
+            .filter(workers=worker, user=tok.user, workstation__isnull=False)
+            .values('workstation_id')
+            .annotate(last_seen=Max('start_time'))
+            .order_by('-last_seen')[:3]
             .values_list('workstation_id', flat=True)
         )
-        seen = set()
-        ordered_recent_ids = []
-        for wid in recent_ids:
-            if wid and wid not in seen:
-                seen.add(wid)
-                ordered_recent_ids.append(wid)
-            if len(ordered_recent_ids) >= 3:
-                break
 
         recent_payload = []
-        if ordered_recent_ids:
-            authorised_ids = set(
-                base_qs.filter(pk__in=ordered_recent_ids).values_list('id', flat=True)
-            )
+        if recent_ids:
+            # Single lookup + membership check against the authorised
+            # queryset (which itself is already tenant + is_active
+            # filtered). One SQL per page load, not two.
             by_id = {
                 s.id: s
-                for s in base_qs.filter(pk__in=ordered_recent_ids)
+                for s in base_qs.filter(pk__in=recent_ids)
             }
-            for wid in ordered_recent_ids:
-                if wid not in authorised_ids:
-                    continue
+            for wid in recent_ids:
                 s = by_id.get(wid)
                 if not s:
                     continue
@@ -1086,18 +1085,104 @@ def _tenant_is_psp_integrated(tok_user) -> bool:
     """True when the tenant has PSP credentials configured. Prefer the
     workstation's company row when present, but fall back to the
     kiosk token owner's Company because some seed data leaves the
-    workstation.company FK blank."""
-    from companies.models import Company
-    company = Company.objects.filter(owner_user=tok_user).first()
+    workstation.company FK blank. Uses the request-scoped
+    ``_tenant_company`` cache to avoid a redundant SQL when both
+    helpers fire in the same request."""
+    company = _tenant_company(tok_user)
     return bool(
         company and company.psp_base_url and company.psp_integration_token
     )
 
 
 def _tenant_company(tok_user):
-    """Resolve the Company row for this tenant, or None."""
+    """Resolve the Company row for this tenant, or None.
+
+    Memoised on the User instance so repeated calls inside a single
+    request (many kiosk endpoints do this, e.g. PSP-sync gate +
+    project-type resolver + integration client factory) collapse to
+    one SQL. Django rebuilds the ``tok_user`` instance per request
+    via ``_resolve_token``, so the cache never leaks across requests
+    or across tenants.
+    """
+    cached = getattr(tok_user, '_cached_tenant_company', None)
+    if cached is not None or hasattr(tok_user, '_cached_tenant_company'):
+        return cached
     from companies.models import Company
-    return Company.objects.filter(owner_user=tok_user).first()
+    company = Company.objects.filter(owner_user=tok_user).first()
+    try:
+        setattr(tok_user, '_cached_tenant_company', company)
+    except (AttributeError, TypeError):
+        # Anonymous / read-only user impls that reject attr writes —
+        # fall back to no caching rather than blowing up.
+        pass
+    return company
+
+
+def _psp_step_target(company, mo_uuid: str, mo_step_uuid: str | None):
+    """Return ``(target_qty, target_duration_hours, setup_seconds)`` from
+    the PSP routing target on this specific MO step.
+
+    PSP's ``mo_step_summary`` exposes ``effective_setup_seconds`` +
+    ``effective_cycle_seconds`` — these are the auto-healed observed
+    values written nightly by ``RoutingHealer`` from real
+    ``WorkstationSession`` data, or the planner-authored values
+    (``setup_time_min`` × 60, ``cycle_time_min`` × 60) as a fallback
+    when the routing hasn't been through a heal yet.
+
+    Preferred over ``_psp_group_throughput`` because:
+
+      * per-MO-step (right target for the actual product being run —
+        two SKUs on the same station get different targets).
+      * setup vs cycle are properly separated so a short run isn't
+        penalised for legitimate setup time.
+
+    Silent-fail semantics same as the group throughput helper —
+    returns ``(None, None, None)`` on any PSP miss so start-session
+    never blocks. Caller falls back to the group throughput +
+    per-worker override chain in ``compute_performance``.
+    """
+    from decimal import Decimal
+
+    if not mo_uuid or not company:
+        return (None, None, None)
+    if not company.psp_base_url or not company.psp_integration_token:
+        return (None, None, None)
+
+    try:
+        from psp_sync.client import PspError, client_for_company
+        client = client_for_company(company)
+        mo = client.get_manufacturing_order(str(mo_uuid))
+    except (ValueError, PspError, Exception):  # noqa: BLE001 — never block start.
+        return (None, None, None)
+
+    steps = (mo or {}).get('steps') or []
+    step = None
+    if mo_step_uuid:
+        step = next((s for s in steps if s.get('uuid') == str(mo_step_uuid)), None)
+    if step is None:
+        # Fallback: single-step MO, or the FE didn't send a step uuid
+        # — pick the only step so the operator still gets a target.
+        step = steps[0] if len(steps) == 1 else None
+    if not step:
+        return (None, None, None)
+
+    def _to_float(v):
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    cycle_seconds = _to_float(step.get('effective_cycle_seconds'))
+    setup_seconds = _to_float(step.get('effective_setup_seconds')) or 0.0
+
+    if cycle_seconds is None or cycle_seconds <= 0:
+        return (None, None, None)
+
+    return (
+        Decimal('1'),
+        Decimal(str(round(cycle_seconds / 3600.0, 4))),
+        int(round(setup_seconds)) if setup_seconds > 0 else None,
+    )
 
 
 def _psp_group_throughput(company, group_uuid: str):
@@ -1448,16 +1533,32 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
             .first()
         )
 
-        # Pull the PSP workstation group's throughput so we can score
-        # this session on stop. Only relevant for MO sessions with a
-        # group uuid + configured PSP integration; anything else falls
-        # back to the local Workstation target fields (which are null
-        # on PSP-mirrored rows, hence this whole dance).
+        # Pull the PSP performance target so save_performance() has
+        # something to score against. Preference order:
+        #   1) MO-step-level target (routing setup + cycle, healed).
+        #      This is per-product and separates setup from cycle so
+        #      an operator isn't punished for legitimate setup time.
+        #   2) Workstation-group historical avg (legacy fallback).
+        #   3) Local Workstation.target_* (legacy, non-PSP tenants).
+        # Only relevant for MO sessions on a PSP-integrated tenant.
         target_qty_override = None
         target_dur_override = None
-        if activity_kind == 'mo' and workstation_group_uuid:
+        setup_seconds_override = None
+        if activity_kind == 'mo':
             company = ws.company or _tenant_company(tok.user)
-            if company:
+            if company and mo_uuid:
+                target_qty_override, target_dur_override, setup_seconds_override = (
+                    _psp_step_target(company, mo_uuid, mo_step_uuid)
+                )
+            # Group throughput as a fallback — kicks in when the MO
+            # step has no cycle time yet (fresh routing, no heal, no
+            # authored value). ``_psp_step_target`` returns all-None
+            # in that case.
+            if (
+                target_qty_override is None
+                and company
+                and workstation_group_uuid
+            ):
                 target_qty_override, target_dur_override = (
                     _psp_group_throughput(company, workstation_group_uuid)
                 )
@@ -1498,6 +1599,7 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
                 # both set or both null (compute_performance guards).
                 override_target_quantity=target_qty_override,
                 override_target_duration=target_dur_override,
+                override_setup_seconds=setup_seconds_override,
                 start_time=_parse_iso(request.data.get('requested_at')) or timezone.now(),
                 shift=shift,
             )
