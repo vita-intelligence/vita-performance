@@ -18,6 +18,8 @@ import HistoryPage from "./_components/HistoryPage";
 import JobsPage from "./_components/JobsPage";
 import CleaningPickerPage from "./_components/CleaningPickerPage";
 import CleaningSessionView from "./_components/CleaningSessionView";
+import LiveQCListPage from "./_components/LiveQCListPage";
+import LiveQCMoNotesPage from "./_components/LiveQCMoNotesPage";
 import AppShell from "./_components/AppShell";
 import type { CleaningWorkstationTile } from "@/types/worker";
 
@@ -55,7 +57,9 @@ type Screen =
     | "history"
     | "jobs"
     | "cleaning-picker"
-    | "cleaning-session";
+    | "cleaning-session"
+    | "live-qc-list"
+    | "live-qc-notes";
 
 interface CachedSession {
     session_token: string;
@@ -86,6 +90,13 @@ export default function PersonalKioskTokenPage() {
     // session view (task #10 renders the form + timer).
     const [cleaningTarget, setCleaningTarget] =
         useState<CleaningWorkstationTile | null>(null);
+    // Live QC — the MO the operator has opened for note-taking, plus
+    // the workstation they'd already been standing at when they
+    // tapped in (snapshotted on each note for the timeline context).
+    const [liveQcTarget, setLiveQcTarget] = useState<{
+        mo_uuid: string;
+        workstation_id: number | null;
+    } | null>(null);
 
     const [activeShift, setActiveShift] = useState<WorkerShift | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
@@ -370,6 +381,7 @@ export default function PersonalKioskTokenPage() {
                             onOpenHistory={() => setScreen("history")}
                             onOpenJobs={() => setScreen("jobs")}
                             onOpenCleaning={() => setScreen("cleaning-picker")}
+                            onOpenLiveQC={() => setScreen("live-qc-list")}
                         />
                     );
                 case "performance":
@@ -466,6 +478,35 @@ export default function PersonalKioskTokenPage() {
                             onBack={() => {
                                 setCleaningTarget(null);
                                 setScreen("cleaning-picker");
+                            }}
+                        />
+                    );
+                case "live-qc-list":
+                    if (!sessionToken) return null;
+                    return (
+                        <LiveQCListPage
+                            token={token}
+                            sessionToken={sessionToken}
+                            onOpenMo={(moUuid, workstationId) => {
+                                setLiveQcTarget({
+                                    mo_uuid: moUuid,
+                                    workstation_id: workstationId,
+                                });
+                                setScreen("live-qc-notes");
+                            }}
+                        />
+                    );
+                case "live-qc-notes":
+                    if (!liveQcTarget || !sessionToken) return null;
+                    return (
+                        <LiveQCMoNotesPage
+                            token={token}
+                            sessionToken={sessionToken}
+                            moUuid={liveQcTarget.mo_uuid}
+                            workstationId={liveQcTarget.workstation_id}
+                            onBack={() => {
+                                setLiveQcTarget(null);
+                                setScreen("live-qc-list");
                             }}
                         />
                     );

@@ -119,6 +119,12 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/qc/workers/`,
         qcFeedback: (token: string) =>
             `/api/kiosk/personal/${token}/qc/feedback/`,
+        qcLiveMOs: (token: string) =>
+            `/api/kiosk/personal/${token}/qc/live-mos/`,
+        qcMoNotes: (token: string, moUuid: string) =>
+            `/api/kiosk/personal/${token}/qc/mos/${moUuid}/notes/`,
+        qcMoNoteCreate: (token: string, moUuid: string) =>
+            `/api/kiosk/personal/${token}/qc/mos/${moUuid}/notes/create/`,
         history: (token: string, workerId: number) =>
             `/api/kiosk/personal/${token}/workers/${workerId}/history/`,
         startStationSession: (token: string, wsId: number) =>

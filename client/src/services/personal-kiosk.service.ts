@@ -557,6 +557,91 @@ export const personalKioskService = {
         return unwrap(res);
     },
 
+    // Live QC — walk-the-floor inspection notes on in-progress MOs.
+    // Distinct from the post-hoc `verifyQCSession` flow above.
+    getLiveQCMOs: async (
+        token: string,
+        sessionToken: string,
+    ): Promise<{
+        results: Array<{
+            mo_uuid: string;
+            item_name: string;
+            item_id: number | null;
+            started_at: string;
+            elapsed_seconds: number;
+            sessions: Array<{
+                session_id: number;
+                workstation_id: number;
+                workstation_name: string;
+                worker_id: number;
+                worker_full_name: string;
+                started_at: string;
+                mo_step_uuid: string | null;
+            }>;
+        }>;
+        count: number;
+    }> => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        const res = await fetch(
+            `${base}${personalKiosk.qcLiveMOs(token)}?${p.toString()}`,
+        );
+        return unwrap(res);
+    },
+
+    getQCMoNotes: async (
+        token: string,
+        sessionToken: string,
+        moUuid: string,
+    ): Promise<{
+        results: Array<{
+            uuid: string;
+            mo_uuid: string;
+            mo_step_uuid: string | null;
+            note_text: string;
+            created_at: string;
+            author: { worker_id: number; full_name: string };
+            workstation: { id: number; name: string } | null;
+        }>;
+        count: number;
+    }> => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        const res = await fetch(
+            `${base}${personalKiosk.qcMoNotes(token, moUuid)}?${p.toString()}`,
+        );
+        return unwrap(res);
+    },
+
+    createQCMoNote: async (
+        token: string,
+        sessionToken: string,
+        moUuid: string,
+        params: {
+            noteText: string;
+            workstationId?: number | null;
+            moStepUuid?: string | null;
+        },
+    ): Promise<{
+        uuid: string;
+        note_text: string;
+        created_at: string;
+        author: { worker_id: number; full_name: string };
+    }> => {
+        const res = await fetch(
+            `${base}${personalKiosk.qcMoNoteCreate(token, moUuid)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_token: sessionToken,
+                    note_text: params.noteText,
+                    workstation_id: params.workstationId ?? null,
+                    mo_step_uuid: params.moStepUuid ?? null,
+                }),
+            },
+        );
+        return unwrap(res);
+    },
+
     verifyQCSession: async (
         token: string,
         sessionId: number,

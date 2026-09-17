@@ -8,3 +8,8 @@ from .qc import (
     QCVerifySessionView,
     QCGeneralFeedbackView,
 )
+from .live_qc import (
+    PublicPersonalKioskLiveMOsView,
+    PublicPersonalKioskQCNotesListView,
+    PublicPersonalKioskQCNoteCreateView,
+)

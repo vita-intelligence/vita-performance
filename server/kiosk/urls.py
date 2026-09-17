@@ -11,6 +11,11 @@ from kiosk.views import (
     KioskFormsView,
     KioskQCWorkersView
 )
+from qc.views import (
+    PublicPersonalKioskLiveMOsView,
+    PublicPersonalKioskQCNotesListView,
+    PublicPersonalKioskQCNoteCreateView,
+)
 from kiosk.views.psp_bridge import KioskMOsView, KioskNonMOActivitiesView
 from dynamic_forms.views import FormResponseCreateView
 # Personal kiosk (tenant-paired tablet) — lives under /api/kiosk/personal
@@ -123,6 +128,22 @@ urlpatterns = [
     # General (session-less) feedback — pick any worker + leave a mark.
     path('personal/<uuid:token>/qc/workers/', PublicPersonalKioskQCRosterView.as_view()),
     path('personal/<uuid:token>/qc/feedback/', PublicPersonalKioskQCGeneralFeedbackView.as_view()),
+    # Live QC — walk-the-floor inspection notes on in-progress MOs.
+    # Distinct from the session-verification flow above (that one runs
+    # post-hoc on completed sessions). Views live in `qc.views.live_qc`
+    # and are re-exported through `qc.views`.
+    path(
+        'personal/<uuid:token>/qc/live-mos/',
+        PublicPersonalKioskLiveMOsView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/notes/',
+        PublicPersonalKioskQCNotesListView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/notes/create/',
+        PublicPersonalKioskQCNoteCreateView.as_view(),
+    ),
 
     # Existing per-workstation kiosk (untouched)
     path('<uuid:token>/', KioskWorkstationView.as_view()),

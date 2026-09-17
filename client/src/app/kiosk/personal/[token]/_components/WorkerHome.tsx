@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
+    ClipboardCheck,
     ClipboardList,
     Clock,
     ExternalLink,
@@ -40,6 +41,9 @@ interface WorkerHomeProps {
     onOpenHistory: () => void;
     onOpenJobs: () => void;
     onOpenCleaning: () => void;
+    /** QC-only — enters the Live QC screen (in-progress MOs with a
+     *  note-taking page per MO). Tile is hidden for non-QA workers. */
+    onOpenLiveQC: () => void;
     /** Optional live reputation snapshot for the hero — parent may
      *  omit and we still render happily from the roster payload. */
     liveScore?: number;
@@ -69,6 +73,7 @@ export default function WorkerHome({
     onOpenHistory,
     onOpenJobs,
     onOpenCleaning,
+    onOpenLiveQC,
     liveScore,
     liveTier,
 }: WorkerHomeProps) {
@@ -170,6 +175,20 @@ export default function WorkerHome({
                         disabled={!shift}
                         onClick={onOpenCleaning}
                     />
+                    {worker.is_qa && (
+                        <NavTile
+                            title="Live QC"
+                            subtitle={
+                                shift
+                                    ? "Note in-progress MOs"
+                                    : "Clock in to unlock"
+                            }
+                            icon={<ClipboardCheck className="size-6" />}
+                            accent="live_qc"
+                            disabled={!shift}
+                            onClick={onOpenLiveQC}
+                        />
+                    )}
                     <NavTile
                         title="Performance"
                         subtitle="14-day trend & recent sessions"
@@ -520,7 +539,8 @@ function NavTile({
         | "stations"
         | "history"
         | "jobs"
-        | "cleaning";
+        | "cleaning"
+        | "live_qc";
     onClick: () => void;
     disabled?: boolean;
 }) {
@@ -537,6 +557,8 @@ function NavTile({
             "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:border-rose-500/50",
         cleaning:
             "bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:border-cyan-500/50",
+        live_qc:
+            "bg-gradient-to-br from-lime-500/10 to-green-500/10 border-lime-500/30 text-lime-700 dark:text-lime-400 hover:border-lime-500/50",
     }[accent];
 
     const iconBg = {
@@ -546,6 +568,7 @@ function NavTile({
         history: "bg-violet-500/15",
         jobs: "bg-rose-500/15",
         cleaning: "bg-cyan-500/15",
+        live_qc: "bg-lime-500/15",
     }[accent];
 
     return (

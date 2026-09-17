@@ -17,7 +17,9 @@ type Screen =
     | "history"
     | "jobs"
     | "cleaning-picker"
-    | "cleaning-session";
+    | "cleaning-session"
+    | "live-qc-list"
+    | "live-qc-notes";
 
 interface AppShellProps {
     worker: Worker;
@@ -39,6 +41,8 @@ const SCREEN_TITLE: Record<Exclude<Screen, "search" | "pin">, string> = {
     jobs: "Jobs",
     "cleaning-picker": "Cleaning",
     "cleaning-session": "Cleaning",
+    "live-qc-list": "Live QC",
+    "live-qc-notes": "Live QC",
 };
 
 /**
