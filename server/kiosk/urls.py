@@ -15,6 +15,9 @@ from qc.views import (
     PublicPersonalKioskLiveMOsView,
     PublicPersonalKioskQCNotesListView,
     PublicPersonalKioskQCNoteCreateView,
+    PublicPersonalKioskLiveQCContextView,
+    PublicPersonalKioskNpdSpecHtmlView,
+    PublicPersonalKioskNpdValidationHtmlView,
 )
 from kiosk.views.psp_bridge import KioskMOsView, KioskNonMOActivitiesView
 from dynamic_forms.views import FormResponseCreateView
@@ -143,6 +146,21 @@ urlpatterns = [
     path(
         'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/notes/create/',
         PublicPersonalKioskQCNoteCreateView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/context/',
+        PublicPersonalKioskLiveQCContextView.as_view(),
+    ),
+    # NPD-rendered HTML embeds — proxied through vita-perf → PSP so
+    # the iframe stays same-origin and no PSP session ever touches
+    # the tablet's DOM. Lazy-fetched on the FE (collapsed by default).
+    path(
+        'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/npd-spec.html',
+        PublicPersonalKioskNpdSpecHtmlView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/npd-validation.html',
+        PublicPersonalKioskNpdValidationHtmlView.as_view(),
     ),
 
     # Existing per-workstation kiosk (untouched)

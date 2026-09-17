@@ -12,4 +12,7 @@ from .live_qc import (
     PublicPersonalKioskLiveMOsView,
     PublicPersonalKioskQCNotesListView,
     PublicPersonalKioskQCNoteCreateView,
+    PublicPersonalKioskLiveQCContextView,
+    PublicPersonalKioskNpdSpecHtmlView,
+    PublicPersonalKioskNpdValidationHtmlView,
 )

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
+    Bell,
     ClipboardCheck,
     ClipboardList,
     Clock,
@@ -29,6 +30,10 @@ import ClockConfirmModal from "./ClockConfirmModal";
 
 interface WorkerHomeProps {
     token: string;
+    /** Post-PIN kiosk session token. Nullable during first-render
+     *  window before ``verify-pin`` returns; the QA reminder banner
+     *  is silently skipped when absent. */
+    sessionToken: string | null;
     worker: Worker;
     shift: WorkerShift | null;
     isClocking: boolean;
@@ -44,6 +49,9 @@ interface WorkerHomeProps {
     /** QC-only — enters the Live QC screen (in-progress MOs with a
      *  note-taking page per MO). Tile is hidden for non-QA workers. */
     onOpenLiveQC: () => void;
+    /** QC-only — enters the QC Review inbox (completed sessions
+     *  awaiting a QA verdict). Tile is hidden for non-QA workers. */
+    onOpenQCReview: () => void;
     /** Optional live reputation snapshot for the hero — parent may
      *  omit and we still render happily from the roster payload. */
     liveScore?: number;
@@ -61,6 +69,7 @@ interface WorkerHomeProps {
  */
 export default function WorkerHome({
     token,
+    sessionToken,
     worker,
     shift,
     isClocking,
@@ -74,6 +83,7 @@ export default function WorkerHome({
     onOpenJobs,
     onOpenCleaning,
     onOpenLiveQC,
+    onOpenQCReview,
     liveScore,
     liveTier,
 }: WorkerHomeProps) {
@@ -85,6 +95,12 @@ export default function WorkerHome({
     // buttons in the card open this dialog; only the modal's own
     // Clock In / Clock Out button actually fires the API.
     const [confirmMode, setConfirmMode] = useState<"in" | "out" | null>(null);
+    // Lifted from LiveSessionCard so ShiftStatusCard can gate Clock
+    // Out on it — the BE rejects clock-out while a session is
+    // running, and mirroring that in the button state prevents the
+    // operator from opening the confirm modal at all.
+    const [activeSession, setActiveSession] =
+        useState<WorkerLiveSession | null>(null);
     const [nowMsForModal, setNowMsForModal] = useState(() => Date.now());
     useEffect(() => {
         if (confirmMode !== "out" || !shift) return;
@@ -104,6 +120,7 @@ export default function WorkerHome({
             <ShiftStatusCard
                 shift={shift}
                 isClocking={isClocking}
+                activeSession={activeSession}
                 onClockIn={() => setConfirmMode("in")}
                 onClockOut={() => setConfirmMode("out")}
             />
@@ -132,47 +149,76 @@ export default function WorkerHome({
                 token={token}
                 workerId={worker.id}
                 onOpenStation={onOpenStation}
+                onSessionChange={setActiveSession}
             />
+
+            {/* Shared QC-check reminder — QA workers only. Polls the
+                same live-MOs endpoint the Live-QC list uses so every
+                QA sees the same count; the moment any of them logs
+                a note against an MO, that MO drops out of the
+                overdue set for everyone. */}
+            {worker.is_qa && shift && sessionToken && (
+                <QcCheckReminderBanner
+                    token={token}
+                    sessionToken={sessionToken}
+                    onOpenLiveQC={onOpenLiveQC}
+                />
+            )}
 
             <div>
                 <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-muted">
                     Explore
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    {/* Tiles that would spawn a NEW WorkSession — Jobs
+                        / Stations / Cleaning — are gated on the same
+                        rule the BE enforces: one active session per
+                        worker at a time. So when the operator is
+                        already running something, we visually block
+                        the entrances instead of letting them get an
+                        error at Start time. Live QC / QC Review /
+                        Performance / Reputation / History don't
+                        create sessions and stay enabled. */}
                     <NavTile
                         title="Jobs"
                         subtitle={
-                            shift
-                                ? "MOs running right now"
-                                : "Clock in to unlock"
+                            !shift
+                                ? "Clock in to unlock"
+                                : activeSession
+                                  ? `Running on ${activeSession.workstation_name ?? "another station"} — stop first`
+                                  : "MOs running right now"
                         }
                         icon={<ClipboardList className="size-6" />}
                         accent="jobs"
-                        disabled={!shift}
+                        disabled={!shift || !!activeSession}
                         onClick={onOpenJobs}
                     />
                     <NavTile
                         title="Stations"
                         subtitle={
-                            shift
-                                ? "Pick a station to start work"
-                                : "Clock in to unlock"
+                            !shift
+                                ? "Clock in to unlock"
+                                : activeSession
+                                  ? `Running on ${activeSession.workstation_name ?? "another station"} — stop first`
+                                  : "Pick a station to start work"
                         }
                         icon={<Factory className="size-6" />}
                         accent="stations"
-                        disabled={!shift}
+                        disabled={!shift || !!activeSession}
                         onClick={onOpenStations}
                     />
                     <NavTile
                         title="Cleaning"
                         subtitle={
-                            shift
-                                ? "Clean a station on the schedule"
-                                : "Clock in to unlock"
+                            !shift
+                                ? "Clock in to unlock"
+                                : activeSession
+                                  ? `Running on ${activeSession.workstation_name ?? "another station"} — stop first`
+                                  : "Clean a station on the schedule"
                         }
                         icon={<SprayCan className="size-6" />}
                         accent="cleaning"
-                        disabled={!shift}
+                        disabled={!shift || !!activeSession}
                         onClick={onOpenCleaning}
                     />
                     {worker.is_qa && (
@@ -187,6 +233,20 @@ export default function WorkerHome({
                             accent="live_qc"
                             disabled={!shift}
                             onClick={onOpenLiveQC}
+                        />
+                    )}
+                    {worker.is_qa && (
+                        <NavTile
+                            title="QC Review"
+                            subtitle={
+                                shift
+                                    ? "Verify completed sessions"
+                                    : "Clock in to unlock"
+                            }
+                            icon={<ClipboardCheck className="size-6" />}
+                            accent="qc_review"
+                            disabled={!shift}
+                            onClick={onOpenQCReview}
                         />
                     )}
                     <NavTile
@@ -220,14 +280,116 @@ export default function WorkerHome({
 /*                           Sub-components                            */
 /* ================================================================== */
 
+/**
+ * QA-only reminder banner. Every 45s it re-fetches the live-MOs list
+ * and counts how many MOs are overdue for a QC check (BE returns the
+ * flag pre-computed against the shared 20-min threshold, so every QA
+ * on the floor sees the same count). When any QA logs a note against
+ * a MO, that MO drops out of the overdue set and the banner shrinks
+ * on the next tick — no coordination needed between QAs.
+ *
+ * Silent-fail on network errors: the banner just hides itself rather
+ * than showing a scary red error on a hub screen.
+ */
+function QcCheckReminderBanner({
+    token,
+    sessionToken,
+    onOpenLiveQC,
+}: {
+    token: string;
+    sessionToken: string;
+    onOpenLiveQC: () => void;
+}) {
+    const [overdue, setOverdue] = useState(0);
+    const [dueSoon, setDueSoon] = useState(0);
+
+    useEffect(() => {
+        let cancelled = false;
+        const fetchOnce = async () => {
+            try {
+                const res = await personalKioskService.getLiveQCMOs(
+                    token,
+                    sessionToken,
+                );
+                if (cancelled) return;
+                let ov = 0;
+                let ds = 0;
+                for (const r of res.results) {
+                    if (r.qc_check_overdue) ov += 1;
+                    else if (r.minutes_since_last_qc_note >= 15) ds += 1;
+                }
+                setOverdue(ov);
+                setDueSoon(ds);
+            } catch {
+                // Silent — a stale reminder is fine on a hub screen.
+            }
+        };
+        void fetchOnce();
+        const id = window.setInterval(fetchOnce, 45_000);
+        const onVis = () => {
+            if (document.visibilityState === "visible") void fetchOnce();
+        };
+        document.addEventListener("visibilitychange", onVis);
+        return () => {
+            cancelled = true;
+            window.clearInterval(id);
+            document.removeEventListener("visibilitychange", onVis);
+        };
+    }, [token, sessionToken]);
+
+    if (overdue === 0 && dueSoon === 0) return null;
+
+    const isRed = overdue > 0;
+    return (
+        <button
+            type="button"
+            onClick={onOpenLiveQC}
+            className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] ${
+                isRed
+                    ? "border-danger/50 bg-danger/5 text-danger"
+                    : "border-warning/50 bg-warning/5 text-warning"
+            }`}
+        >
+            <Bell className="size-5 shrink-0" />
+            <div className="min-w-0 flex-1">
+                {isRed ? (
+                    <>
+                        <p className="text-sm font-black">
+                            {overdue} MO{overdue === 1 ? "" : "s"} due for a
+                            20-min QC check
+                        </p>
+                        <p className="text-[11px] opacity-80">
+                            Any QA can log it — tap to open Live QC.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-sm font-black">
+                            {dueSoon} MO{dueSoon === 1 ? "" : "s"} approaching
+                            QC-check window
+                        </p>
+                        <p className="text-[11px] opacity-80">
+                            Head over before they turn red.
+                        </p>
+                    </>
+                )}
+            </div>
+            <ClipboardCheck className="size-5 shrink-0" />
+        </button>
+    );
+}
+
 function LiveSessionCard({
     token,
     workerId,
     onOpenStation,
+    onSessionChange,
 }: {
     token: string;
     workerId: number;
     onOpenStation: (workstationId: number) => void;
+    /** Optional — parent mirrors this to gate Clock Out on it. */
+    onSessionChange?: (session: WorkerLiveSession | null) => void;
 }) {
     const [session, setSession] = useState<WorkerLiveSession | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -246,6 +408,7 @@ function LiveSessionCard({
                 );
                 if (!cancelled) {
                     setSession(res.active_session);
+                    onSessionChange?.(res.active_session);
                     setError(null);
                 }
             } catch (err: unknown) {
@@ -420,11 +583,16 @@ function HeroIdentity({
 function ShiftStatusCard({
     shift,
     isClocking,
+    activeSession,
     onClockIn,
     onClockOut,
 }: {
     shift: WorkerShift | null;
     isClocking: boolean;
+    /** When non-null, Clock Out is blocked: the BE rejects clock-out
+     *  while any WorkSession is `active`, so the button dims + a hint
+     *  tells the operator to stop their session first. */
+    activeSession: WorkerLiveSession | null;
     onClockIn: () => void;
     onClockOut: () => void;
 }) {
@@ -481,6 +649,13 @@ function ShiftStatusCard({
         minute: "2-digit",
     });
 
+    const clockOutBlocked = !!activeSession;
+    const clockOutHint = clockOutBlocked
+        ? `Stop your session at ${
+              activeSession?.workstation_name ?? "the current station"
+          } before clocking out.`
+        : null;
+
     return (
         <div className="rounded-3xl border border-success/40 bg-success/5 p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -504,19 +679,28 @@ function ShiftStatusCard({
                         </p>
                     </div>
                 </div>
-                <Button
-                    color="danger"
-                    variant="flat"
-                    size="lg"
-                    startContent={
-                        !isClocking ? <LogOut className="size-5" /> : undefined
-                    }
-                    isLoading={isClocking}
-                    onPress={onClockOut}
-                    className="h-14 px-8 text-base font-bold"
-                >
-                    Clock out
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                    <Button
+                        color="danger"
+                        variant="flat"
+                        size="lg"
+                        startContent={
+                            !isClocking ? <LogOut className="size-5" /> : undefined
+                        }
+                        isLoading={isClocking}
+                        onPress={onClockOut}
+                        isDisabled={clockOutBlocked}
+                        className="h-14 px-8 text-base font-bold"
+                        title={clockOutHint ?? undefined}
+                    >
+                        Clock out
+                    </Button>
+                    {clockOutHint && (
+                        <p className="max-w-[16rem] text-right text-[10px] text-muted">
+                            {clockOutHint}
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -540,7 +724,8 @@ function NavTile({
         | "history"
         | "jobs"
         | "cleaning"
-        | "live_qc";
+        | "live_qc"
+        | "qc_review";
     onClick: () => void;
     disabled?: boolean;
 }) {
@@ -559,6 +744,8 @@ function NavTile({
             "bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:border-cyan-500/50",
         live_qc:
             "bg-gradient-to-br from-lime-500/10 to-green-500/10 border-lime-500/30 text-lime-700 dark:text-lime-400 hover:border-lime-500/50",
+        qc_review:
+            "bg-gradient-to-br from-teal-500/10 to-emerald-500/10 border-teal-500/30 text-teal-700 dark:text-teal-400 hover:border-teal-500/50",
     }[accent];
 
     const iconBg = {
@@ -569,6 +756,7 @@ function NavTile({
         jobs: "bg-rose-500/15",
         cleaning: "bg-cyan-500/15",
         live_qc: "bg-lime-500/15",
+        qc_review: "bg-teal-500/15",
     }[accent];
 
     return (

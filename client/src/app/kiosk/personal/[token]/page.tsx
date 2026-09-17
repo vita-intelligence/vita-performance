@@ -284,10 +284,17 @@ export default function PersonalKioskTokenPage() {
             });
             setActiveShift(null);
         } catch (err) {
+            // 409 with code=active_sessions is the "still on the line"
+            // guard, not a real failure — reword the toast so the
+            // operator knows what to do instead of chasing a "bug".
+            const body = (err as { body?: { code?: string } })?.body;
+            const isActiveSessions = body?.code === "active_sessions";
             addToast({
-                title: "Clock out failed",
+                title: isActiveSessions
+                    ? "Finish your sessions first"
+                    : "Clock out failed",
                 description: getMsg(err),
-                color: "danger",
+                color: isActiveSessions ? "warning" : "danger",
             });
         } finally {
             setIsClocking(false);
@@ -365,6 +372,7 @@ export default function PersonalKioskTokenPage() {
                     return (
                         <WorkerHome
                             token={token}
+                            sessionToken={sessionToken}
                             worker={selectedWorker}
                             shift={activeShift}
                             isClocking={isClocking}
@@ -382,6 +390,7 @@ export default function PersonalKioskTokenPage() {
                             onOpenJobs={() => setScreen("jobs")}
                             onOpenCleaning={() => setScreen("cleaning-picker")}
                             onOpenLiveQC={() => setScreen("live-qc-list")}
+                            onOpenQCReview={() => setScreen("qc")}
                         />
                     );
                 case "performance":
@@ -412,7 +421,6 @@ export default function PersonalKioskTokenPage() {
                                 setOpenStationId(id);
                                 setScreen("station");
                             }}
-                            onOpenQC={() => setScreen("qc")}
                         />
                     );
                 case "jobs":

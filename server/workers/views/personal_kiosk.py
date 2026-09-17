@@ -396,7 +396,52 @@ class PublicPersonalKioskEndShiftView(APIView):
         except WorkerShift.DoesNotExist:
             return Response({'detail': 'Shift not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Block clock-out while the worker still has running work
+        # sessions — otherwise the session's shift stamp + performance
+        # calc dangle against a "closed" shift, and the operator loses
+        # sight of the fact they haven't stopped the line. Operator
+        # must go back into each station and hit Stop first.
         if shift.is_active:
+            from work_sessions.models import WorkSession
+            active_sessions = (
+                WorkSession.objects
+                .filter(workers=shift.worker, status='active')
+                .select_related('workstation')
+                .order_by('start_time')
+            )
+            active_list = list(active_sessions[:10])
+            if active_list:
+                names = [
+                    (s.workstation.name if s.workstation_id else 'Cleaning')
+                    for s in active_list
+                ]
+                joined = ', '.join(names[:3])
+                more = len(active_list) - 3
+                if more > 0:
+                    joined = f"{joined} (+{more} more)"
+                return Response(
+                    {
+                        'detail': (
+                            f"You still have {len(active_list)} running "
+                            f"session{'' if len(active_list) == 1 else 's'}: "
+                            f"{joined}. Stop each one before clocking out."
+                        ),
+                        'code': 'active_sessions',
+                        'active_count': len(active_list),
+                        'sessions': [
+                            {
+                                'id': s.id,
+                                'workstation_id': s.workstation_id,
+                                'workstation_name': (
+                                    s.workstation.name if s.workstation_id else None
+                                ),
+                                'started_at': s.start_time.isoformat() if s.start_time else None,
+                            }
+                            for s in active_list
+                        ],
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
             shift.close(notes=request.data.get('notes'))
         return Response(WorkerShiftSerializer(shift).data)
 
@@ -657,17 +702,27 @@ class PublicPersonalKioskCleaningWorkstationsView(APIView):
         from dynamic_forms.models import DynamicForm
         from workstations.models import Workstation
 
-        # Active cleaning forms with a workstation attached. The publish
-        # endpoint always sets workstation on cleaning-trigger rows, so
-        # nulls here mean the WS mirror row is still catching up — skip
-        # those cleanly.
+        # Active cleaning forms with a workstation attached.
+        #
+        # Scope by ``workstation.user`` rather than ``form.user`` —
+        # PSP-published forms have ``user_id = NULL`` by design (the
+        # publish endpoint on vita-perf intentionally allows nullable
+        # user so a PSP push doesn't need a matching vita-perf user
+        # row per tenant). The workstation, however, always carries
+        # ``user_id`` (it's the tenant handle we mirror onto), so
+        # gating on ``workstation.user`` catches BOTH legacy in-app
+        # forms (where ``form.user == workstation.user == tok.user``)
+        # AND PSP-published forms (where ``form.user is None`` but
+        # ``workstation.user == tok.user``). Without this fix, PSP-
+        # published cleaning forms silently drop off the picker even
+        # though the publisher landed them correctly.
         cleaning_forms = (
             DynamicForm.objects
             .filter(
-                user=tok.user,
                 is_active=True,
                 trigger=DynamicForm.TRIGGER_CLEANING,
                 workstation__isnull=False,
+                workstation__user=tok.user,
             )
             .select_related('workstation')
         )
@@ -1346,19 +1401,42 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
 
         from work_sessions.models import WorkSession
 
-        # Guard against double-start on non-general stations; on general
-        # stations, only reject if THIS worker is already in a session
-        # here.
-        if ws.is_general:
-            if WorkSession.objects.filter(workstation=ws, status='active', workers=worker).exists():
-                return Response(
-                    {'detail': 'You already have a session running here.'},
-                    status=status.HTTP_409_CONFLICT,
-                )
-        else:
+        # Anti-flood guard — a worker can only run ONE session at a
+        # time across the whole shop floor, regardless of which
+        # workstation they're on. Prevents the "operator clocks in on
+        # Blending #1, wanders over to Encapsulation #1 and starts a
+        # second MO" pattern that inflates their hours + double-books
+        # the labour cost onto two MOs. Live QC notes go through a
+        # separate endpoint (``qc/mos/.../notes/create/``) and never
+        # open a work_session, so QC operators can keep capturing
+        # observations while their own MO session (if any) is running.
+        conflicting = (
+            WorkSession.objects
+            .filter(workers=worker, status='active')
+            .select_related('workstation')
+            .first()
+        )
+        if conflicting is not None:
+            same_ws = conflicting.workstation_id == ws.id
+            ws_name = getattr(conflicting.workstation, 'name', None) or 'another station'
+            detail = (
+                'You already have a session running here — stop it before starting a new one.'
+                if same_ws
+                else f'You already have a session running on {ws_name}. Stop it before starting another.'
+            )
+            return Response(
+                {'detail': detail, 'code': 'session_already_active'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # On non-general stations, only one session at all — even for
+        # different workers. Independent from the anti-flood guard
+        # above (which is per-worker) so a general station can still
+        # host multiple workers concurrently.
+        if not ws.is_general:
             if WorkSession.objects.filter(workstation=ws, status='active').exists():
                 return Response(
-                    {'detail': 'A session is already active on this workstation.'},
+                    {'detail': 'A session is already active on this workstation.', 'code': 'workstation_busy'},
                     status=status.HTTP_409_CONFLICT,
                 )
 

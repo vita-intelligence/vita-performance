@@ -31,7 +31,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from django.db.models import Min
+from django.db.models import Max, Min
+from django.http import HttpResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -117,7 +120,7 @@ class PublicPersonalKioskLiveMOsView(APIView):
             WorkSession.objects
             .select_related('user', 'workstation', 'item')
             .filter(
-                status='in_progress',
+                status='active',
                 activity_kind='mo',
                 mo_uuid__isnull=False,
             )
@@ -136,9 +139,23 @@ class PublicPersonalKioskLiveMOsView(APIView):
             key = ws_session.mo_uuid
             row = by_mo.get(key)
             if row is None:
+                # Prefer ``override_task_name`` — the start-session view
+                # writes the PSP MO's product name into that column
+                # precisely so downstream reads don't need a live PSP
+                # round-trip. ``item.name`` is the fallback for legacy
+                # sessions that pre-date the override + for non-PSP
+                # tenants where every session has a locally-mirrored
+                # item. The last fallback is a short MO uuid prefix so
+                # the row is never actually empty ("(unnamed)" was the
+                # symptom that prompted this fix).
+                item_name = (
+                    (ws_session.override_task_name or '').strip()
+                    or (getattr(ws_session.item, 'name', '') or '').strip()
+                    or f"MO {key[:8]}"
+                )
                 row = {
                     'mo_uuid': key,
-                    'item_name': getattr(ws_session.item, 'name', '') or '',
+                    'item_name': item_name,
                     'item_id': getattr(ws_session.item, 'id', None),
                     'started_at': ws_session.start_time,
                     'sessions': [],
@@ -167,15 +184,51 @@ class PublicPersonalKioskLiveMOsView(APIView):
                 'mo_step_uuid': ws_session.mo_step_uuid or None,
             })
 
+        # Latest QC note per MO in a single SQL — powers the shared
+        # "20-min check due" reminder. When ANY QA worker logs a note,
+        # every other QA's row for that MO clears together (no
+        # duplicate reminders). Fetches only the MOs currently on the
+        # floor to keep the payload cheap.
+        mo_uuids = list(by_mo.keys())
+        latest_by_mo: dict[str, datetime] = {}
+        if mo_uuids:
+            latest_rows = (
+                QCNote.objects
+                .filter(mo_uuid__in=mo_uuids)
+                .values('mo_uuid')
+                .annotate(last_at=Max('created_at'))
+            )
+            for r in latest_rows:
+                latest_by_mo[r['mo_uuid']] = r['last_at']
+
         rows = []
         for row in by_mo.values():
             started_at = row['started_at']
             row['started_at'] = started_at.isoformat()
             row['elapsed_seconds'] = int((now - started_at).total_seconds())
+
+            last_note_at = latest_by_mo.get(row['mo_uuid'])
+            reference = last_note_at or started_at
+            minutes_since = int((now - reference).total_seconds() // 60)
+            row['last_qc_note_at'] = (
+                last_note_at.isoformat() if last_note_at else None
+            )
+            row['minutes_since_last_qc_note'] = minutes_since
+            # Threshold hardcoded here for now — 20 min per the ask.
+            # If per-company config becomes needed, promote to a
+            # company setting + read on the same fetch.
+            row['qc_check_overdue'] = minutes_since >= 20
             rows.append(row)
-        # Longest-running MO first — QC tends to prioritise the ones
-        # that have been on the line the longest.
-        rows.sort(key=lambda r: -r['elapsed_seconds'])
+
+        # Overdue MOs first, then longest-running. Puts the ones that
+        # need a QA visit right at the top of the QA's list.
+        rows.sort(
+            key=lambda r: (
+                not r['qc_check_overdue'],
+                -r['minutes_since_last_qc_note'],
+                -r['elapsed_seconds'],
+            )
+        )
         return Response({'results': rows, 'count': len(rows)})
 
 
@@ -271,6 +324,198 @@ class PublicPersonalKioskQCNoteCreateView(APIView):
         )
         _post_qc_note_to_psp(session.worker, note)
         return Response(_serialise_note(note), status=status.HTTP_201_CREATED)
+
+
+class PublicPersonalKioskLiveQCContextView(APIView):
+    """``GET /api/kiosk/personal/<token>/qc/mos/<mo_uuid>/context/?session_token=…``
+
+    Aggregates the read-only context a QC operator wants at their
+    fingertips while writing notes against a running MO:
+
+      * MO summary (code, item, quantity, status)
+      * Finished-product spec (dosage form, warnings, storage, ...)
+        — pulled from PSP's integration read as an additive field.
+      * BOM breakdown for this MO — parts + required_qty scaled to
+        the MO's output quantity.
+      * Deep-links to NPD's spec sheet + product-validation pages
+        (opened by the FE in a new tab). Nil when PSP has no NPD
+        integration configured OR when the MO has no NPD trial-batch
+        provenance (e.g. a manual PSP-native MO).
+
+    Silent-degrade on any PSP outage — returns the sections that
+    resolved and empty stubs for the rest so the operator still
+    sees the notes area.
+    """
+
+    permission_classes = (AllowAny,)
+
+    def get(self, request, token, mo_uuid):
+        session, err = _resolve_qc_session(request, token)
+        if err:
+            return err
+
+        company = getattr(session.worker, 'company', None)
+        payload: dict = {
+            'mo': None,
+            'finished_product_spec': None,
+            'parts': [],
+            'npd_links': {'spec_sheet': None, 'validation': None},
+        }
+
+        base_url = getattr(company, 'psp_base_url', None) if company else None
+        token_str = getattr(company, 'psp_integration_token', None) if company else None
+        if not base_url or not token_str:
+            return Response(payload)
+
+        from psp_sync.client import PspError, client_for_company
+
+        try:
+            client = client_for_company(company)
+        except (ValueError, PspError):
+            return Response(payload)
+
+        mo_uuid_str = str(mo_uuid)
+
+        try:
+            mo_data = client.get_manufacturing_order(mo_uuid_str)
+        except PspError as exc:
+            logger.warning('Live QC context: PSP MO fetch failed: %s', exc)
+            mo_data = {}
+
+        item = mo_data.get('item') or {}
+        payload['mo'] = {
+            'uuid': mo_data.get('uuid') or mo_uuid_str,
+            'status': mo_data.get('status'),
+            'quantity': mo_data.get('quantity'),
+            'due_date': mo_data.get('due_date'),
+            'project_type': mo_data.get('project_type'),
+            'item_name': item.get('name') or '',
+            'item_uuid': item.get('uuid'),
+            'item_type': item.get('item_type'),
+        }
+        payload['finished_product_spec'] = mo_data.get('finished_product_spec')
+
+        try:
+            parts_data = client.get_manufacturing_order_parts(mo_uuid_str)
+        except PspError as exc:
+            logger.warning('Live QC context: PSP parts fetch failed: %s', exc)
+            parts_data = {}
+
+        for row in (parts_data.get('parts') or []):
+            part = row.get('part') or {}
+            payload['parts'].append({
+                'uuid': row.get('uuid'),
+                'sort_order': row.get('sort_order'),
+                'is_fixed': row.get('is_fixed'),
+                'part_name': part.get('name') or '',
+                'part_code': part.get('code') or part.get('external_sku') or '',
+                'required_qty': row.get('required_qty'),
+                'uom': row.get('uom') or (part.get('stock_uom') or {}).get('symbol') or '',
+            })
+
+        # Build NPD deep-links from the info PSP just returned. Both
+        # are gated on ``npd_frontend_url`` being set on the PSP
+        # company row AND the MO carrying an NPD provenance uuid.
+        npd_root = mo_data.get('npd_frontend_url')
+        formulation_uuid = mo_data.get('npd_formulation_uuid')
+        trial_batch_uuid = mo_data.get('npd_trial_batch_uuid')
+        if npd_root and formulation_uuid:
+            base = npd_root.rstrip('/')
+            payload['npd_links']['spec_sheet'] = (
+                f"{base}/formulations/{formulation_uuid}/spec-sheets/final"
+            )
+            if trial_batch_uuid:
+                payload['npd_links']['validation'] = (
+                    f"{base}/formulations/{formulation_uuid}"
+                    f"/trial-batches/{trial_batch_uuid}/validation"
+                )
+
+        return Response(payload)
+
+
+@method_decorator(xframe_options_exempt, name='dispatch')
+class _PublicKioskNpdEmbedProxy(APIView):
+    """Base for the two NPD-embed proxies. Streams PSP's rendered HTML
+    back to the kiosk browser under vita-perf's origin so the iframe
+    stays same-origin and no PSP session / integration token ever
+    reaches the DOM. Kind is set by subclass (``spec`` | ``validation``).
+
+    We deliberately pass NPD's error stubs through with their original
+    HTTP status — the ``NpdSheetEmbed`` component on the FE already
+    renders a friendly message from a 404 body, so we don't want to
+    dress it up as a 200 here.
+    """
+
+    permission_classes = (AllowAny,)
+    kind: str = ''
+
+    def get(self, request, token, mo_uuid):
+        session, err = _resolve_qc_session(request, token)
+        if err:
+            return err
+
+        company = getattr(session.worker, 'company', None)
+        if not company:
+            return HttpResponse(
+                _stub_html('No company on this kiosk worker.'),
+                status=500,
+                content_type='text/html',
+            )
+
+        from psp_sync.client import PspError, client_for_company
+
+        try:
+            client = client_for_company(company)
+        except (ValueError, PspError) as exc:
+            return HttpResponse(
+                _stub_html(f'PSP not reachable: {exc}'),
+                status=502,
+                content_type='text/html',
+            )
+
+        try:
+            body, content_type, upstream_status = client.get_mo_npd_html(
+                str(mo_uuid), self.kind,
+            )
+        except PspError as exc:
+            logger.warning('NPD %s proxy: PSP transport error: %s', self.kind, exc)
+            return HttpResponse(
+                _stub_html(f'PSP transport error: {exc}'),
+                status=502,
+                content_type='text/html',
+            )
+
+        resp = HttpResponse(
+            body,
+            status=upstream_status,
+            content_type=content_type or 'text/html',
+        )
+        resp['Cache-Control'] = 'no-store'
+        # Explicitly drop upstream's X-Frame-Options: SAMEORIGIN.
+        # The Django API (e.g. :8000) and the kiosk FE (e.g. :3020)
+        # are different origins, so SAMEORIGIN blocks the iframe.
+        # The security perimeter for this content is the kiosk
+        # ``session_token`` on every request, not framing itself.
+        if 'X-Frame-Options' in resp:
+            del resp['X-Frame-Options']
+        return resp
+
+
+class PublicPersonalKioskNpdSpecHtmlView(_PublicKioskNpdEmbedProxy):
+    kind = 'spec'
+
+
+class PublicPersonalKioskNpdValidationHtmlView(_PublicKioskNpdEmbedProxy):
+    kind = 'validation'
+
+
+def _stub_html(message: str) -> str:
+    from html import escape
+    return (
+        '<!doctype html><html><head><meta charset="utf-8" /></head>'
+        '<body style="font-family: system-ui, sans-serif; padding: 2rem; '
+        'color: #555;"><p>{msg}</p></body></html>'
+    ).format(msg=escape(message))
 
 
 def _post_qc_note_to_psp(worker, note: QCNote) -> None:

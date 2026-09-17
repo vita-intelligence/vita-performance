@@ -227,6 +227,31 @@ class PspClient:
         content_type = response.headers.get("Content-Type", "application/octet-stream")
         return response.content, content_type
 
+    def get_mo_npd_html(self, mo_uuid: str, kind: str) -> tuple[bytes, str, int]:
+        """Fetch PSP's proxied NPD-rendered HTML for one MO.
+
+        ``kind`` is either ``"spec"`` (specification sheet) or
+        ``"validation"`` (product-validation sheet). Returns the raw
+        bytes + content-type + upstream status code so the caller can
+        pass NPD's 404 stubs (or 200 payloads) through the vita-perf
+        kiosk proxy untouched. Never raises for 4xx / 5xx — those are
+        legitimate NPD states we want the browser to see verbatim.
+        """
+        if kind not in ("spec", "validation"):
+            raise ValueError(f"unsupported npd embed kind: {kind}")
+        url = (
+            f"{self.base_url}/api/integration/manufacturing-orders/"
+            f"{mo_uuid}/npd-{kind}.html"
+        )
+        try:
+            response = self._session.get(url, timeout=self._timeout)
+        except requests.RequestException as e:
+            raise PspTransientError(
+                f"network error fetching NPD {kind} for MO {mo_uuid}: {e}"
+            ) from e
+        content_type = response.headers.get("Content-Type", "text/html")
+        return response.content, content_type, response.status_code
+
     def list_manufacturing_orders_for_workstations(
         self,
         workstation_uuids: list[str],

@@ -569,6 +569,9 @@ export const personalKioskService = {
             item_id: number | null;
             started_at: string;
             elapsed_seconds: number;
+            last_qc_note_at: string | null;
+            minutes_since_last_qc_note: number;
+            qc_check_overdue: boolean;
             sessions: Array<{
                 session_id: number;
                 workstation_id: number;
@@ -584,6 +587,65 @@ export const personalKioskService = {
         const p = new URLSearchParams({ session_token: sessionToken });
         const res = await fetch(
             `${base}${personalKiosk.qcLiveMOs(token)}?${p.toString()}`,
+        );
+        return unwrap(res);
+    },
+
+    // Same-origin iframe URLs for the two NPD-rendered HTML embeds.
+    // ``session_token`` is appended so the kiosk auth guard resolves
+    // the worker / company on each proxy request (endpoint reads it
+    // from query string; keeps the URL fetchable by <iframe src="…">
+    // without needing custom headers).
+    qcMoNpdSpecIframeUrl: (
+        token: string,
+        sessionToken: string,
+        moUuid: string,
+    ): string => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        return `${base}${personalKiosk.qcMoNpdSpecHtml(token, moUuid)}?${p.toString()}`;
+    },
+    qcMoNpdValidationIframeUrl: (
+        token: string,
+        sessionToken: string,
+        moUuid: string,
+    ): string => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        return `${base}${personalKiosk.qcMoNpdValidationHtml(token, moUuid)}?${p.toString()}`;
+    },
+
+    getQCMoContext: async (
+        token: string,
+        sessionToken: string,
+        moUuid: string,
+    ): Promise<{
+        mo: {
+            uuid: string;
+            status: string | null;
+            quantity: string | number | null;
+            due_date: string | null;
+            project_type: string | null;
+            item_name: string;
+            item_uuid: string | null;
+            item_type: string | null;
+        } | null;
+        finished_product_spec: Record<string, unknown> | null;
+        parts: Array<{
+            uuid: string | null;
+            sort_order: number | null;
+            is_fixed: boolean | null;
+            part_name: string;
+            part_code: string;
+            required_qty: string | number | null;
+            uom: string;
+        }>;
+        npd_links: {
+            spec_sheet: string | null;
+            validation: string | null;
+        };
+    }> => {
+        const p = new URLSearchParams({ session_token: sessionToken });
+        const res = await fetch(
+            `${base}${personalKiosk.qcMoContext(token, moUuid)}?${p.toString()}`,
         );
         return unwrap(res);
     },

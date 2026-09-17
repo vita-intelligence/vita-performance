@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
-import { AlertTriangle, ClipboardCheck, Factory, Loader2, Users } from "lucide-react";
+import {
+    AlertTriangle,
+    Bell,
+    Check,
+    ClipboardCheck,
+    Factory,
+    Loader2,
+    Users,
+} from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
 
 interface LiveMoRow {
@@ -11,6 +19,9 @@ interface LiveMoRow {
     item_id: number | null;
     started_at: string;
     elapsed_seconds: number;
+    last_qc_note_at: string | null;
+    minutes_since_last_qc_note: number;
+    qc_check_overdue: boolean;
     sessions: Array<{
         session_id: number;
         workstation_id: number;
@@ -21,6 +32,12 @@ interface LiveMoRow {
         mo_step_uuid: string | null;
     }>;
 }
+
+// Shared with WorkerHome via the same-shape service response — every
+// 20 min since the last note for an MO, every QA sees a reminder;
+// the moment anyone logs a note for that MO, the timer resets
+// globally (BE returns the same `last_qc_note_at` to every reader).
+const QC_CHECK_INTERVAL_MIN = 20;
 
 interface LiveQCListPageProps {
     token: string;
@@ -104,6 +121,8 @@ export default function LiveQCListPage({
         );
     }
 
+    const overdueCount = rows.filter((r) => r.qc_check_overdue).length;
+
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6">
             <div className="flex items-center justify-between">
@@ -124,6 +143,19 @@ export default function LiveQCListPage({
                 </Button>
             </div>
 
+            {/* Shared reminder banner. Any QA who opens the list sees
+                the same count; when one of them logs a note, the MO
+                falls out of the overdue set for everyone. */}
+            {overdueCount > 0 && (
+                <div className="flex items-center gap-2 rounded-2xl border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">
+                    <Bell className="size-4 shrink-0" />
+                    <p className="font-black">
+                        {overdueCount} MO{overdueCount === 1 ? "" : "s"} due for
+                        a {QC_CHECK_INTERVAL_MIN}-min QC check
+                    </p>
+                </div>
+            )}
+
             {rows.map((row) => (
                 <button
                     key={row.mo_uuid}
@@ -134,7 +166,11 @@ export default function LiveQCListPage({
                             row.sessions[0]?.workstation_id ?? null,
                         )
                     }
-                    className="group flex w-full flex-col gap-2 rounded-2xl border border-border bg-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg active:scale-[0.99]"
+                    className={`group flex w-full flex-col gap-2 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] ${
+                        row.qc_check_overdue
+                            ? "border-danger/50 bg-danger/5 hover:border-danger"
+                            : "border-border bg-surface hover:border-primary/40"
+                    }`}
                 >
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -145,9 +181,12 @@ export default function LiveQCListPage({
                                 MO {row.mo_uuid.slice(0, 8)}
                             </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-success/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-success">
-                            {formatElapsed(row.elapsed_seconds)}
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-success">
+                                {formatElapsed(row.elapsed_seconds)}
+                            </span>
+                            <QcCheckPill row={row} />
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2 text-[11px] text-muted">
@@ -167,13 +206,64 @@ export default function LiveQCListPage({
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                    <div
+                        className={`flex items-center gap-1 text-[11px] font-black uppercase tracking-widest transition-opacity ${
+                            row.qc_check_overdue
+                                ? "text-danger opacity-100"
+                                : "text-primary opacity-0 group-hover:opacity-100"
+                        }`}
+                    >
                         <ClipboardCheck className="size-3.5" />
-                        Add QC note
+                        {row.qc_check_overdue
+                            ? "Log the check"
+                            : "Add QC note"}
                     </div>
                 </button>
             ))}
         </div>
+    );
+}
+
+/**
+ * Compact pill telling the QA operator the state of the 20-min
+ * check clock on this MO. Three states:
+ *   fresh  (< 15 min)     → green "Checked Xm ago"
+ *   due soon (15–19 min) → amber "Due in Xm"
+ *   overdue (>= 20 min)  → red "Overdue by Xm"
+ * When a note has never been logged, we treat the MO's start time
+ * as the reference so a freshly-started MO doesn't render "Overdue"
+ * for the first 20 minutes of its life either.
+ */
+function QcCheckPill({ row }: { row: LiveMoRow }) {
+    const mins = row.minutes_since_last_qc_note;
+    const overdue = row.qc_check_overdue;
+    const dueSoon = !overdue && mins >= QC_CHECK_INTERVAL_MIN - 5;
+    const label = row.last_qc_note_at
+        ? overdue
+            ? `Overdue by ${mins - QC_CHECK_INTERVAL_MIN}m`
+            : dueSoon
+              ? `Due in ${QC_CHECK_INTERVAL_MIN - mins}m`
+              : `Checked ${mins}m ago`
+        : overdue
+          ? `No check in ${mins}m`
+          : `Next check in ${QC_CHECK_INTERVAL_MIN - mins}m`;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${
+                overdue
+                    ? "bg-danger/15 text-danger"
+                    : dueSoon
+                      ? "bg-warning/15 text-warning"
+                      : "bg-success/15 text-success"
+            }`}
+        >
+            {overdue ? (
+                <Bell className="size-3" />
+            ) : (
+                <Check className="size-3" />
+            )}
+            {label}
+        </span>
     );
 }
 

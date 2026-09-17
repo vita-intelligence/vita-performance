@@ -121,6 +121,7 @@ def pull_workstations(company: Company, client: "PspClient") -> PullResult:
             natural_key={"name": defaults["name"]},
             defaults=defaults,
             create_only_defaults={"is_general": True},
+            known_remote_ids=remote_uuids,
         )
         result.created += int(created)
         result.updated += int(not created)
@@ -165,6 +166,7 @@ def pull_employees(company: Company, client: "PspClient") -> PullResult:
             external_id=row["uuid"],
             natural_key={"full_name": defaults["full_name"]},
             defaults=defaults,
+            known_remote_ids=remote_uuids,
         )
         result.created += int(created)
         result.updated += int(not created)
@@ -189,6 +191,7 @@ def pull_employees(company: Company, client: "PspClient") -> PullResult:
 def pull_items(company: Company, client: "PspClient") -> PullResult:
     result = PullResult()
     remote = client.list_items(item_types=["finished_product", "semi_finished"])
+    remote_uuids = {row["uuid"] for row in remote}
 
     for row in remote:
         defaults = {
@@ -201,6 +204,7 @@ def pull_items(company: Company, client: "PspClient") -> PullResult:
             external_id=row["uuid"],
             natural_key={"name": defaults["name"]},
             defaults=defaults,
+            known_remote_ids=remote_uuids,
         )
         result.created += int(created)
         result.updated += int(not created)
@@ -219,6 +223,7 @@ def _upsert_with_adopt(
     natural_key,
     defaults,
     create_only_defaults=None,
+    known_remote_ids=None,
 ):
     """Idempotent upsert that also prevents duplicate-name pumps.
 
@@ -234,15 +239,28 @@ def _upsert_with_adopt(
          otherwise duplicate a full ledger on any tenant where a data
          restore / migration wiped ``external_id`` between the seed
          and the next sync.
-      3. Two or more null-external_id namesakes → **not safe** to
-         adopt (would ambiguously pick one), so we fall back to
-         creating a new row. The seed on PSP will then need an
-         operator to reconcile.
-      4. No candidate at all → create new.
+      3. **NEW — stale-external_id recovery.** No external_id match and
+         no null-external_id namesakes, but exactly one namesake exists
+         whose stored external_id is NOT in ``known_remote_ids`` (i.e.
+         the PSP row it used to point at no longer exists — dead uuid,
+         classic aftermath of a PSP DB reseed / restore-from-backup /
+         staging-clone-with-fresh-uuids). Re-stamp its external_id to
+         the incoming one instead of creating a duplicate + orphaning
+         the dead row. Only fires when ``known_remote_ids`` is passed
+         (so single-item lookups from tests skip this branch).
+      4. Two or more matches → **not safe** to adopt (would
+         ambiguously pick one), so we fall back to creating a new row.
+         The seed on PSP will then need an operator to reconcile.
+      5. No candidate at all → create new.
 
     ``create_only_defaults`` are applied ONLY when we insert a fresh
     row — updates + adoptions skip them so they don't clobber a
     supervisor's local override (e.g. flipping ``is_general`` off).
+
+    ``known_remote_ids`` is the FULL set of uuids the current pull run
+    is about to see (built by the caller before iterating). Passing it
+    enables the stale-external_id recovery step; omitting it keeps
+    behaviour identical to the pre-recovery contract.
 
     Returns ``True`` when a row was created, ``False`` when updated
     or adopted. Callers use the boolean to bump their created /
@@ -267,6 +285,32 @@ def _upsert_with_adopt(
             setattr(adoptee, k, v)
         adoptee.save()
         return False
+
+    # Stale-external_id recovery.
+    #
+    # We only take this branch when the caller passed a ``known_remote_ids``
+    # set AND there's exactly ONE local row with a matching name whose
+    # currently-stored external_id is DEAD on PSP. Both conditions are
+    # important:
+    #
+    #   * Requiring the set avoids the false-heal where we don't know
+    #     what PSP still has (test callers that pass a single row don't
+    #     opt into recovery — safer default).
+    #   * Requiring the stored id to be DEAD avoids the wrong-heal
+    #     where PSP has BOTH a legit renamed row AND a same-name new
+    #     row — in that case we'd rather create the new row + leave
+    #     the renamed one intact for the deactivate-stale pass below.
+    if known_remote_ids is not None:
+        named_matches = list(qs.filter(**natural_key)[:2])
+        if len(named_matches) == 1:
+            row = named_matches[0]
+            stored = row.external_id
+            if stored and str(stored) not in known_remote_ids:
+                row.external_id = external_id
+                for k, v in defaults.items():
+                    setattr(row, k, v)
+                row.save()
+                return False
 
     # Zero or ambiguous — create a fresh row.
     create_kwargs = dict(defaults)

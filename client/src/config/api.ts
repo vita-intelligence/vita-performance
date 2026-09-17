@@ -125,6 +125,12 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/qc/mos/${moUuid}/notes/`,
         qcMoNoteCreate: (token: string, moUuid: string) =>
             `/api/kiosk/personal/${token}/qc/mos/${moUuid}/notes/create/`,
+        qcMoContext: (token: string, moUuid: string) =>
+            `/api/kiosk/personal/${token}/qc/mos/${moUuid}/context/`,
+        qcMoNpdSpecHtml: (token: string, moUuid: string) =>
+            `/api/kiosk/personal/${token}/qc/mos/${moUuid}/npd-spec.html`,
+        qcMoNpdValidationHtml: (token: string, moUuid: string) =>
+            `/api/kiosk/personal/${token}/qc/mos/${moUuid}/npd-validation.html`,
         history: (token: string, workerId: number) =>
             `/api/kiosk/personal/${token}/workers/${workerId}/history/`,
         startStationSession: (token: string, wsId: number) =>

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ClipboardCheck,
     Clock,
     Factory,
     Info,
@@ -22,7 +21,6 @@ interface StationsPageProps {
     workerName: string;
     isClockedIn: boolean;
     onOpenStation: (workstationId: number) => void;
-    onOpenQC: () => void;
 }
 
 /**
@@ -45,7 +43,6 @@ export default function StationsPage({
     workerName,
     isClockedIn,
     onOpenStation,
-    onOpenQC,
 }: StationsPageProps) {
     // Hard gate — no shift, no station browsing. Prevents a worker
     // from landing on StationView + firing Start against a null shift.
@@ -149,29 +146,10 @@ export default function StationsPage({
                 subtitle={`${workerName} — pick a station to open its kiosk`}
             />
 
-            {/* QA tile — inline QC review inbox. */}
-            {meta.qaEnabled && (
-                <button
-                    type="button"
-                    onClick={onOpenQC}
-                    className="group flex items-center gap-4 rounded-3xl border-2 border-primary/40 bg-primary/5 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg active:scale-[0.99]"
-                >
-                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                        <ClipboardCheck className="size-7" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-base font-black text-text">
-                            Quality Control
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted">
-                            Review completed sessions across every station.
-                        </p>
-                    </div>
-                    <span className="hidden rounded-full bg-primary/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary sm:inline">
-                        Reviewer
-                    </span>
-                </button>
-            )}
+            {/* QC Review moved to WorkerHome (main kiosk grid) so QA
+                operators can jump straight from the hub instead of
+                digging through Stations. See ``WorkerHome.tsx`` for
+                the tile — same permission gate (``worker.is_qa``). */}
 
             {meta.recent.length > 0 && !debouncedQuery && (
                 <RecentStations
