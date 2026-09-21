@@ -1753,13 +1753,22 @@ class PublicPersonalKioskPendingSessionFormView(APIView):
         worker_uuid = getattr(worker, 'uuid', None)
         worker_uuid_str = str(worker_uuid) if worker_uuid else None
 
+        # Scope by ``workstation.user`` — see the block-comment on
+        # :class:`PublicPersonalKioskCleaningWorkstationsView` +
+        # :class:`PublicPersonalKioskStartCleaningSessionView` for the
+        # full rationale. Short version: PSP-published forms carry
+        # ``user_id = NULL`` by design; filtering on ``form.user``
+        # silently drops them and the operator sees an empty
+        # start/end-trigger list even though the publisher landed
+        # them. Workstation always carries the tenant, so scoping
+        # via ``workstation__user`` covers both legacy + PSP rows.
         rows = (
             DynamicForm.objects
             .filter(
-                user=tok.user,
                 is_active=True,
                 trigger=trigger,
                 workstation=ws,
+                workstation__user=tok.user,
             )
             .order_by('sort_order', 'id')
         )
@@ -1796,7 +1805,18 @@ def _persist_session_form_responses(session, entries, tok_user):
     """Save every entry in `entries` as a FormResponse tied to
     `session`. Silent-degrade — bad refs / malformed entries log and
     skip. `entries` may be either a legacy `[form_id, answers]` pair
-    (single response) or a list of `{form_id, answers}` dicts."""
+    (single response) or a list of `{form_id, answers}` dicts.
+
+    Tenant scoping goes via ``workstation__user`` — PSP-published
+    forms have ``form.user = NULL`` and would silently drop under a
+    ``user=tok_user`` filter, so the operator would fill out a
+    PSP-published cleaning / start / end form, hit submit, and the
+    responses would vanish. Every triggered form is tied to a
+    workstation (schema); every workstation carries the tenant
+    ``user_id``, so this scope covers both legacy in-app forms
+    (``form.user == workstation.user == tok_user``) AND PSP-published
+    forms (``form.user is None``, ``workstation.user == tok_user``).
+    """
     if not entries:
         return
     if isinstance(entries, dict):
@@ -1813,7 +1833,7 @@ def _persist_session_form_responses(session, entries, tok_user):
             continue
         form = (
             DynamicForm.objects
-            .filter(pk=form_id, user=tok_user, is_active=True)
+            .filter(pk=form_id, workstation__user=tok_user, is_active=True)
             .first()
         )
         if not form:
@@ -1824,13 +1844,19 @@ def _persist_session_form_responses(session, entries, tok_user):
 def _persist_session_form_response(session, form_id, answers, tok_user):
     """Legacy single-form entry point kept for the cleaning-session
     completion view (task #10) which still submits one form at a time.
-    New callers should use `_persist_session_form_responses`."""
+    New callers should use `_persist_session_form_responses`.
+
+    Same tenant-scoping fix as the batch sibling above — PSP-published
+    forms have ``form.user = NULL`` and were silently dropped by a
+    naive ``user=tok_user`` filter, so cleaning-form answers vanished
+    on submit.
+    """
     if not form_id or not isinstance(answers, dict):
         return
     from dynamic_forms.models import DynamicForm, FormResponse
     form = (
         DynamicForm.objects
-        .filter(pk=form_id, user=tok_user, is_active=True)
+        .filter(pk=form_id, workstation__user=tok_user, is_active=True)
         .first()
     )
     if not form:
@@ -1877,13 +1903,28 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
             )
 
         from dynamic_forms.models import DynamicForm
+        # Scope by ``workstation.user`` rather than ``form.user`` —
+        # PSP-published forms have ``user_id = NULL`` by design (the
+        # publisher on vita-perf allows nullable user so a PSP push
+        # doesn't need a matching vita-perf user row per tenant). The
+        # workstation always carries ``user_id`` (the tenant handle),
+        # so gating on ``workstation__user`` catches BOTH legacy in-
+        # app forms (``form.user == workstation.user == tok.user``)
+        # AND PSP-published forms (``form.user is None``,
+        # ``workstation.user == tok.user``). Without this, PSP-
+        # published cleaning forms silently drop and the operator
+        # gets "no cleaning forms assigned" even though the list
+        # view (which uses the same tenant-scoping) happily shows
+        # the workstation with a form-count chip. Mirrors the fix
+        # already in place on
+        # :class:`PublicPersonalKioskCleaningWorkstationsView`.
         form_rows = list(
             DynamicForm.objects
             .filter(
-                user=tok.user,
                 is_active=True,
                 trigger=DynamicForm.TRIGGER_CLEANING,
                 workstation=ws,
+                workstation__user=tok.user,
             )
             .order_by('sort_order', 'id')
         )
