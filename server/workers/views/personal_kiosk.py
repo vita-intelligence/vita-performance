@@ -2099,6 +2099,7 @@ class PublicPersonalKioskCompleteCleaningSessionView(APIView):
             duration_seconds=duration_seconds,
             started_at=start,
             ended_at=end,
+            shift=ws_session.shift,
         )
 
         return Response({
@@ -2108,11 +2109,24 @@ class PublicPersonalKioskCompleteCleaningSessionView(APIView):
         })
 
 
-def _post_cleaning_complete_to_psp(user, workstation, worker, session_id, duration_seconds, started_at, ended_at):
+def _post_cleaning_complete_to_psp(
+    user,
+    workstation,
+    worker,
+    session_id,
+    duration_seconds,
+    started_at,
+    ended_at,
+    shift=None,
+):
     """POST cleaning-complete summary to PSP so it can recompute the
-    workstation's `next_cleaning_due_at` and drop the per-equipment
-    audit events. Silent-degrade — any failure logs a warning and the
-    kiosk carries on."""
+    workstation's ``next_cleaning_due_at``, drop the per-equipment
+    audit events, AND attach the event to the worker's shift timeline
+    (once the PSP employee-detail page renders that breakdown — the
+    payload carries the shift identity today so any future consumer
+    can just group by ``shift_id`` or ``(worker_uuid, shift_started_at)``).
+    Silent-degrade — any failure logs a warning and the kiosk carries
+    on."""
     import logging
     logger = logging.getLogger(__name__)
 
@@ -2142,9 +2156,29 @@ def _post_cleaning_complete_to_psp(user, workstation, worker, session_id, durati
         'session_id': session_id,
         'worker_id': worker.id if worker else None,
         'worker_name': getattr(worker, 'full_name', None),
+        # PSP-side uuid so the eventual breakdown page can key on
+        # something PSP already knows (integer ``worker_id`` is
+        # vita-perf-local). Falls back to null when the worker isn't
+        # mirrored from PSP HR yet — callback still lands, just
+        # unattributed.
+        'worker_uuid': getattr(worker, 'external_id', None) if worker else None,
         'duration_seconds': duration_seconds,
         'started_at': started_at.isoformat() if started_at else None,
         'ended_at': ended_at.isoformat() if ended_at else None,
+        # Shift context — cleaning session already carries an
+        # ``FK → WorkerShift`` (stamped at session start), so we
+        # forward the shift identity for the future PSP employee
+        # /hr/employees/<uuid>/shifts/<n> breakdown page. Null when
+        # the cleaning was started outside a shift (rare — worker
+        # forgot to clock in, or a per-station kiosk with no shift
+        # concept fires this path). ``shift_id`` is vita-perf-local
+        # int; ``shift_started_at`` is the stable natural key PSP
+        # can group by even without adopting our id.
+        'shift_id': getattr(shift, 'id', None) if shift else None,
+        'shift_started_at': (
+            shift.clocked_in_at.isoformat()
+            if shift and shift.clocked_in_at else None
+        ),
     }
     try:
         resp = requests.post(
