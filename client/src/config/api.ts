@@ -85,6 +85,13 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/workers/${workerId}/cleaning-workstations/`,
         startCleaningSession: (token: string) =>
             `/api/kiosk/personal/${token}/cleaning-sessions/start/`,
+        //: Hydrate an active cleaning session by id — powers the
+        //: "resume from home-menu live-activity banner" path so the
+        //: worker doesn't get thrown into the station RunningPanel
+        //: (which asks for "quantity produced" on Stop — meaningless
+        //: on a cleaning session).
+        getCleaningSession: (token: string, sessId: number) =>
+            `/api/kiosk/personal/${token}/cleaning-sessions/${sessId}/`,
         completeCleaningSession: (token: string, sessId: number) =>
             `/api/kiosk/personal/${token}/cleaning-sessions/${sessId}/complete/`,
         pendingSessionForm: (token: string, wsId: number) =>

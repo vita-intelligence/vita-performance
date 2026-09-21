@@ -193,6 +193,24 @@ export const personalKioskService = {
         return unwrap(res);
     },
 
+    // Resume an active cleaning session that the operator started
+    // earlier + then navigated away from. Returns the same shape as
+    // startCleaningSession so the FE view can reuse the type + flow.
+    // 404 when the session was closed, belongs to another worker,
+    // or isn't a cleaning session.
+    getCleaningSession: async (
+        token: string,
+        sessionId: number,
+        params: { sessionToken: string },
+    ): Promise<CleaningSessionStart> => {
+        const url = new URL(
+            `${base}${personalKiosk.getCleaningSession(token, sessionId)}`,
+        );
+        url.searchParams.set("session_token", params.sessionToken);
+        const res = await fetch(url.toString());
+        return unwrap(res);
+    },
+
     completeCleaningSession: async (
         token: string,
         sessionId: number,

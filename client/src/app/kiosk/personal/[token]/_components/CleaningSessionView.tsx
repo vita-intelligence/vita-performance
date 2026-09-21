@@ -24,6 +24,16 @@ interface CleaningSessionViewProps {
     token: string;
     sessionToken: string;
     target: CleaningWorkstationTile;
+    /**
+     * When set, skip the Confirm → Start dance and hydrate an
+     * already-running session by id. Powers the "resume from the
+     * Home-menu Live-Activity banner" flow — a worker who taps
+     * their live-session card for a cleaning session lands here
+     * with the timer already ticking, instead of getting thrown
+     * into the production RunningPanel (which asks for "quantity
+     * produced" — nonsense on a cleaning run).
+     */
+    resumeSessionId?: number;
     onFinished: () => void;
     onBack: () => void;
 }
@@ -74,10 +84,18 @@ export default function CleaningSessionView({
     token,
     sessionToken,
     target,
+    resumeSessionId,
     onFinished,
     onBack,
 }: CleaningSessionViewProps) {
-    const [phase, setPhase] = useState<Phase>("confirm");
+    const [phase, setPhase] = useState<Phase>(
+        // Resume paths start in a transient "starting" phase so the
+        // hydrate effect below can fetch the session before we
+        // render either Confirm or Running. Without this the
+        // operator would see the Confirm card flicker before the
+        // fetch completes, then get swapped to Running mid-scroll.
+        resumeSessionId != null ? "starting" : "confirm",
+    );
     const [session, setSession] = useState<CleaningSessionStart | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [duration, setDuration] = useState<number | null>(null);
@@ -89,6 +107,38 @@ export default function CleaningSessionView({
     const [responses, setResponses] = useState<
         Array<{ formId: number; answers: Record<string, unknown> }>
     >([]);
+
+    // Resume-from-home hydration. Fires once when the parent
+    // mounts this view with a ``resumeSessionId`` — fetches the
+    // existing session's identity + form list and jumps straight
+    // to the ``running`` phase. Failure falls back to the Confirm
+    // card with an inline error so the operator can still see what
+    // went wrong (session already closed, wrong worker, network).
+    useEffect(() => {
+        if (resumeSessionId == null) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await personalKioskService.getCleaningSession(
+                    token,
+                    resumeSessionId,
+                    { sessionToken },
+                );
+                if (cancelled) return;
+                setSession(res);
+                setCurrentIndex(0);
+                setResponses([]);
+                setPhase("running");
+            } catch (err) {
+                if (cancelled) return;
+                setError(getMsg(err));
+                setPhase("confirm");
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [resumeSessionId, token, sessionToken]);
 
     const handleStart = useCallback(async () => {
         setPhase("starting");

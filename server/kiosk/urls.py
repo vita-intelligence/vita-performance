@@ -33,6 +33,7 @@ from workers.views import (
     PublicPersonalKioskStationsView,
     PublicPersonalKioskCleaningWorkstationsView,
     PublicPersonalKioskStartCleaningSessionView,
+    PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
     PublicPersonalKioskPendingSessionFormView,
     PublicPersonalKioskPerformanceView,
@@ -119,6 +120,10 @@ urlpatterns = [
     path(
         'personal/<uuid:token>/cleaning-sessions/start/',
         PublicPersonalKioskStartCleaningSessionView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/cleaning-sessions/<int:sess_id>/',
+        PublicPersonalKioskGetCleaningSessionView.as_view(),
     ),
     path(
         'personal/<uuid:token>/cleaning-sessions/<int:sess_id>/complete/',

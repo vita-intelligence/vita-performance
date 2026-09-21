@@ -2016,6 +2016,115 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
         )
 
 
+class PublicPersonalKioskGetCleaningSessionView(APIView):
+    """GET /api/kiosk/personal/<token>/cleaning-sessions/<sess_id>/
+
+    Hydrate an ACTIVE cleaning session so the kiosk can resume it
+    from the main-menu Live-Activity banner. Returns the same shape
+    as :class:`PublicPersonalKioskStartCleaningSessionView` — session
+    identity + start_time + the ordered form list — WITHOUT creating
+    a new session. 404 when the session is closed, belongs to
+    another worker, or doesn't match ``activity_kind='cleaning'``.
+
+    Wiring: a worker who taps their live-session card on
+    :file:`WorkerHome.tsx` for a cleaning session lands here instead
+    of the station-view RunningPanel (which would ask for
+    "quantity produced" — meaningless on a cleaning run). The FE
+    then jumps straight to the ``running`` phase with the timer
+    already ticking + Stop button primed to open the form walk-
+    through.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, sess_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from work_sessions.models import WorkSession
+        try:
+            ws_session = (
+                WorkSession.objects
+                .select_related('workstation')
+                .prefetch_related('workers')
+                .get(pk=sess_id, user=tok.user, activity_kind='cleaning')
+            )
+        except WorkSession.DoesNotExist:
+            return Response(
+                {'detail': 'Cleaning session not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not ws_session.workers.filter(pk=worker.pk).exists():
+            return Response(
+                {'detail': 'Not your session.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if ws_session.status != 'active':
+            return Response(
+                {'detail': 'Session already closed.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        ws = ws_session.workstation
+        from dynamic_forms.models import DynamicForm
+        # Same tenant-scoping rule as the sibling views —
+        # ``workstation__user`` catches PSP-published forms whose
+        # ``user_id`` is null. See the block-comment on the list
+        # view for full rationale.
+        form_rows = list(
+            DynamicForm.objects
+            .filter(
+                is_active=True,
+                trigger=DynamicForm.TRIGGER_CLEANING,
+                workstation=ws,
+                workstation__user=tok.user,
+            )
+            .order_by('sort_order', 'id')
+        )
+        # Audience filter per-form. Same rule as start-session.
+        worker_uuid = getattr(worker, 'uuid', None)
+        worker_uuid_str = str(worker_uuid) if worker_uuid else None
+        applicable = []
+        for form in form_rows:
+            allowlist = form.worker_uuids or []
+            if allowlist:
+                if worker_uuid_str is None:
+                    continue
+                if worker_uuid_str not in [str(u) for u in allowlist]:
+                    continue
+            applicable.append(form)
+
+        def _flatten_schema(schema_raw):
+            if isinstance(schema_raw, dict):
+                return schema_raw.get('fields') or []
+            if isinstance(schema_raw, list):
+                return schema_raw
+            return []
+
+        forms_out = [
+            {
+                'id': f.id,
+                'name': f.name,
+                'sort_order': f.sort_order,
+                'schema': _flatten_schema(f.schema),
+            }
+            for f in applicable
+        ]
+
+        return Response({
+            'session_id': ws_session.id,
+            'workstation_id': ws.id,
+            'workstation_name': ws.name,
+            'start_time': ws_session.start_time.isoformat(),
+            'forms': forms_out,
+            'form': forms_out[0] if forms_out else None,
+        })
+
+
 class PublicPersonalKioskCompleteCleaningSessionView(APIView):
     """POST /api/kiosk/personal/<token>/cleaning-sessions/<sess_id>/complete/
 

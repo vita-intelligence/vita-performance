@@ -90,6 +90,13 @@ export default function PersonalKioskTokenPage() {
     // session view (task #10 renders the form + timer).
     const [cleaningTarget, setCleaningTarget] =
         useState<CleaningWorkstationTile | null>(null);
+    // Set when the Home-menu live-activity banner is tapped for a
+    // cleaning session — hydrates the CleaningSessionView with the
+    // existing session's forms + start time and jumps straight to
+    // the ``running`` phase (skipping Confirm → Start which would
+    // spawn a second session and 409 anyway).
+    const [resumeCleaningSessionId, setResumeCleaningSessionId] =
+        useState<number | null>(null);
     // Live QC — the MO the operator has opened for note-taking, plus
     // the workstation they'd already been standing at when they
     // tapped in (snapshotted on each note for the timeline context).
@@ -381,7 +388,39 @@ export default function PersonalKioskTokenPage() {
                             onOpenPerformance={() => setScreen("performance")}
                             onOpenReputation={() => setScreen("reputation")}
                             onOpenStations={() => setScreen("stations")}
-                            onOpenStation={(id) => {
+                            onOpenStation={(id, opts) => {
+                                // Cleaning sessions have their own view
+                                // (timer + form-gate on Stop). Route to
+                                // it directly when the live-session
+                                // banner is tapped for a cleaning run —
+                                // sending the worker to StationView
+                                // would render the production
+                                // RunningPanel which asks for "quantity
+                                // produced" on Stop, meaningless here.
+                                if (opts?.cleaningSessionId != null) {
+                                    // Synthesise a minimum tile —
+                                    // CleaningSessionView reads
+                                    // ``workstation_id`` +
+                                    // ``workstation_name`` for headers;
+                                    // form metadata comes from the
+                                    // resume-hydration fetch below.
+                                    setCleaningTarget({
+                                        workstation_id: id,
+                                        workstation_name:
+                                            opts.workstationName ?? "",
+                                        kiosk_token: "",
+                                        form_id: 0,
+                                        form_name: "",
+                                        form_count: 0,
+                                        last_cleaning_at: null,
+                                        next_cleaning_due_at: null,
+                                    });
+                                    setResumeCleaningSessionId(
+                                        opts.cleaningSessionId,
+                                    );
+                                    setScreen("cleaning-session");
+                                    return;
+                                }
                                 setPreselectedJob(null);
                                 setOpenStationId(id);
                                 setScreen("station");
@@ -479,13 +518,24 @@ export default function PersonalKioskTokenPage() {
                             token={token}
                             sessionToken={sessionToken}
                             target={cleaningTarget}
+                            resumeSessionId={resumeCleaningSessionId ?? undefined}
                             onFinished={() => {
                                 setCleaningTarget(null);
+                                setResumeCleaningSessionId(null);
                                 setScreen("home");
                             }}
                             onBack={() => {
                                 setCleaningTarget(null);
-                                setScreen("cleaning-picker");
+                                setResumeCleaningSessionId(null);
+                                // If the operator landed here via the
+                                // Home-menu live-activity banner
+                                // (resume path), Back returns Home,
+                                // not the picker they never opened.
+                                setScreen(
+                                    resumeCleaningSessionId != null
+                                        ? "home"
+                                        : "cleaning-picker",
+                                );
                             }}
                         />
                     );

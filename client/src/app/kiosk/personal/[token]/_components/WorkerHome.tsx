@@ -42,7 +42,10 @@ interface WorkerHomeProps {
     onOpenPerformance: () => void;
     onOpenReputation: () => void;
     onOpenStations: () => void;
-    onOpenStation: (workstationId: number) => void;
+    onOpenStation: (
+        workstationId: number,
+        opts?: { cleaningSessionId?: number; workstationName?: string },
+    ) => void;
     onOpenHistory: () => void;
     onOpenJobs: () => void;
     onOpenCleaning: () => void;
@@ -387,7 +390,10 @@ function LiveSessionCard({
 }: {
     token: string;
     workerId: number;
-    onOpenStation: (workstationId: number) => void;
+    onOpenStation: (
+        workstationId: number,
+        opts?: { cleaningSessionId?: number; workstationName?: string },
+    ) => void;
     /** Optional — parent mirrors this to gate Clock Out on it. */
     onSessionChange?: (session: WorkerLiveSession | null) => void;
 }) {
@@ -467,8 +473,21 @@ function LiveSessionCard({
         <button
             type="button"
             onClick={() => {
-                if (session.workstation_id != null)
-                    onOpenStation(session.workstation_id);
+                if (session.workstation_id == null) return;
+                // Cleaning sessions have their own view (timer +
+                // form-gate on Stop). Passing ``cleaningSessionId``
+                // tells the parent to route to CleaningSessionView
+                // with resume-hydration instead of the production
+                // RunningPanel (which would ask for "quantity
+                // produced" on Stop — meaningless on a cleaning run).
+                if (session.activity_kind === "cleaning") {
+                    onOpenStation(session.workstation_id, {
+                        cleaningSessionId: session.id,
+                        workstationName: session.workstation_name ?? "",
+                    });
+                    return;
+                }
+                onOpenStation(session.workstation_id);
             }}
             className="w-full text-left rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10 p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
         >

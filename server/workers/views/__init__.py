@@ -33,6 +33,7 @@ from .personal_kiosk import (
     PublicPersonalKioskStartWorkstationSessionView,
     PublicPersonalKioskStopWorkstationSessionView,
     PublicPersonalKioskStartCleaningSessionView,
+    PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
     PublicPersonalKioskPendingSessionFormView,
     PublicPersonalKioskQCSessionsView,
