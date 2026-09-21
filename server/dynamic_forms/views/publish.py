@@ -51,12 +51,21 @@ logger = logging.getLogger(__name__)
 
 # Map PSP triggers to vita-perf's legacy trigger enum. PSP uses
 # workstation-scoped names since they're honest about what fires;
-# vita-perf's local enum stays `start`/`end`/`cleaning` — the mapping
-# happens on ingest. `cleaning` is a new value added by migration 0002.
+# vita-perf's local enum stays `start`/`end`/`cleaning`/`maintenance`
+# — the mapping happens on ingest. `cleaning` was added by migration
+# 0002; `maintenance` by migration 0005.
 _TRIGGER_MAP = {
     "workstation_start": DynamicForm.TRIGGER_START,
     "workstation_end": DynamicForm.TRIGGER_END,
     "cleaning": DynamicForm.TRIGGER_CLEANING,
+    "maintenance": DynamicForm.TRIGGER_MAINTENANCE,
+    "equipment_cleaning": DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
+    "equipment_maintenance": DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
+}
+
+_EQUIPMENT_SCOPED_TRIGGERS = {
+    DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
+    DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
 }
 
 
@@ -168,6 +177,28 @@ class DynamicFormPublishView(APIView):
                     workstation_uuid,
                 )
 
+        # Equipment scope — only present when the template's trigger
+        # is equipment-scoped. PSP publishes one mirror row per
+        # (workstation × equipment) so the kiosk keys the query
+        # tightly. Reject a nullable equipment_uuid for the
+        # equipment-scoped triggers (payload bug on PSP side) so
+        # bad data never lands.
+        equipment_uuid_raw = data.get("equipment_uuid")
+        equipment_uuid: UUID | None = None
+        if equipment_uuid_raw:
+            try:
+                equipment_uuid = UUID(str(equipment_uuid_raw))
+            except (ValueError, TypeError):
+                return _bad(
+                    "`equipment_uuid` must be a valid UUID.",
+                    code="invalid_equipment_uuid",
+                )
+        if trigger in _EQUIPMENT_SCOPED_TRIGGERS and equipment_uuid is None:
+            return _bad(
+                "`equipment_uuid` is required for equipment-scoped triggers.",
+                code="missing_equipment_uuid",
+            )
+
         # Optional cleaning schedule mirror — only meaningful when
         # trigger == cleaning AND the workstation resolved. Parsed
         # upfront so a bad shape rejects the whole request rather than
@@ -197,6 +228,35 @@ class DynamicFormPublishView(APIView):
                         code="invalid_cleaning_schedule",
                     )
 
+        # Parallel maintenance schedule mirror. Same shape, same rules
+        # — only meaningful when trigger == maintenance AND the
+        # workstation resolved. Feeds the "next maintenance due" chip
+        # on the kiosk maintenance entry point.
+        maint_last_at: datetime | None = None
+        maint_next_due: date | None = None
+        maint_schedule_present = False
+        maint_schedule = data.get("workstation_maintenance_schedule")
+        if trigger == DynamicForm.TRIGGER_MAINTENANCE and isinstance(maint_schedule, dict):
+            maint_schedule_present = True
+            raw_last = maint_schedule.get("last_maintenance_at")
+            if raw_last is not None:
+                maint_last_at = parse_datetime(str(raw_last))
+                if maint_last_at is None:
+                    return _bad(
+                        "`workstation_maintenance_schedule.last_maintenance_at` "
+                        "must be an ISO-8601 datetime.",
+                        code="invalid_maintenance_schedule",
+                    )
+            raw_next = maint_schedule.get("next_maintenance_due_at")
+            if raw_next is not None:
+                maint_next_due = parse_date(str(raw_next))
+                if maint_next_due is None:
+                    return _bad(
+                        "`workstation_maintenance_schedule.next_maintenance_due_at` "
+                        "must be an ISO-8601 date.",
+                        code="invalid_maintenance_schedule",
+                    )
+
         sort_order_raw = data.get("sort_order", 0)
         try:
             sort_order = int(sort_order_raw) if sort_order_raw is not None else 0
@@ -204,11 +264,16 @@ class DynamicFormPublishView(APIView):
             return _bad("`sort_order` must be an integer.", code="invalid_sort_order")
 
         with transaction.atomic():
-            # Composite upsert key: (psp_uuid, workstation). Same
-            # template can attach to N workstations = N mirror rows.
+            # Composite upsert key: (psp_uuid, workstation,
+            # equipment_uuid). One template can attach to N
+            # workstations AND N machines = N distinct mirror rows.
             existing = (
                 DynamicForm.objects.select_for_update()
-                .filter(psp_uuid=psp_uuid, workstation=workstation)
+                .filter(
+                    psp_uuid=psp_uuid,
+                    workstation=workstation,
+                    equipment_uuid=equipment_uuid,
+                )
                 .first()
             )
 
@@ -216,9 +281,11 @@ class DynamicFormPublishView(APIView):
                 stored_version = existing.psp_version or 0
                 if psp_version <= stored_version:
                     logger.info(
-                        "Dropping stale publish: psp_uuid=%s ws=%s incoming=%d stored=%d",
+                        "Dropping stale publish: psp_uuid=%s ws=%s "
+                        "equipment=%s incoming=%d stored=%d",
                         psp_uuid,
                         workstation.id if workstation else None,
+                        equipment_uuid,
                         psp_version,
                         stored_version,
                     )
@@ -247,6 +314,16 @@ class DynamicFormPublishView(APIView):
                         update_fields=["last_cleaning_at", "next_cleaning_due_at"]
                     )
 
+                if maint_schedule_present and workstation is not None:
+                    workstation.last_maintenance_at = maint_last_at
+                    workstation.next_maintenance_due_at = maint_next_due
+                    workstation.save(
+                        update_fields=[
+                            "last_maintenance_at",
+                            "next_maintenance_due_at",
+                        ]
+                    )
+
                 return Response(
                     {
                         "status": "updated",
@@ -260,6 +337,7 @@ class DynamicFormPublishView(APIView):
             row = DynamicForm.objects.create(
                 psp_uuid=psp_uuid,
                 psp_version=psp_version,
+                equipment_uuid=equipment_uuid,
                 source=DynamicForm.SOURCE_PSP,
                 user=None,
                 workstation=workstation,

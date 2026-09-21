@@ -23,6 +23,7 @@ from kiosk.views.psp_bridge import KioskMOsView, KioskNonMOActivitiesView
 from dynamic_forms.views import FormResponseCreateView
 # Personal kiosk (tenant-paired tablet) — lives under /api/kiosk/personal
 # so the URL family stays consistent with /kiosk/<workstation-token>.
+from workstations.views.equipment_sync import WorkstationEquipmentSyncView
 from workers.views import (
     PersonalKioskTokenView,
     PublicPersonalKioskRosterView,
@@ -35,6 +36,11 @@ from workers.views import (
     PublicPersonalKioskStartCleaningSessionView,
     PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
+    PublicPersonalKioskMaintenanceWorkstationsView,
+    PublicPersonalKioskWorkstationEquipmentView,
+    PublicPersonalKioskStartMaintenanceSessionView,
+    PublicPersonalKioskGetMaintenanceSessionView,
+    PublicPersonalKioskCompleteMaintenanceSessionView,
     PublicPersonalKioskPendingSessionFormView,
     PublicPersonalKioskPerformanceView,
     PublicPersonalKioskReputationView,
@@ -54,6 +60,7 @@ from workers.views import (
     PublicPersonalKioskQCVerifySessionView,
     PublicPersonalKioskQCRosterView,
     PublicPersonalKioskQCGeneralFeedbackView,
+    PspShiftDetailView,
 )
 
 urlpatterns = [
@@ -130,6 +137,31 @@ urlpatterns = [
         PublicPersonalKioskCompleteCleaningSessionView.as_view(),
     ),
 
+    # Maintenance kiosk flow — parallel to cleaning above. The
+    # picker → workstations endpoint shows maintenance-triggered
+    # forms; the equipment endpoint feeds the optional per-machine
+    # scoping on the session start screen.
+    path(
+        'personal/<uuid:token>/workers/<int:worker_id>/maintenance-workstations/',
+        PublicPersonalKioskMaintenanceWorkstationsView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/workstations/<int:ws_id>/equipment/',
+        PublicPersonalKioskWorkstationEquipmentView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/maintenance-sessions/start/',
+        PublicPersonalKioskStartMaintenanceSessionView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/maintenance-sessions/<int:sess_id>/',
+        PublicPersonalKioskGetMaintenanceSessionView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/maintenance-sessions/<int:sess_id>/complete/',
+        PublicPersonalKioskCompleteMaintenanceSessionView.as_view(),
+    ),
+
     # Embedded QC — is_qa workers verify sessions inside the personal kiosk.
     path('personal/<uuid:token>/qc/sessions/', PublicPersonalKioskQCSessionsView.as_view()),
     path('personal/<uuid:token>/qc/sessions/<int:session_id>/verify/', PublicPersonalKioskQCVerifySessionView.as_view()),
@@ -166,6 +198,27 @@ urlpatterns = [
     path(
         'personal/<uuid:token>/qc/mos/<uuid:mo_uuid>/npd-validation.html',
         PublicPersonalKioskNpdValidationHtmlView.as_view(),
+    ),
+
+    # PSP → vita-perf inbound: shift-detail page reads the full
+    # session-level breakdown of one WorkerShift so it can render
+    # the chronological timeline + activity-kind dashboard. Auth
+    # via the shared ``PSP_PUBLISH_TOKEN`` header (reuses the same
+    # secret the forms publisher validates against).
+    path(
+        'psp/shifts/<int:shift_id>/detail/',
+        PspShiftDetailView.as_view(),
+        name='psp-shift-detail',
+    ),
+
+    # PSP → vita-perf inbound: full-replace sync of a workstation's
+    # equipment roster. PSP re-posts on every equipment attach /
+    # update / detach so the kiosk equipment picker always renders
+    # the current set. Same shared secret as the forms publisher.
+    path(
+        'psp/workstation-equipment/',
+        WorkstationEquipmentSyncView.as_view(),
+        name='psp-workstation-equipment-sync',
     ),
 
     # Existing per-workstation kiosk (untouched)

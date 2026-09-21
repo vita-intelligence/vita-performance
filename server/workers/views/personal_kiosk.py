@@ -788,6 +788,508 @@ class PublicPersonalKioskCleaningWorkstationsView(APIView):
         })
 
 
+class PublicPersonalKioskMaintenanceWorkstationsView(APIView):
+    """GET /api/kiosk/personal/<token>/workers/<id>/maintenance-workstations/
+    — parallel to :class:`PublicPersonalKioskCleaningWorkstationsView`.
+
+    Returns every active workstation the worker can open that has an
+    active ``DynamicForm(trigger='maintenance')`` assigned. Includes
+    the mirrored ``last_maintenance_at`` / ``next_maintenance_due_at``
+    so the picker can render due-soon chips without a second round-
+    trip. Sorted overdue-first (same rule as cleaning).
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, worker_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        worker = _worker_for_token(tok, worker_id)
+        if not worker:
+            return Response({'detail': 'Worker not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        _sync_psp_if_stale(tok.user, block_when_empty=False)
+
+        from dynamic_forms.models import DynamicForm
+        from workstations.models import Workstation
+
+        # Same tenant-scoping rule as cleaning — see
+        # :class:`PublicPersonalKioskCleaningWorkstationsView` for
+        # the full rationale on `workstation__user`.
+        maintenance_forms = (
+            DynamicForm.objects
+            .filter(
+                is_active=True,
+                trigger=DynamicForm.TRIGGER_MAINTENANCE,
+                workstation__isnull=False,
+                workstation__user=tok.user,
+            )
+            .select_related('workstation')
+        )
+
+        allowed_ids = set(
+            Workstation.objects
+            .filter(user=tok.user, is_active=True)
+            .filter(Q(is_general=True) | Q(authorized_workers=worker))
+            .values_list('id', flat=True)
+        )
+
+        seen: dict[int, dict] = {}
+        for mf in maintenance_forms:
+            ws = mf.workstation
+            if ws is None or ws.id not in allowed_ids or not ws.is_active:
+                continue
+            row = seen.get(ws.id)
+            if row is None:
+                row = {
+                    'workstation_id': ws.id,
+                    'workstation_name': ws.name,
+                    'kiosk_token': str(ws.kiosk_token),
+                    'form_id': mf.id,
+                    'form_name': mf.name,
+                    'form_count': 1,
+                    'last_maintenance_at': (
+                        ws.last_maintenance_at.isoformat()
+                        if ws.last_maintenance_at else None
+                    ),
+                    'next_maintenance_due_at': (
+                        ws.next_maintenance_due_at.isoformat()
+                        if ws.next_maintenance_due_at else None
+                    ),
+                }
+                seen[ws.id] = row
+            else:
+                row['form_count'] += 1
+        rows = list(seen.values())
+
+        from datetime import date
+        today = date.today()
+
+        def sort_key(r):
+            raw = r['next_maintenance_due_at']
+            if not raw:
+                return (2, r['workstation_name'].lower())
+            due = date.fromisoformat(raw[:10])
+            bucket = 0 if due <= today else 1
+            return (bucket, due.toordinal(), r['workstation_name'].lower())
+
+        rows.sort(key=sort_key)
+
+        return Response({'items': rows, 'total': len(rows)})
+
+
+class PublicPersonalKioskWorkstationEquipmentView(APIView):
+    """GET /api/kiosk/personal/<token>/workstations/<ws_id>/equipment/
+    — list active equipment mirrored from PSP against this workstation.
+
+    Feeds the equipment picker on the cleaning / maintenance session
+    flows so an operator can scope the session to a specific machine
+    (e.g. "I'm cleaning the V-blender, not the whole cell") for
+    per-machine audit records.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, ws_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response(
+                {'detail': 'Invalid kiosk link.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response(
+                {'detail': 'Session expired.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        ws = _resolve_workstation_for_tenant(tok, ws_id)
+        if not ws:
+            return Response(
+                {'detail': 'Workstation not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not _worker_authorized_on(ws, worker):
+            return Response(
+                {'detail': 'Not authorised on this station.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from workstations.models import WorkstationEquipment
+        rows = (
+            WorkstationEquipment.objects
+            .filter(workstation=ws, is_active=True)
+            .order_by('name', 'id')
+        )
+        return Response({
+            'workstation_id': ws.id,
+            'workstation_name': ws.name,
+            'items': [
+                {
+                    'uuid': e.equipment_uuid,
+                    'name': e.name,
+                    'serial_number': e.serial_number or None,
+                    'category_name': e.category_name or None,
+                }
+                for e in rows
+            ],
+            'total': rows.count(),
+        })
+
+
+class PublicPersonalKioskStartMaintenanceSessionView(APIView):
+    """POST /api/kiosk/personal/<token>/maintenance-sessions/start/
+
+    body: ``{session_token, workstation_id, equipment_uuid?}``
+
+    Parallel to :class:`PublicPersonalKioskStartCleaningSessionView` —
+    opens a WorkSession with ``activity_kind='maintenance'`` and hands
+    back the ordered maintenance form list. Optional
+    ``equipment_uuid`` scopes the audit event to a specific machine.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, token):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        ws_id = request.data.get('workstation_id')
+        if not ws_id:
+            return Response(
+                {'detail': 'workstation_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ws = _resolve_workstation_for_tenant(tok, ws_id)
+        if not ws:
+            return Response({'detail': 'Workstation not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not _worker_authorized_on(ws, worker):
+            return Response(
+                {'detail': 'Not authorised on this station.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        equipment_uuid, equipment_row, err_resp = _resolve_optional_equipment(
+            request.data.get('equipment_uuid'),
+            ws,
+        )
+        if err_resp is not None:
+            return err_resp
+
+        from dynamic_forms.models import DynamicForm
+        form_rows = list(
+            _load_session_forms_for_scope(
+                trigger_ws=DynamicForm.TRIGGER_MAINTENANCE,
+                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
+                workstation=ws,
+                tok=tok,
+                equipment_uuid=equipment_uuid,
+            )
+        )
+        if not form_rows:
+            scope_label = (
+                'equipment on this workstation'
+                if equipment_uuid else 'this workstation'
+            )
+            return Response(
+                {'detail': f'No maintenance forms assigned to {scope_label}.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        worker_uuid = getattr(worker, 'uuid', None)
+        worker_uuid_str = str(worker_uuid) if worker_uuid else None
+        applicable = []
+        for form in form_rows:
+            allowlist = form.worker_uuids or []
+            if allowlist:
+                if worker_uuid_str is None:
+                    continue
+                if worker_uuid_str not in [str(u) for u in allowlist]:
+                    continue
+            applicable.append(form)
+
+        if not applicable:
+            return Response(
+                {'detail': 'No maintenance forms apply to you on this workstation.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from work_sessions.models import WorkSession
+        if WorkSession.objects.filter(
+            workstation=ws,
+            status='active',
+            activity_kind='maintenance',
+        ).exists():
+            return Response(
+                {'detail': 'A maintenance session is already active on this workstation.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        shift = (
+            WorkerShift.objects
+            .filter(worker=worker, status=WorkerShift.STATUS_ACTIVE)
+            .first()
+        )
+
+        task_label = (
+            f'Maintenance · {equipment_row.name}'
+            if equipment_row is not None
+            else f'Maintenance · {ws.name}'
+        )
+
+        with transaction.atomic():
+            ws_session = WorkSession.objects.create(
+                user=tok.user,
+                company=ws.company,
+                workstation=ws,
+                status='active',
+                activity_kind='maintenance',
+                equipment_uuid=equipment_uuid,
+                start_time=_parse_iso(request.data.get('requested_at')) or timezone.now(),
+                shift=shift,
+                override_task_name=task_label,
+            )
+            ws_session.workers.set([worker.id])
+
+        def _flatten_schema(schema_raw):
+            if isinstance(schema_raw, dict):
+                return schema_raw.get('fields') or []
+            if isinstance(schema_raw, list):
+                return schema_raw
+            return []
+
+        forms_out = [
+            {
+                'id': f.id,
+                'name': f.name,
+                'sort_order': f.sort_order,
+                'schema': _flatten_schema(f.schema),
+            }
+            for f in applicable
+        ]
+
+        return Response(
+            {
+                'session_id': ws_session.id,
+                'workstation_id': ws.id,
+                'workstation_name': ws.name,
+                'equipment_uuid': equipment_uuid,
+                'equipment_name': equipment_row.name if equipment_row else None,
+                'start_time': ws_session.start_time.isoformat(),
+                'forms': forms_out,
+                'form': forms_out[0] if forms_out else None,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PublicPersonalKioskGetMaintenanceSessionView(APIView):
+    """GET /api/kiosk/personal/<token>/maintenance-sessions/<sess_id>/
+    — hydrate an active maintenance session (Home-menu resume path).
+
+    Parallel to :class:`PublicPersonalKioskGetCleaningSessionView`.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, sess_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from work_sessions.models import WorkSession
+        try:
+            ws_session = (
+                WorkSession.objects
+                .select_related('workstation')
+                .prefetch_related('workers')
+                .get(pk=sess_id, user=tok.user, activity_kind='maintenance')
+            )
+        except WorkSession.DoesNotExist:
+            return Response(
+                {'detail': 'Maintenance session not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not ws_session.workers.filter(pk=worker.pk).exists():
+            return Response(
+                {'detail': 'Not your session.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if ws_session.status != 'active':
+            return Response(
+                {'detail': 'Session already closed.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        ws = ws_session.workstation
+        from dynamic_forms.models import DynamicForm
+        form_rows = list(
+            _load_session_forms_for_scope(
+                trigger_ws=DynamicForm.TRIGGER_MAINTENANCE,
+                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
+                workstation=ws,
+                tok=tok,
+                equipment_uuid=ws_session.equipment_uuid,
+            )
+        )
+        worker_uuid = getattr(worker, 'uuid', None)
+        worker_uuid_str = str(worker_uuid) if worker_uuid else None
+        applicable = []
+        for form in form_rows:
+            allowlist = form.worker_uuids or []
+            if allowlist:
+                if worker_uuid_str is None:
+                    continue
+                if worker_uuid_str not in [str(u) for u in allowlist]:
+                    continue
+            applicable.append(form)
+
+        def _flatten_schema(schema_raw):
+            if isinstance(schema_raw, dict):
+                return schema_raw.get('fields') or []
+            if isinstance(schema_raw, list):
+                return schema_raw
+            return []
+
+        forms_out = [
+            {
+                'id': f.id,
+                'name': f.name,
+                'sort_order': f.sort_order,
+                'schema': _flatten_schema(f.schema),
+            }
+            for f in applicable
+        ]
+
+        # Resolve the equipment_uuid's display name for the header
+        # if the session was scoped to a specific machine.
+        equipment_name = None
+        if ws_session.equipment_uuid:
+            from workstations.models import WorkstationEquipment
+            row = (
+                WorkstationEquipment.objects
+                .filter(workstation=ws, equipment_uuid=ws_session.equipment_uuid)
+                .first()
+            )
+            equipment_name = row.name if row else None
+
+        return Response({
+            'session_id': ws_session.id,
+            'workstation_id': ws.id,
+            'workstation_name': ws.name,
+            'equipment_uuid': ws_session.equipment_uuid,
+            'equipment_name': equipment_name,
+            'start_time': ws_session.start_time.isoformat(),
+            'forms': forms_out,
+            'form': forms_out[0] if forms_out else None,
+        })
+
+
+class PublicPersonalKioskCompleteMaintenanceSessionView(APIView):
+    """POST /api/kiosk/personal/<token>/maintenance-sessions/<sess_id>/complete/
+    — parallel to :class:`PublicPersonalKioskCompleteCleaningSessionView`.
+
+    Persists form responses, closes the WorkSession, and fires the
+    PSP session-complete callback (silent-degrade). The callback
+    recomputes ``next_maintenance_due_at`` on the workstation OR on
+    the equipment (when ``equipment_uuid`` is set) and writes the
+    matching audit event row.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, token, sess_id):
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        _s, worker = _resolve_session_worker(tok, request)
+        if not worker:
+            return Response({'detail': 'Session expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from work_sessions.models import WorkSession
+        try:
+            ws_session = (
+                WorkSession.objects
+                .select_related('workstation')
+                .prefetch_related('workers')
+                .get(pk=sess_id, user=tok.user, activity_kind='maintenance')
+            )
+        except WorkSession.DoesNotExist:
+            return Response(
+                {'detail': 'Maintenance session not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not ws_session.workers.filter(pk=worker.pk).exists():
+            return Response({'detail': 'Not your session.'}, status=status.HTTP_403_FORBIDDEN)
+        if ws_session.status != 'active':
+            return Response(
+                {'detail': 'Session already closed.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        responses = request.data.get('responses')
+        if responses is None:
+            legacy_form_id = request.data.get('form_id')
+            legacy_answers = request.data.get('answers')
+            if legacy_form_id and isinstance(legacy_answers, dict):
+                responses = [{'form_id': legacy_form_id, 'answers': legacy_answers}]
+            else:
+                responses = []
+        if not isinstance(responses, list):
+            return Response(
+                {'detail': '`responses` must be an array of {form_id, answers}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            _persist_session_form_responses(ws_session, responses, tok.user)
+
+            ws_session.end_time = _parse_iso(request.data.get('requested_at')) or timezone.now()
+            ws_session.status = 'completed'
+            ws_session.save(update_fields=['end_time', 'status'])
+
+        start = ws_session.start_time
+        end = ws_session.end_time
+        duration_seconds = int((end - start).total_seconds()) if start and end else 0
+
+        try:
+            _post_session_complete_to_psp(
+                tok.user,
+                workstation=ws_session.workstation,
+                worker=worker,
+                session_id=ws_session.id,
+                duration_seconds=duration_seconds,
+                started_at=start,
+                ended_at=end,
+                activity_kind='maintenance',
+                equipment_uuid=ws_session.equipment_uuid,
+                shift=ws_session.shift,
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                'maintenance callback raised unexpectedly for session %s '
+                '(session already closed locally; PSP will re-sync on '
+                'the next state change)',
+                ws_session.id,
+            )
+
+        return Response({
+            'session_id': ws_session.id,
+            'duration_seconds': duration_seconds,
+            'ended_at': end.isoformat() if end else None,
+        })
+
+
 class PublicPersonalKioskPerformanceView(APIView):
     """GET /api/kiosk/personal/<token>/workers/<id>/performance/
     — sessions + trend for the worker's own detail page.
@@ -1079,6 +1581,94 @@ def _worker_authorized_on(workstation, worker):
     if workstation.is_general:
         return True
     return workstation.authorized_workers.filter(pk=worker.pk).exists()
+
+
+def _load_session_forms_for_scope(*, trigger_ws, trigger_eq, workstation, tok, equipment_uuid):
+    """Pull the ordered list of DynamicForm rows to walk on a
+    cleaning / maintenance session. Branches on scope:
+
+    * When ``equipment_uuid`` is set, load forms with
+      ``trigger=trigger_eq`` AND ``equipment_uuid=equipment_uuid``.
+      Equipment-scoped forms are attached at the PSP category level
+      and pushed one mirror row per (workstation × equipment) by
+      :mod:`Backend.Forms.Publisher`.
+
+    * When ``equipment_uuid`` is null, load workstation-scoped
+      forms (``trigger=trigger_ws`` AND ``equipment_uuid IS NULL``).
+
+    Tenant-gated via ``workstation__user`` — same rule as the
+    picker views (PSP-published forms have ``user_id=NULL`` by
+    design, so gating on the form's own user would silently drop
+    them; gating on the workstation's user catches both legacy
+    and PSP-published forms).
+    """
+    from dynamic_forms.models import DynamicForm
+
+    qs = DynamicForm.objects.filter(
+        is_active=True,
+        workstation=workstation,
+        workstation__user=tok.user,
+    )
+    if equipment_uuid:
+        qs = qs.filter(trigger=trigger_eq, equipment_uuid=equipment_uuid)
+    else:
+        qs = qs.filter(trigger=trigger_ws, equipment_uuid__isnull=True)
+    return qs.order_by('sort_order', 'id')
+
+
+def _resolve_optional_equipment(raw_uuid, workstation):
+    """Look up an optional ``equipment_uuid`` from a session-start /
+    complete request. Returns ``(uuid_str, WorkstationEquipment row,
+    error_response)`` where ``error_response`` is a ready-to-return
+    Response when the payload was malformed / detached / not on this
+    workstation, and ``None`` on the happy path (both no equipment
+    picked AND a valid equipment picked).
+
+    Rejects:
+      * a non-string
+      * a string that doesn't parse as UUID
+      * an equipment_uuid that isn't mirrored against this workstation
+        or is soft-deactivated
+
+    Rationale: cleaning / maintenance sessions are auditor evidence —
+    an operator can't tag an audit event with a machine that PSP has
+    already detached from this cell. Fail closed."""
+    if raw_uuid in (None, ''):
+        return None, None, None
+
+    if not isinstance(raw_uuid, str):
+        return None, None, Response(
+            {'detail': '`equipment_uuid` must be a string.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        uuid.UUID(raw_uuid)
+    except (ValueError, TypeError):
+        return None, None, Response(
+            {'detail': f'`equipment_uuid` must be a UUID (got {raw_uuid!r}).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from workstations.models import WorkstationEquipment
+    try:
+        row = WorkstationEquipment.objects.get(
+            workstation=workstation,
+            equipment_uuid=raw_uuid,
+            is_active=True,
+        )
+    except WorkstationEquipment.DoesNotExist:
+        return None, None, Response(
+            {
+                'detail': (
+                    'This equipment is not attached to the selected '
+                    'workstation. Refresh the picker.'
+                ),
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return raw_uuid, row, None
 
 
 def _tenant_is_psp_integrated(tok_user) -> bool:
@@ -1902,40 +2492,39 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Optional equipment scoping — operator can target a specific
+        # machine attached to this workstation instead of the whole
+        # cell. Resolved BEFORE the form query so the query can pick
+        # the right (workstation-scope vs equipment-scope) forms.
+        equipment_uuid, equipment_row, err_resp = _resolve_optional_equipment(
+            request.data.get('equipment_uuid'),
+            ws,
+        )
+        if err_resp is not None:
+            return err_resp
+
         from dynamic_forms.models import DynamicForm
-        # Scope by ``workstation.user`` rather than ``form.user`` —
-        # PSP-published forms have ``user_id = NULL`` by design (the
-        # publisher on vita-perf allows nullable user so a PSP push
-        # doesn't need a matching vita-perf user row per tenant). The
-        # workstation always carries ``user_id`` (the tenant handle),
-        # so gating on ``workstation__user`` catches BOTH legacy in-
-        # app forms (``form.user == workstation.user == tok.user``)
-        # AND PSP-published forms (``form.user is None``,
-        # ``workstation.user == tok.user``). Without this, PSP-
-        # published cleaning forms silently drop and the operator
-        # gets "no cleaning forms assigned" even though the list
-        # view (which uses the same tenant-scoping) happily shows
-        # the workstation with a form-count chip. Mirrors the fix
-        # already in place on
-        # :class:`PublicPersonalKioskCleaningWorkstationsView`.
         form_rows = list(
-            DynamicForm.objects
-            .filter(
-                is_active=True,
-                trigger=DynamicForm.TRIGGER_CLEANING,
+            _load_session_forms_for_scope(
+                trigger_ws=DynamicForm.TRIGGER_CLEANING,
+                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
                 workstation=ws,
-                workstation__user=tok.user,
+                tok=tok,
+                equipment_uuid=equipment_uuid,
             )
-            .order_by('sort_order', 'id')
         )
         if not form_rows:
+            scope_label = (
+                'equipment on this workstation'
+                if equipment_uuid else 'this workstation'
+            )
             return Response(
-                {'detail': 'No cleaning forms assigned to this workstation.'},
+                {'detail': f'No cleaning forms assigned to {scope_label}.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Audience filter per-form. Workstation surfaces only if at
-        # least one form applies to this worker.
+        # Audience filter per-form. Session opens only if at least
+        # one form applies to this worker.
         worker_uuid = getattr(worker, 'uuid', None)
         worker_uuid_str = str(worker_uuid) if worker_uuid else None
         applicable = []
@@ -1971,6 +2560,12 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
             .first()
         )
 
+        task_label = (
+            f'Cleaning · {equipment_row.name}'
+            if equipment_row is not None
+            else f'Cleaning · {ws.name}'
+        )
+
         with transaction.atomic():
             ws_session = WorkSession.objects.create(
                 user=tok.user,
@@ -1978,9 +2573,10 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
                 workstation=ws,
                 status='active',
                 activity_kind='cleaning',
+                equipment_uuid=equipment_uuid,
                 start_time=_parse_iso(request.data.get('requested_at')) or timezone.now(),
                 shift=shift,
-                override_task_name=f'Cleaning · {ws.name}',
+                override_task_name=task_label,
             )
             ws_session.workers.set([worker.id])
 
@@ -2071,19 +2667,14 @@ class PublicPersonalKioskGetCleaningSessionView(APIView):
 
         ws = ws_session.workstation
         from dynamic_forms.models import DynamicForm
-        # Same tenant-scoping rule as the sibling views —
-        # ``workstation__user`` catches PSP-published forms whose
-        # ``user_id`` is null. See the block-comment on the list
-        # view for full rationale.
         form_rows = list(
-            DynamicForm.objects
-            .filter(
-                is_active=True,
-                trigger=DynamicForm.TRIGGER_CLEANING,
+            _load_session_forms_for_scope(
+                trigger_ws=DynamicForm.TRIGGER_CLEANING,
+                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
                 workstation=ws,
-                workstation__user=tok.user,
+                tok=tok,
+                equipment_uuid=ws_session.equipment_uuid,
             )
-            .order_by('sort_order', 'id')
         )
         # Audience filter per-form. Same rule as start-session.
         worker_uuid = getattr(worker, 'uuid', None)
@@ -2217,6 +2808,7 @@ class PublicPersonalKioskCompleteCleaningSessionView(APIView):
                 started_at=start,
                 ended_at=end,
                 shift=ws_session.shift,
+                equipment_uuid=ws_session.equipment_uuid,
             )
         except Exception:
             import logging
@@ -2234,7 +2826,7 @@ class PublicPersonalKioskCompleteCleaningSessionView(APIView):
         })
 
 
-def _post_cleaning_complete_to_psp(
+def _post_session_complete_to_psp(
     user,
     workstation,
     worker,
@@ -2242,22 +2834,40 @@ def _post_cleaning_complete_to_psp(
     duration_seconds,
     started_at,
     ended_at,
+    activity_kind,
+    equipment_uuid=None,
     shift=None,
+    form_response_uuids=None,
 ):
-    """POST cleaning-complete summary to PSP so it can recompute the
-    workstation's ``next_cleaning_due_at``, drop the per-equipment
-    audit events, AND attach the event to the worker's shift timeline
-    (once the PSP employee-detail page renders that breakdown — the
-    payload carries the shift identity today so any future consumer
-    can just group by ``shift_id`` or ``(worker_uuid, shift_started_at)``).
-    Silent-degrade — any failure logs a warning and the kiosk carries
-    on."""
+    """POST session-complete summary to PSP for a cleaning OR
+    maintenance session. PSP writes to the appropriate audit-log
+    table (``workstation_events`` for workstation-scoped sessions,
+    ``equipment_events`` when ``equipment_uuid`` is set) and bumps
+    the cadence scalars (``last_cleaning_at`` / ``next_cleaning_due_at``
+    or their maintenance parallels).
+
+    Unified callback replaces the legacy ``cleaning-complete``
+    endpoint — PSP resolves what table + cadence to bump based on
+    the ``kind`` + ``equipment_uuid`` in the payload.
+
+    Silent-degrade — any failure logs a warning and the kiosk
+    carries on. The audit log is best-effort in real time; the
+    reconciler backfills a missed post in the background.
+    """
     import logging
     logger = logging.getLogger(__name__)
 
+    if activity_kind not in ('cleaning', 'maintenance'):
+        logger.info(
+            'session callback skipped: activity_kind=%s not audited',
+            activity_kind,
+        )
+        return
+
     if not workstation or not workstation.external_id:
         logger.info(
-            'cleaning callback skipped: workstation %s has no external_id',
+            '%s callback skipped: workstation %s has no external_id',
+            activity_kind,
             getattr(workstation, 'id', None),
         )
         return
@@ -2267,18 +2877,20 @@ def _post_cleaning_complete_to_psp(
     token = getattr(company, 'psp_integration_token', None) if company else None
     if not base_url or not token:
         logger.info(
-            'cleaning callback skipped: PSP integration not configured '
-            'on company %s', getattr(company, 'id', None)
+            '%s callback skipped: PSP integration not configured '
+            'on company %s', activity_kind, getattr(company, 'id', None)
         )
         return
 
     import requests
     url = (
         f"{base_url.rstrip('/')}"
-        f"/api/integration/workstations/{workstation.external_id}/cleaning-complete/"
+        f"/api/integration/workstations/{workstation.external_id}/session-complete/"
     )
     body = {
+        'kind': activity_kind,
         'session_id': session_id,
+        'equipment_uuid': equipment_uuid,
         'worker_id': worker.id if worker else None,
         'worker_name': getattr(worker, 'full_name', None),
         # PSP-side uuid so the eventual breakdown page can key on
@@ -2290,20 +2902,21 @@ def _post_cleaning_complete_to_psp(
         'duration_seconds': duration_seconds,
         'started_at': started_at.isoformat() if started_at else None,
         'ended_at': ended_at.isoformat() if ended_at else None,
-        # Shift context — cleaning session already carries an
-        # ``FK → WorkerShift`` (stamped at session start), so we
-        # forward the shift identity for the future PSP employee
-        # /hr/employees/<uuid>/shifts/<n> breakdown page. Null when
-        # the cleaning was started outside a shift (rare — worker
+        # Shift context — cleaning + maintenance sessions carry an
+        # ``FK → WorkerShift`` stamped at start, so we forward the
+        # shift identity for the PSP shift-detail page. Null when
+        # the session was started outside a shift (rare — worker
         # forgot to clock in, or a per-station kiosk with no shift
-        # concept fires this path). ``shift_id`` is vita-perf-local
-        # int; ``shift_started_at`` is the stable natural key PSP
-        # can group by even without adopting our id.
+        # concept fires this path).
         'shift_id': getattr(shift, 'id', None) if shift else None,
         'shift_started_at': (
             shift.clocked_in_at.isoformat()
             if shift and shift.clocked_in_at else None
         ),
+        # Optional: DynamicForm responses filled in when closing the
+        # session. Passed through so PSP can link the audit row to
+        # the specific checklist evidence the operator submitted.
+        'form_response_uuids': list(form_response_uuids or []),
     }
     try:
         resp = requests.post(
@@ -2314,14 +2927,48 @@ def _post_cleaning_complete_to_psp(
         )
         if resp.status_code >= 400:
             logger.warning(
-                'PSP cleaning-complete callback rejected (%s): %s',
+                'PSP %s-complete callback rejected (%s): %s',
+                activity_kind,
                 resp.status_code,
                 resp.text[:400],
             )
     except requests.RequestException as exc:
         logger.warning(
-            'PSP cleaning-complete callback transport failure: %s', exc,
+            'PSP %s-complete callback transport failure: %s',
+            activity_kind,
+            exc,
         )
+
+
+def _post_cleaning_complete_to_psp(
+    user,
+    workstation,
+    worker,
+    session_id,
+    duration_seconds,
+    started_at,
+    ended_at,
+    shift=None,
+    equipment_uuid=None,
+    form_response_uuids=None,
+):
+    """Legacy shim — forwards to the unified session-complete
+    callback. Kept as a named function so the rest of this module's
+    imports don't need to change and the git diff stays reviewable.
+    """
+    _post_session_complete_to_psp(
+        user=user,
+        workstation=workstation,
+        worker=worker,
+        session_id=session_id,
+        duration_seconds=duration_seconds,
+        started_at=started_at,
+        ended_at=ended_at,
+        activity_kind='cleaning',
+        equipment_uuid=equipment_uuid,
+        shift=shift,
+        form_response_uuids=form_response_uuids,
+    )
 
 
 class PublicPersonalKioskHistoryView(APIView):

@@ -17,6 +17,7 @@ import {
     Sparkles,
     SprayCan,
     TrendingUp,
+    Wrench,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { RndBadge } from "@/components/RndBadge";
@@ -49,6 +50,7 @@ interface WorkerHomeProps {
     onOpenHistory: () => void;
     onOpenJobs: () => void;
     onOpenCleaning: () => void;
+    onOpenMaintenance: () => void;
     /** QC-only — enters the Live QC screen (in-progress MOs with a
      *  note-taking page per MO). Tile is hidden for non-QA workers. */
     onOpenLiveQC: () => void;
@@ -85,6 +87,7 @@ export default function WorkerHome({
     onOpenHistory,
     onOpenJobs,
     onOpenCleaning,
+    onOpenMaintenance,
     onOpenLiveQC,
     onOpenQCReview,
     liveScore,
@@ -223,6 +226,20 @@ export default function WorkerHome({
                         accent="cleaning"
                         disabled={!shift || !!activeSession}
                         onClick={onOpenCleaning}
+                    />
+                    <NavTile
+                        title="Maintenance"
+                        subtitle={
+                            !shift
+                                ? "Clock in to unlock"
+                                : activeSession
+                                  ? `Running on ${activeSession.workstation_name ?? "another station"} — stop first`
+                                  : "Service a machine or station"
+                        }
+                        icon={<Wrench className="size-6" />}
+                        accent="maintenance"
+                        disabled={!shift || !!activeSession}
+                        onClick={onOpenMaintenance}
                     />
                     {worker.is_qa && (
                         <NavTile
@@ -743,6 +760,7 @@ function NavTile({
         | "history"
         | "jobs"
         | "cleaning"
+        | "maintenance"
         | "live_qc"
         | "qc_review";
     onClick: () => void;
@@ -761,6 +779,8 @@ function NavTile({
             "bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:border-rose-500/50",
         cleaning:
             "bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:border-cyan-500/50",
+        maintenance:
+            "bg-gradient-to-br from-violet-500/10 to-purple-500/10 border-violet-500/30 text-violet-600 dark:text-violet-400 hover:border-violet-500/50",
         live_qc:
             "bg-gradient-to-br from-lime-500/10 to-green-500/10 border-lime-500/30 text-lime-700 dark:text-lime-400 hover:border-lime-500/50",
         qc_review:
@@ -774,6 +794,7 @@ function NavTile({
         history: "bg-violet-500/15",
         jobs: "bg-rose-500/15",
         cleaning: "bg-cyan-500/15",
+        maintenance: "bg-violet-500/15",
         live_qc: "bg-lime-500/15",
         qc_review: "bg-teal-500/15",
     }[accent];

@@ -18,6 +18,8 @@ type Screen =
     | "jobs"
     | "cleaning-picker"
     | "cleaning-session"
+    | "maintenance-picker"
+    | "maintenance-session"
     | "live-qc-list"
     | "live-qc-notes";
 
@@ -41,6 +43,8 @@ const SCREEN_TITLE: Record<Exclude<Screen, "search" | "pin">, string> = {
     jobs: "Jobs",
     "cleaning-picker": "Cleaning",
     "cleaning-session": "Cleaning",
+    "maintenance-picker": "Maintenance",
+    "maintenance-session": "Maintenance",
     "live-qc-list": "Live QC",
     "live-qc-notes": "Live QC",
 };

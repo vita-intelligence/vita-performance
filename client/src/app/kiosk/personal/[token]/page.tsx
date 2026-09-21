@@ -18,10 +18,15 @@ import HistoryPage from "./_components/HistoryPage";
 import JobsPage from "./_components/JobsPage";
 import CleaningPickerPage from "./_components/CleaningPickerPage";
 import CleaningSessionView from "./_components/CleaningSessionView";
+import MaintenancePickerPage from "./_components/MaintenancePickerPage";
+import MaintenanceSessionView from "./_components/MaintenanceSessionView";
 import LiveQCListPage from "./_components/LiveQCListPage";
 import LiveQCMoNotesPage from "./_components/LiveQCMoNotesPage";
 import AppShell from "./_components/AppShell";
-import type { CleaningWorkstationTile } from "@/types/worker";
+import type {
+    CleaningWorkstationTile,
+    MaintenanceWorkstationTile,
+} from "@/types/worker";
 
 /**
  * Public personal-kiosk landing.
@@ -58,6 +63,8 @@ type Screen =
     | "jobs"
     | "cleaning-picker"
     | "cleaning-session"
+    | "maintenance-picker"
+    | "maintenance-session"
     | "live-qc-list"
     | "live-qc-notes";
 
@@ -97,6 +104,9 @@ export default function PersonalKioskTokenPage() {
     // spawn a second session and 409 anyway).
     const [resumeCleaningSessionId, setResumeCleaningSessionId] =
         useState<number | null>(null);
+    // Maintenance parallel — same shape, different table.
+    const [maintenanceTarget, setMaintenanceTarget] =
+        useState<MaintenanceWorkstationTile | null>(null);
     // Live QC — the MO the operator has opened for note-taking, plus
     // the workstation they'd already been standing at when they
     // tapped in (snapshotted on each note for the timeline context).
@@ -411,7 +421,6 @@ export default function PersonalKioskTokenPage() {
                                         kiosk_token: "",
                                         form_id: 0,
                                         form_name: "",
-                                        form_count: 0,
                                         last_cleaning_at: null,
                                         next_cleaning_due_at: null,
                                     });
@@ -428,6 +437,9 @@ export default function PersonalKioskTokenPage() {
                             onOpenHistory={() => setScreen("history")}
                             onOpenJobs={() => setScreen("jobs")}
                             onOpenCleaning={() => setScreen("cleaning-picker")}
+                            onOpenMaintenance={() =>
+                                setScreen("maintenance-picker")
+                            }
                             onOpenLiveQC={() => setScreen("live-qc-list")}
                             onOpenQCReview={() => setScreen("qc")}
                         />
@@ -536,6 +548,36 @@ export default function PersonalKioskTokenPage() {
                                         ? "home"
                                         : "cleaning-picker",
                                 );
+                            }}
+                        />
+                    );
+                case "maintenance-picker":
+                    return (
+                        <MaintenancePickerPage
+                            token={token}
+                            workerId={selectedWorker.id}
+                            workerName={selectedWorker.full_name}
+                            isClockedIn={!!activeShift}
+                            onOpenMaintenance={(row) => {
+                                setMaintenanceTarget(row);
+                                setScreen("maintenance-session");
+                            }}
+                        />
+                    );
+                case "maintenance-session":
+                    if (!maintenanceTarget || !sessionToken) return null;
+                    return (
+                        <MaintenanceSessionView
+                            token={token}
+                            sessionToken={sessionToken}
+                            target={maintenanceTarget}
+                            onFinished={() => {
+                                setMaintenanceTarget(null);
+                                setScreen("home");
+                            }}
+                            onBack={() => {
+                                setMaintenanceTarget(null);
+                                setScreen("maintenance-picker");
                             }}
                         />
                     );

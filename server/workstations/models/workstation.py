@@ -43,6 +43,13 @@ class Workstation(models.Model):
     last_cleaning_at = models.DateTimeField(null=True, blank=True)
     next_cleaning_due_at = models.DateField(null=True, blank=True, db_index=True)
 
+    # Parallel mirror for maintenance cadence — same shape, same
+    # trigger (a PSP publish or a vp maintenance-session complete
+    # callback bumps the scalars). Cleaning ≠ maintenance for
+    # auditors so the two schedules live side by side, not conflated.
+    last_maintenance_at = models.DateTimeField(null=True, blank=True)
+    next_maintenance_due_at = models.DateField(null=True, blank=True, db_index=True)
+
     # nullable overrides — null means use global settings
     working_hours_per_day = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     overtime_threshold = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)

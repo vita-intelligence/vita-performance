@@ -8,12 +8,18 @@ class DynamicForm(models.Model):
     TRIGGER_END = 'end'
     TRIGGER_BOTH = 'both'
     TRIGGER_CLEANING = 'cleaning'
+    TRIGGER_MAINTENANCE = 'maintenance'
+    TRIGGER_EQUIPMENT_CLEANING = 'equipment_cleaning'
+    TRIGGER_EQUIPMENT_MAINTENANCE = 'equipment_maintenance'
 
     TRIGGER_CHOICES = [
         (TRIGGER_START, 'Session Start'),
         (TRIGGER_END, 'Session End'),
         (TRIGGER_BOTH, 'Both'),
         (TRIGGER_CLEANING, 'Cleaning'),
+        (TRIGGER_MAINTENANCE, 'Maintenance'),
+        (TRIGGER_EQUIPMENT_CLEANING, 'Equipment cleaning'),
+        (TRIGGER_EQUIPMENT_MAINTENANCE, 'Equipment maintenance'),
     ]
 
     SOURCE_LEGACY = 'legacy'
@@ -40,7 +46,7 @@ class DynamicForm(models.Model):
         blank=True,
     )
     name = models.CharField(max_length=200)
-    trigger = models.CharField(max_length=10, choices=TRIGGER_CHOICES, default=TRIGGER_START)
+    trigger = models.CharField(max_length=32, choices=TRIGGER_CHOICES, default=TRIGGER_START)
     schema = models.JSONField(default=dict)
     is_active = models.BooleanField(default=True)
 
@@ -52,6 +58,13 @@ class DynamicForm(models.Model):
     # lives on `unique_together = ('psp_uuid', 'workstation')` in Meta.
     psp_uuid = models.UUIDField(null=True, blank=True, db_index=True)
     psp_version = models.IntegerField(null=True, blank=True)
+    # When set, this DynamicForm is equipment-scoped — it fires only
+    # when a cleaning / maintenance session on ``workstation`` also
+    # targets this specific equipment. NULL = workstation-scoped
+    # (the legacy behaviour). Indexed because the kiosk queries by
+    # ``(workstation, equipment_uuid, trigger)`` on every session
+    # start where an equipment is picked.
+    equipment_uuid = models.UUIDField(null=True, blank=True, db_index=True)
     # Kiosk walks forms in this order per slot. Sent by the PSP
     # publisher from the workstation_form_assignment.sort_order.
     sort_order = models.IntegerField(default=0)
@@ -73,10 +86,13 @@ class DynamicForm(models.Model):
     class Meta:
         db_table = 'dynamic_forms'
         ordering = ['-created_at']
-        # One mirror row per (template × workstation). Postgres treats
-        # `(NULL, anything)` as distinct so legacy rows (psp_uuid=NULL)
-        # coexist freely regardless of workstation.
-        unique_together = [('psp_uuid', 'workstation')]
+        # One mirror row per (template × workstation × equipment).
+        # Postgres treats `(NULL, anything)` as distinct so a single
+        # equipment-scoped template attached to two different
+        # machines on the same workstation produces two distinct
+        # rows (one per equipment_uuid). Legacy rows with
+        # psp_uuid=NULL still coexist freely.
+        unique_together = [('psp_uuid', 'workstation', 'equipment_uuid')]
 
     def __str__(self):
         return f"{self.name} ({self.trigger})"

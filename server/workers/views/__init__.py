@@ -35,9 +35,15 @@ from .personal_kiosk import (
     PublicPersonalKioskStartCleaningSessionView,
     PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
+    PublicPersonalKioskMaintenanceWorkstationsView,
+    PublicPersonalKioskWorkstationEquipmentView,
+    PublicPersonalKioskStartMaintenanceSessionView,
+    PublicPersonalKioskGetMaintenanceSessionView,
+    PublicPersonalKioskCompleteMaintenanceSessionView,
     PublicPersonalKioskPendingSessionFormView,
     PublicPersonalKioskQCSessionsView,
     PublicPersonalKioskQCVerifySessionView,
     PublicPersonalKioskQCRosterView,
     PublicPersonalKioskQCGeneralFeedbackView,
 )
+from .psp_shift_detail import PspShiftDetailView

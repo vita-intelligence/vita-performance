@@ -5,6 +5,9 @@ import {
     CleaningSessionStart,
     CleaningWorkstationsPayload,
     HistoryPayload,
+    MaintenanceSessionComplete,
+    MaintenanceSessionStart,
+    MaintenanceWorkstationsPayload,
     PendingSessionFormPayload,
     JobPreviewPayload,
     JobsPayload,
@@ -23,6 +26,7 @@ import {
     WorkerShift,
     WorkerStationsPayload,
     WorkerTodaySummary,
+    WorkstationEquipmentPayload,
 } from "@/types/worker";
 
 const { personalKiosk } = API_CONFIG.endpoints;
@@ -177,6 +181,7 @@ export const personalKioskService = {
         params: {
             sessionToken: string;
             workstationId: number;
+            equipmentUuid?: string | null;
         },
     ): Promise<CleaningSessionStart> => {
         const res = await fetch(
@@ -187,6 +192,7 @@ export const personalKioskService = {
                 body: JSON.stringify({
                     session_token: params.sessionToken,
                     workstation_id: params.workstationId,
+                    equipment_uuid: params.equipmentUuid || null,
                 }),
             },
         );
@@ -224,6 +230,94 @@ export const personalKioskService = {
     ): Promise<CleaningSessionComplete> => {
         const res = await fetch(
             `${base}${personalKiosk.completeCleaningSession(token, sessionId)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_token: params.sessionToken,
+                    responses: params.responses.map((r) => ({
+                        form_id: r.formId,
+                        answers: r.answers,
+                    })),
+                }),
+            },
+        );
+        return unwrap(res);
+    },
+
+    // ── Maintenance flow (parallel to cleaning) ─────────────────────
+    getMaintenanceWorkstations: async (
+        token: string,
+        workerId: number,
+    ): Promise<MaintenanceWorkstationsPayload> => {
+        const res = await fetch(
+            `${base}${personalKiosk.maintenanceWorkstations(token, workerId)}`,
+        );
+        return unwrap(res);
+    },
+
+    getWorkstationEquipment: async (
+        token: string,
+        wsId: number,
+        params: { sessionToken: string },
+    ): Promise<WorkstationEquipmentPayload> => {
+        const url = new URL(
+            `${base}${personalKiosk.workstationEquipment(token, wsId)}`,
+        );
+        url.searchParams.set("session_token", params.sessionToken);
+        const res = await fetch(url.toString());
+        return unwrap(res);
+    },
+
+    startMaintenanceSession: async (
+        token: string,
+        params: {
+            sessionToken: string;
+            workstationId: number;
+            equipmentUuid?: string | null;
+        },
+    ): Promise<MaintenanceSessionStart> => {
+        const res = await fetch(
+            `${base}${personalKiosk.startMaintenanceSession(token)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_token: params.sessionToken,
+                    workstation_id: params.workstationId,
+                    equipment_uuid: params.equipmentUuid || null,
+                }),
+            },
+        );
+        return unwrap(res);
+    },
+
+    getMaintenanceSession: async (
+        token: string,
+        sessionId: number,
+        params: { sessionToken: string },
+    ): Promise<MaintenanceSessionStart> => {
+        const url = new URL(
+            `${base}${personalKiosk.getMaintenanceSession(token, sessionId)}`,
+        );
+        url.searchParams.set("session_token", params.sessionToken);
+        const res = await fetch(url.toString());
+        return unwrap(res);
+    },
+
+    completeMaintenanceSession: async (
+        token: string,
+        sessionId: number,
+        params: {
+            sessionToken: string;
+            responses: Array<{
+                formId: number;
+                answers: Record<string, unknown>;
+            }>;
+        },
+    ): Promise<MaintenanceSessionComplete> => {
+        const res = await fetch(
+            `${base}${personalKiosk.completeMaintenanceSession(token, sessionId)}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

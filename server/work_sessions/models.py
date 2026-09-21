@@ -67,6 +67,18 @@ class WorkSession(models.Model):
         db_index=True,
         help_text='PSP MO-step uuid when activity_kind = "mo".',
     )
+    equipment_uuid = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            'PSP equipment uuid when a cleaning / maintenance session '
+            'targeted a specific machine attached to this workstation '
+            '(as opposed to the workstation itself). Null means the '
+            'session was workstation-scoped.'
+        ),
+    )
     workers = models.ManyToManyField(Worker, through='SessionWorker', related_name='work_sessions')
     workstation = models.ForeignKey(Workstation, on_delete=models.CASCADE, related_name='sessions')
     # Personal-kiosk provenance. When the session is started from a

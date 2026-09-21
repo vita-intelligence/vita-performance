@@ -197,6 +197,72 @@ export interface CleaningSessionComplete {
   ended_at: string | null;
 }
 
+/** One workstation on the Maintenance entry point picker. Parallel
+ *  to :type:`CleaningWorkstationTile` — same shape, different
+ *  cadence fields (maintenance instead of cleaning). */
+export interface MaintenanceWorkstationTile {
+  workstation_id: number;
+  workstation_name: string;
+  kiosk_token: string;
+  form_id: number;
+  form_name: string;
+  last_maintenance_at: string | null;
+  next_maintenance_due_at: string | null;
+}
+
+export interface MaintenanceWorkstationsPayload {
+  items: MaintenanceWorkstationTile[];
+  total: number;
+}
+
+/** One machine attached to a workstation. Rendered on the "scope
+ *  this session" picker so the operator can tag a cleaning /
+ *  maintenance session to a specific piece of equipment instead of
+ *  the workstation as a whole. */
+export interface WorkstationEquipmentItem {
+  uuid: string;
+  name: string;
+  serial_number: string | null;
+  category_name: string | null;
+}
+
+export interface WorkstationEquipmentPayload {
+  workstation_id: number;
+  workstation_name: string;
+  items: WorkstationEquipmentItem[];
+  total: number;
+}
+
+/** Payload returned when a maintenance session opens. Same envelope
+ *  as :type:`CleaningSessionStart` + carries the resolved
+ *  ``equipment_uuid`` / ``equipment_name`` when the session was
+ *  scoped to a specific machine. */
+export interface MaintenanceSessionStart {
+  session_id: number;
+  workstation_id: number;
+  workstation_name: string;
+  equipment_uuid: string | null;
+  equipment_name: string | null;
+  start_time: string;
+  forms: Array<{
+    id: number;
+    name: string;
+    sort_order: number;
+    schema: unknown[];
+  }>;
+  form: {
+    id: number;
+    name: string;
+    schema: unknown[];
+  } | null;
+}
+
+export interface MaintenanceSessionComplete {
+  session_id: number;
+  duration_seconds: number;
+  ended_at: string | null;
+}
+
 /** One pending session form. Kiosk walks the returned list in
  *  `sort_order` before the session actually starts / stops. */
 export interface PendingSessionForm {

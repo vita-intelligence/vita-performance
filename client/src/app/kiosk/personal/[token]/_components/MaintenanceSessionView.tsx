@@ -9,22 +9,22 @@ import {
     Loader2,
     Play,
     Radio,
-    SprayCan,
+    Wrench,
     Square,
 } from "lucide-react";
 import FormRenderer from "@/components/shared/FormRenderer";
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import type {
-    CleaningSessionStart,
-    CleaningWorkstationTile,
+    MaintenanceSessionStart,
+    MaintenanceWorkstationTile,
     WorkstationEquipmentItem,
 } from "@/types/worker";
 import type { FormField, KioskForm } from "@/types/dynamic-form";
 
-interface CleaningSessionViewProps {
+interface MaintenanceSessionViewProps {
     token: string;
     sessionToken: string;
-    target: CleaningWorkstationTile;
+    target: MaintenanceWorkstationTile;
     /**
      * When set, skip the Confirm → Start dance and hydrate an
      * already-running session by id. Powers the "resume from the
@@ -48,7 +48,7 @@ type Phase =
     | "done";
 
 /**
- * Cleaning session mirrors the shape of a normal work session on
+ * Maintenance session mirrors the shape of a normal work session on
  * :class:`StationView`'s ``RunningPanel``:
  *
  *   1. ``confirm``       — pre-session card explaining what's about
@@ -81,14 +81,14 @@ type Phase =
  * fill-in time, matching how operators actually think about the
  * "cleaning session length" metric.
  */
-export default function CleaningSessionView({
+export default function MaintenanceSessionView({
     token,
     sessionToken,
     target,
     resumeSessionId,
     onFinished,
     onBack,
-}: CleaningSessionViewProps) {
+}: MaintenanceSessionViewProps) {
     const [phase, setPhase] = useState<Phase>(
         // Resume paths start in a transient "starting" phase so the
         // hydrate effect below can fetch the session before we
@@ -97,7 +97,7 @@ export default function CleaningSessionView({
         // fetch completes, then get swapped to Running mid-scroll.
         resumeSessionId != null ? "starting" : "confirm",
     );
-    const [session, setSession] = useState<CleaningSessionStart | null>(null);
+    const [session, setSession] = useState<MaintenanceSessionStart | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [duration, setDuration] = useState<number | null>(null);
     // Walk-through state: `currentIndex` tracks which form in
@@ -109,11 +109,8 @@ export default function CleaningSessionView({
         Array<{ formId: number; answers: Record<string, unknown> }>
     >([]);
 
-    // Equipment scope picker — an operator can either clean the
-    // whole workstation (default) OR target one machine on it, in
-    // which case the audit event lands against the equipment and
-    // the kiosk pulls the equipment_cleaning forms attached to the
-    // machine's category instead of the workstation-scoped ones.
+    // Equipment scope picker — mirror of the cleaning view. See
+    // :file:`CleaningSessionView.tsx` for the design rationale.
     const [equipmentList, setEquipmentList] = useState<WorkstationEquipmentItem[]>(
         [],
     );
@@ -134,8 +131,7 @@ export default function CleaningSessionView({
                 if (cancelled) return;
                 setEquipmentList(res.items);
             } catch {
-                // Silent — kiosk falls back to workstation-only
-                // scope when the equipment fetch fails.
+                // Silent — fall back to workstation-only scope.
             }
         })();
         return () => {
@@ -154,7 +150,7 @@ export default function CleaningSessionView({
         let cancelled = false;
         (async () => {
             try {
-                const res = await personalKioskService.getCleaningSession(
+                const res = await personalKioskService.getMaintenanceSession(
                     token,
                     resumeSessionId,
                     { sessionToken },
@@ -179,7 +175,7 @@ export default function CleaningSessionView({
         setPhase("starting");
         setError(null);
         try {
-            const res = await personalKioskService.startCleaningSession(token, {
+            const res = await personalKioskService.startMaintenanceSession(token, {
                 sessionToken,
                 workstationId: target.workstation_id,
                 equipmentUuid: selectedEquipmentUuid,
@@ -231,7 +227,7 @@ export default function CleaningSessionView({
 
             setPhase("submitting");
             try {
-                const res = await personalKioskService.completeCleaningSession(
+                const res = await personalKioskService.completeMaintenanceSession(
                     token,
                     session.session_id,
                     {
@@ -242,7 +238,7 @@ export default function CleaningSessionView({
                 setDuration(res.duration_seconds);
                 setPhase("done");
                 addToast({
-                    title: "Cleaning logged",
+                    title: "Maintenance logged",
                     description: `${target.workstation_name} — ${formatDuration(res.duration_seconds)}.`,
                     color: "success",
                 });
@@ -368,7 +364,7 @@ function ConfirmCard({
     selectedEquipmentUuid,
     onSelectEquipment,
 }: {
-    target: CleaningWorkstationTile;
+    target: MaintenanceWorkstationTile;
     starting: boolean;
     error: string | null;
     onStart: () => void;
@@ -391,11 +387,11 @@ function ConfirmCard({
             <div className="rounded-2xl border-2 border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-sky-500/10 p-5 sm:p-6">
                 <div className="flex items-center gap-3">
                     <span className="flex size-11 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
-                        <SprayCan className="size-6" />
+                        <Wrench className="size-6" />
                     </span>
                     <div className="min-w-0">
                         <p className="text-[11px] font-black uppercase tracking-widest text-muted">
-                            Cleaning session
+                            Maintenance session
                         </p>
                         <h1 className="text-lg font-black text-text sm:text-2xl">
                             {target.workstation_name}
@@ -407,10 +403,10 @@ function ConfirmCard({
                         <span className="font-semibold">Checklist:</span>{" "}
                         {target.form_name}
                     </p>
-                    {target.last_cleaning_at && (
+                    {target.last_maintenance_at && (
                         <p className="text-xs text-muted">
-                            Last cleaned:{" "}
-                            {new Date(target.last_cleaning_at).toLocaleString()}
+                            Last serviced:{" "}
+                            {new Date(target.last_maintenance_at).toLocaleString()}
                         </p>
                     )}
                 </div>
@@ -422,7 +418,6 @@ function ConfirmCard({
                     equipmentList={equipmentList}
                     selectedEquipmentUuid={selectedEquipmentUuid}
                     onSelect={onSelectEquipment}
-                    verb="cleaning"
                 />
             )}
 
@@ -443,11 +438,11 @@ function ConfirmCard({
                 ) : (
                     <Play className="size-5" />
                 )}
-                {starting ? "Starting…" : "Start cleaning"}
+                {starting ? "Starting…" : "Start maintenance"}
             </button>
             <p className="text-center text-xs text-muted">
                 The timer starts as soon as you tap Start. When the
-                station is clean, tap Stop cleaning and the checklist
+                service is done, tap Stop maintenance and the checklist
                 opens — the timer keeps running until you submit it.
             </p>
         </div>
@@ -458,7 +453,7 @@ function ConfirmCard({
 /**
  * Running panel — mirrors ``StationView``'s RunningPanel: a big
  * emerald "Session running" card with a pulsing dot and the live
- * elapsed timer, a workstation info card, and a red "Stop cleaning"
+ * elapsed timer, a workstation info card, and a red "Stop maintenance"
  * button. Tapping Stop hands control to :func:`handleStop` which
  * opens the form walk-through; the timer keeps ticking behind the
  * form until the last one is submitted (backend stamps ``end_time``
@@ -469,8 +464,8 @@ function RunningPanel({
     session,
     onStop,
 }: {
-    target: CleaningWorkstationTile;
-    session: CleaningSessionStart;
+    target: MaintenanceWorkstationTile;
+    session: MaintenanceSessionStart;
     onStop: () => void;
 }) {
     const elapsed = useElapsed(session.start_time);
@@ -487,7 +482,7 @@ function RunningPanel({
                     </div>
                     <div className="min-w-0 flex-1">
                         <p className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                            Cleaning in progress
+                            Maintenance in progress
                         </p>
                         <p className="mt-1 text-3xl font-black tabular-nums text-text">
                             {formatDuration(elapsed)}
@@ -501,19 +496,19 @@ function RunningPanel({
 
             <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-4">
                 <div className="flex items-center gap-2">
-                    <SprayCan className="size-4 text-cyan-500" />
+                    <Wrench className="size-4 text-cyan-500" />
                     <p className="text-xs font-semibold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
                         Checklist queued
                     </p>
                 </div>
                 <p className="mt-1 text-sm text-text">{target.form_name}</p>
                 <p className="mt-1 text-xs text-muted">
-                    Tap Stop cleaning when the station is clean. The
+                    Tap Stop maintenance when the service is done. The
                     checklist opens then — the timer keeps ticking
                     until you submit, so the total time recorded
                     includes filling the form. Hit the ✕ on the
                     checklist if you tapped Stop by mistake — it
-                    returns you here so you can keep cleaning.
+                    returns you here so you can keep going.
                 </p>
             </div>
 
@@ -523,7 +518,7 @@ function RunningPanel({
                 className="inline-flex h-16 items-center justify-center gap-2 rounded-2xl bg-danger text-white text-base font-black uppercase tracking-widest transition-opacity hover:opacity-90"
             >
                 <Square className="size-5" />
-                Stop cleaning
+                Stop maintenance
             </button>
         </div>
     );
@@ -534,8 +529,8 @@ function BackdropCard({
     session,
     step,
 }: {
-    target: CleaningWorkstationTile;
-    session: CleaningSessionStart;
+    target: MaintenanceWorkstationTile;
+    session: MaintenanceSessionStart;
     step?: { current: number; total: number };
 }) {
     const elapsed = useElapsed(session.start_time);
@@ -543,7 +538,7 @@ function BackdropCard({
         <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-4">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <SprayCan className="size-4 text-cyan-500" />
+                    <Wrench className="size-4 text-cyan-500" />
                     <p className="text-xs font-semibold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
                         {target.workstation_name}
                     </p>
@@ -567,7 +562,7 @@ function DoneCard({
     durationSeconds,
     onBack,
 }: {
-    target: CleaningWorkstationTile;
+    target: MaintenanceWorkstationTile;
     durationSeconds: number;
     onBack: () => void;
 }) {
@@ -578,7 +573,7 @@ function DoneCard({
                     <CheckCircle2 className="size-7" />
                 </div>
                 <h1 className="mt-3 text-xl font-black text-text sm:text-2xl">
-                    Cleaning complete
+                    Maintenance complete
                 </h1>
                 <p className="mt-1 text-sm text-muted">
                     {target.workstation_name} · {formatDuration(durationSeconds)}
@@ -629,44 +624,36 @@ function getMsg(err: unknown): string {
 }
 
 /**
- * Scope picker on the confirm screen. Renders when the workstation
- * has at least one active piece of equipment mirrored from PSP.
- * Radio group: "This workstation" (default, null uuid) + one row
- * per attached machine (equipment uuid).
- *
- * Picking a machine means the audit event lands against the
- * equipment, and the kiosk pulls the ``equipment_cleaning`` /
- * ``equipment_maintenance`` forms attached to that machine's
- * category on PSP instead of the workstation-scoped forms.
+ * Scope picker on the maintenance confirm screen. Mirror of the
+ * cleaning variant — pick "This workstation" (default) or a
+ * specific machine on it. Machine-scoped sessions land audit
+ * events against the equipment and pull the equipment-scoped
+ * forms attached at the category level.
  */
 function ScopePicker({
     workstationName,
     equipmentList,
     selectedEquipmentUuid,
     onSelect,
-    verb,
 }: {
     workstationName: string;
     equipmentList: WorkstationEquipmentItem[];
     selectedEquipmentUuid: string | null;
     onSelect: (uuid: string | null) => void;
-    verb: "cleaning" | "maintenance";
 }) {
-    const verbLabel = verb === "cleaning" ? "cleaning" : "maintaining";
-    const wsLabel = verb === "cleaning" ? "the whole cell" : "the whole workstation";
     return (
         <div className="rounded-2xl border border-border/60 bg-surface/30 p-4">
             <p className="text-[11px] font-black uppercase tracking-widest text-muted">
-                What are you {verbLabel}?
+                What are you maintaining?
             </p>
             <p className="mt-1 text-xs text-muted">
                 The audit event goes against whatever you pick — so pick
-                the machine if you&apos;re {verbLabel} it specifically, or
-                the workstation if you&apos;re {verbLabel} the whole cell.
+                the machine if you&apos;re servicing it specifically, or
+                the workstation if you&apos;re working on the whole cell.
             </p>
             <ul className="mt-3 space-y-1.5">
                 <ScopeOption
-                    label={`${workstationName} · ${wsLabel}`}
+                    label={`${workstationName} · the whole workstation`}
                     checked={selectedEquipmentUuid === null}
                     onSelect={() => onSelect(null)}
                 />
