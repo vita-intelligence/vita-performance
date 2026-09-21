@@ -2090,17 +2090,33 @@ class PublicPersonalKioskCompleteCleaningSessionView(APIView):
         duration_seconds = int((end - start).total_seconds()) if start and end else 0
 
         # Fire PSP callback — silent-degrade so a bad callback never
-        # blocks the operator from closing their session.
-        _post_cleaning_complete_to_psp(
-            tok.user,
-            workstation=ws_session.workstation,
-            worker=worker,
-            session_id=ws_session.id,
-            duration_seconds=duration_seconds,
-            started_at=start,
-            ended_at=end,
-            shift=ws_session.shift,
-        )
+        # blocks the operator from closing their session. The helper
+        # itself already catches ``requests.RequestException`` for
+        # transport failures, but wrapping the whole call in a
+        # belt-and-braces try/except catches Python-level bugs (e.g.
+        # a keyword-arg mismatch after a signature rev shipped) that
+        # would otherwise 500 AFTER the transaction above committed
+        # ``status=completed`` — leaving the session wedged (every
+        # retry 409s) with no way for the operator to close it.
+        try:
+            _post_cleaning_complete_to_psp(
+                tok.user,
+                workstation=ws_session.workstation,
+                worker=worker,
+                session_id=ws_session.id,
+                duration_seconds=duration_seconds,
+                started_at=start,
+                ended_at=end,
+                shift=ws_session.shift,
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                'cleaning callback raised unexpectedly for session %s '
+                '(session already closed locally; PSP will re-sync on '
+                'the next state change)',
+                ws_session.id,
+            )
 
         return Response({
             'session_id': ws_session.id,

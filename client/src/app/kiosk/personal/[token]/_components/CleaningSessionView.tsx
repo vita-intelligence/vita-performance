@@ -225,11 +225,20 @@ export default function CleaningSessionView({
                     isSubmitting={phase === "submitting"}
                     onSubmit={handleSubmit}
                     onClose={() => {
-                        // Deliberate: keep the session running when the
-                        // operator dismisses the form (e.g. to grab a
-                        // supply). The backdrop card behind gives them
-                        // a "Resume checklist" button.
-                        // No state change — the portal just unmounts.
+                        // Recover from a mis-tapped Stop — return to
+                        // the running panel so the operator can keep
+                        // cleaning (timer never stopped ticking; the
+                        // session stays ``active`` on the backend
+                        // until the last form is submitted). Tapping
+                        // Stop again reopens the checklist. Answers
+                        // filled on the current form are discarded on
+                        // purpose — closing counts as "wait, I'm not
+                        // done cleaning yet", so wiping the partial
+                        // response prevents a stale answer sticking
+                        // around into a later resume.
+                        setPhase("running");
+                        setCurrentIndex(0);
+                        setResponses([]);
                     }}
                     token={token}
                 />
@@ -397,7 +406,9 @@ function RunningPanel({
                     Tap Stop cleaning when the station is clean. The
                     checklist opens then — the timer keeps ticking
                     until you submit, so the total time recorded
-                    includes filling the form.
+                    includes filling the form. Hit the ✕ on the
+                    checklist if you tapped Stop by mistake — it
+                    returns you here so you can keep cleaning.
                 </p>
             </div>
 
