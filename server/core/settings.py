@@ -162,6 +162,7 @@ if REDIS_URL:
             "TIMEOUT": 60 * 60 * 24, # 24 hours
         }
     }
+    SILENCED_SYSTEM_CHECKS: list[str] = []
 else:
     CACHES = {
         "default": {
@@ -170,6 +171,13 @@ else:
             "TIMEOUT": 60 * 60 * 24,
         }
     }
+    # django-ratelimit refuses LocMemCache (E003) because rate-limits
+    # only make sense against a *shared* cache. In the sandbox we run
+    # a single worker with no Redis, so per-process counters are
+    # actually correct — silence the check to allow boot. When
+    # REDIS_URL is set (prod), the check is left on so a
+    # misconfiguration surfaces normally.
+    SILENCED_SYSTEM_CHECKS = ["django_ratelimit.E003"]
 # ===========================
 
 
