@@ -126,30 +126,50 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 
 # ========== CHANNELS & ASGI ========== #
-REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
-print(f"REDIS_URL: {REDIS_URL}")
+# REDIS_URL is optional. When set, we use channels_redis + RedisCache
+# (production topology, needed for multi-worker WebSocket fan-out and
+# a shared cache across uvicorn/daphne workers). When unset, fall
+# back to InMemoryChannelLayer + LocMemCache — fine for a single-
+# instance sandbox, breaks silently under multi-worker prod.
+REDIS_URL = os.environ.get("REDIS_URL", "").strip() or None
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
 
 ASGI_APPLICATION = "core.asgi.application"
 # =================================== #
 
 
 # ========== CACHE ==========
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": REDIS_URL,
-        "TIMEOUT": 60 * 60 * 24, # 24 hours
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": 60 * 60 * 24, # 24 hours
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "vita-performance-locmem",
+            "TIMEOUT": 60 * 60 * 24,
+        }
+    }
 # ===========================
 
 
