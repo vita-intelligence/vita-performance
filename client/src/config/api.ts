@@ -96,6 +96,10 @@ export const API_CONFIG = {
             `/api/kiosk/personal/${token}/cleaning-sessions/${sessId}/complete/`,
         maintenanceWorkstations: (token: string, workerId: number) =>
             `/api/kiosk/personal/${token}/workers/${workerId}/maintenance-workstations/`,
+        cleaningMachines: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/cleaning-machines/`,
+        maintenanceMachines: (token: string, workerId: number) =>
+            `/api/kiosk/personal/${token}/workers/${workerId}/maintenance-machines/`,
         workstationEquipment: (token: string, wsId: number) =>
             `/api/kiosk/personal/${token}/workstations/${wsId}/equipment/`,
         startMaintenanceSession: (token: string) =>

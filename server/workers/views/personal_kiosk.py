@@ -719,7 +719,7 @@ class PublicPersonalKioskCleaningWorkstationsView(APIView):
             DynamicForm.objects
             .filter(
                 is_active=True,
-                trigger=DynamicForm.TRIGGER_CLEANING,
+                trigger=DynamicForm.TRIGGER_CLEANING_END,
                 workstation__isnull=False,
                 workstation__user=tok.user,
             )
@@ -821,7 +821,7 @@ class PublicPersonalKioskMaintenanceWorkstationsView(APIView):
             DynamicForm.objects
             .filter(
                 is_active=True,
-                trigger=DynamicForm.TRIGGER_MAINTENANCE,
+                trigger=DynamicForm.TRIGGER_MAINTENANCE_END,
                 workstation__isnull=False,
                 workstation__user=tok.user,
             )
@@ -876,6 +876,162 @@ class PublicPersonalKioskMaintenanceWorkstationsView(APIView):
 
         rows.sort(key=sort_key)
 
+        return Response({'items': rows, 'total': len(rows)})
+
+
+def _list_machines_with_forms(*, tok, worker, trigger):
+    """Shared query for the Machine tab on the cleaning +
+    maintenance pickers.
+
+    Returns the list of (workstation × equipment) pairs where an
+    equipment-scoped form is attached for the given trigger AND
+    the worker can open that workstation. Deduped per equipment
+    since one machine can only physically live on one workstation
+    at a time.
+
+    Each row carries the equipment display info + workstation info
+    + equipment's own cadence chips (mirrored from PSP into the
+    ``WorkstationEquipment`` row — actually we don't mirror the
+    equipment cadence today, so those are omitted; the FE picker
+    just shows the machine name + workstation + form count).
+    """
+    from dynamic_forms.models import DynamicForm
+    from workstations.models import Workstation, WorkstationEquipment
+
+    forms = (
+        DynamicForm.objects
+        .filter(
+            is_active=True,
+            trigger=trigger,
+            workstation__isnull=False,
+            workstation__user=tok.user,
+            equipment_uuid__isnull=False,
+        )
+        .select_related('workstation')
+    )
+
+    allowed_ids = set(
+        Workstation.objects
+        .filter(user=tok.user, is_active=True)
+        .filter(Q(is_general=True) | Q(authorized_workers=worker))
+        .values_list('id', flat=True)
+    )
+
+    # Group forms per (workstation × equipment_uuid) so we can
+    # render one row per machine with its form_count.
+    per_key: dict[tuple[int, str], dict] = {}
+    for f in forms:
+        ws = f.workstation
+        if ws is None or ws.id not in allowed_ids or not ws.is_active:
+            continue
+        key = (ws.id, str(f.equipment_uuid))
+        row = per_key.get(key)
+        if row is None:
+            per_key[key] = {
+                'workstation_id': ws.id,
+                'workstation_name': ws.name,
+                'equipment_uuid': str(f.equipment_uuid),
+                'form_id': f.id,
+                'form_name': f.name,
+                'form_count': 1,
+            }
+        else:
+            row['form_count'] += 1
+
+    # Resolve equipment display name from the mirror. When the
+    # mirror is out of sync (equipment_uuid on a form but no
+    # matching WorkstationEquipment row), fall back to the uuid.
+    equipment_uuids = list({r['equipment_uuid'] for r in per_key.values()})
+    equipment_by_uuid: dict[str, dict] = {}
+    if equipment_uuids:
+        for eq in WorkstationEquipment.objects.filter(
+            equipment_uuid__in=equipment_uuids,
+            is_active=True,
+        ):
+            equipment_by_uuid.setdefault(
+                str(eq.equipment_uuid),
+                {
+                    'name': eq.name,
+                    'serial_number': eq.serial_number or None,
+                    'category_name': eq.category_name or None,
+                },
+            )
+
+    out = []
+    for row in per_key.values():
+        eq = equipment_by_uuid.get(row['equipment_uuid'])
+        out.append({
+            **row,
+            'equipment_name': (
+                eq['name'] if eq
+                else f"Equipment · {row['equipment_uuid'][:8]}"
+            ),
+            'serial_number': eq['serial_number'] if eq else None,
+            'category_name': eq['category_name'] if eq else None,
+        })
+
+    out.sort(key=lambda r: (
+        r['workstation_name'].lower(),
+        r['equipment_name'].lower(),
+    ))
+    return out
+
+
+class PublicPersonalKioskCleaningMachinesView(APIView):
+    """GET /api/kiosk/personal/<token>/workers/<id>/cleaning-machines/
+
+    Machine-tab feed for the Cleaning picker. Lists every equipment
+    unit the worker can reach that carries at least one active
+    ``equipment_cleaning`` form (via its category's assignment on
+    PSP). Sorted by workstation then machine name.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, worker_id):
+        from dynamic_forms.models import DynamicForm
+
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        worker = _worker_for_token(tok, worker_id)
+        if not worker:
+            return Response({'detail': 'Worker not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        _sync_psp_if_stale(tok.user, block_when_empty=False)
+
+        rows = _list_machines_with_forms(
+            tok=tok,
+            worker=worker,
+            trigger=DynamicForm.TRIGGER_EQUIPMENT_CLEANING_END,
+        )
+        return Response({'items': rows, 'total': len(rows)})
+
+
+class PublicPersonalKioskMaintenanceMachinesView(APIView):
+    """GET /api/kiosk/personal/<token>/workers/<id>/maintenance-machines/
+    — parallel to :class:`PublicPersonalKioskCleaningMachinesView`.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, token, worker_id):
+        from dynamic_forms.models import DynamicForm
+
+        tok = _resolve_token(token)
+        if not tok:
+            return Response({'detail': 'Invalid kiosk link.'}, status=status.HTTP_404_NOT_FOUND)
+        worker = _worker_for_token(tok, worker_id)
+        if not worker:
+            return Response({'detail': 'Worker not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        _sync_psp_if_stale(tok.user, block_when_empty=False)
+
+        rows = _list_machines_with_forms(
+            tok=tok,
+            worker=worker,
+            trigger=DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_END,
+        )
         return Response({'items': rows, 'total': len(rows)})
 
 
@@ -982,17 +1138,14 @@ class PublicPersonalKioskStartMaintenanceSessionView(APIView):
         if err_resp is not None:
             return err_resp
 
-        from dynamic_forms.models import DynamicForm
-        form_rows = list(
-            _load_session_forms_for_scope(
-                trigger_ws=DynamicForm.TRIGGER_MAINTENANCE,
-                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
-                workstation=ws,
-                tok=tok,
-                equipment_uuid=equipment_uuid,
-            )
+        start_forms, end_forms, total = _resolve_session_forms_wire(
+            kind='maintenance',
+            workstation=ws,
+            tok=tok,
+            worker=worker,
+            equipment_uuid=equipment_uuid,
         )
-        if not form_rows:
+        if total == 0:
             scope_label = (
                 'equipment on this workstation'
                 if equipment_uuid else 'this workstation'
@@ -1000,24 +1153,6 @@ class PublicPersonalKioskStartMaintenanceSessionView(APIView):
             return Response(
                 {'detail': f'No maintenance forms assigned to {scope_label}.'},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-
-        worker_uuid = getattr(worker, 'uuid', None)
-        worker_uuid_str = str(worker_uuid) if worker_uuid else None
-        applicable = []
-        for form in form_rows:
-            allowlist = form.worker_uuids or []
-            if allowlist:
-                if worker_uuid_str is None:
-                    continue
-                if worker_uuid_str not in [str(u) for u in allowlist]:
-                    continue
-            applicable.append(form)
-
-        if not applicable:
-            return Response(
-                {'detail': 'No maintenance forms apply to you on this workstation.'},
-                status=status.HTTP_403_FORBIDDEN,
             )
 
         from work_sessions.models import WorkSession
@@ -1057,23 +1192,6 @@ class PublicPersonalKioskStartMaintenanceSessionView(APIView):
             )
             ws_session.workers.set([worker.id])
 
-        def _flatten_schema(schema_raw):
-            if isinstance(schema_raw, dict):
-                return schema_raw.get('fields') or []
-            if isinstance(schema_raw, list):
-                return schema_raw
-            return []
-
-        forms_out = [
-            {
-                'id': f.id,
-                'name': f.name,
-                'sort_order': f.sort_order,
-                'schema': _flatten_schema(f.schema),
-            }
-            for f in applicable
-        ]
-
         return Response(
             {
                 'session_id': ws_session.id,
@@ -1082,8 +1200,14 @@ class PublicPersonalKioskStartMaintenanceSessionView(APIView):
                 'equipment_uuid': equipment_uuid,
                 'equipment_name': equipment_row.name if equipment_row else None,
                 'start_time': ws_session.start_time.isoformat(),
-                'forms': forms_out,
-                'form': forms_out[0] if forms_out else None,
+                'start_forms': start_forms,
+                'end_forms': end_forms,
+                # Legacy aliases for kiosk builds that pre-date the
+                # two-phase model. `forms` = end forms (matches the
+                # historical single-list-of-forms-after-Stop shape);
+                # `form` = first end form.
+                'forms': end_forms,
+                'form': end_forms[0] if end_forms else None,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -1131,44 +1255,13 @@ class PublicPersonalKioskGetMaintenanceSessionView(APIView):
             )
 
         ws = ws_session.workstation
-        from dynamic_forms.models import DynamicForm
-        form_rows = list(
-            _load_session_forms_for_scope(
-                trigger_ws=DynamicForm.TRIGGER_MAINTENANCE,
-                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
-                workstation=ws,
-                tok=tok,
-                equipment_uuid=ws_session.equipment_uuid,
-            )
+        start_forms, end_forms, _total = _resolve_session_forms_wire(
+            kind='maintenance',
+            workstation=ws,
+            tok=tok,
+            worker=worker,
+            equipment_uuid=ws_session.equipment_uuid,
         )
-        worker_uuid = getattr(worker, 'uuid', None)
-        worker_uuid_str = str(worker_uuid) if worker_uuid else None
-        applicable = []
-        for form in form_rows:
-            allowlist = form.worker_uuids or []
-            if allowlist:
-                if worker_uuid_str is None:
-                    continue
-                if worker_uuid_str not in [str(u) for u in allowlist]:
-                    continue
-            applicable.append(form)
-
-        def _flatten_schema(schema_raw):
-            if isinstance(schema_raw, dict):
-                return schema_raw.get('fields') or []
-            if isinstance(schema_raw, list):
-                return schema_raw
-            return []
-
-        forms_out = [
-            {
-                'id': f.id,
-                'name': f.name,
-                'sort_order': f.sort_order,
-                'schema': _flatten_schema(f.schema),
-            }
-            for f in applicable
-        ]
 
         # Resolve the equipment_uuid's display name for the header
         # if the session was scoped to a specific machine.
@@ -1189,8 +1282,10 @@ class PublicPersonalKioskGetMaintenanceSessionView(APIView):
             'equipment_uuid': ws_session.equipment_uuid,
             'equipment_name': equipment_name,
             'start_time': ws_session.start_time.isoformat(),
-            'forms': forms_out,
-            'form': forms_out[0] if forms_out else None,
+            'start_forms': start_forms,
+            'end_forms': end_forms,
+            'forms': end_forms,
+            'form': end_forms[0] if end_forms else None,
         })
 
 
@@ -1583,25 +1678,132 @@ def _worker_authorized_on(workstation, worker):
     return workstation.authorized_workers.filter(pk=worker.pk).exists()
 
 
-def _load_session_forms_for_scope(*, trigger_ws, trigger_eq, workstation, tok, equipment_uuid):
-    """Pull the ordered list of DynamicForm rows to walk on a
-    cleaning / maintenance session. Branches on scope:
+def _load_session_forms_by_phase(*, kind, workstation, tok, equipment_uuid):
+    """Load the ordered ``{start: [...], end: [...]}`` DynamicForm
+    lists to walk on a cleaning / maintenance session. Branches on
+    scope + phase — the four ``_start`` triggers fire BEFORE the
+    kiosk timer opens, the four ``_end`` triggers fire AFTER Stop.
 
-    * When ``equipment_uuid`` is set, load forms with
-      ``trigger=trigger_eq`` AND ``equipment_uuid=equipment_uuid``.
-      Equipment-scoped forms are attached at the PSP category level
-      and pushed one mirror row per (workstation × equipment) by
-      :mod:`Backend.Forms.Publisher`.
-
-    * When ``equipment_uuid`` is null, load workstation-scoped
-      forms (``trigger=trigger_ws`` AND ``equipment_uuid IS NULL``).
+    Params:
+      * ``kind``: ``"cleaning"`` or ``"maintenance"``. Picks the
+        workstation-scoped and equipment-scoped trigger pair used
+        for this activity.
+      * ``equipment_uuid``: when set, load equipment-scoped forms
+        (attached at the PSP equipment-category level, mirrored one
+        row per (workstation × equipment × trigger)). When null,
+        load workstation-scoped forms.
 
     Tenant-gated via ``workstation__user`` — same rule as the
     picker views (PSP-published forms have ``user_id=NULL`` by
-    design, so gating on the form's own user would silently drop
-    them; gating on the workstation's user catches both legacy
+    design; gating on the workstation's user catches both legacy
     and PSP-published forms).
     """
+    from dynamic_forms.models import DynamicForm
+
+    if kind == 'cleaning':
+        if equipment_uuid:
+            triggers = (
+                DynamicForm.TRIGGER_EQUIPMENT_CLEANING_START,
+                DynamicForm.TRIGGER_EQUIPMENT_CLEANING_END,
+            )
+        else:
+            triggers = (
+                DynamicForm.TRIGGER_CLEANING_START,
+                DynamicForm.TRIGGER_CLEANING_END,
+            )
+    elif kind == 'maintenance':
+        if equipment_uuid:
+            triggers = (
+                DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_START,
+                DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_END,
+            )
+        else:
+            triggers = (
+                DynamicForm.TRIGGER_MAINTENANCE_START,
+                DynamicForm.TRIGGER_MAINTENANCE_END,
+            )
+    else:
+        raise ValueError(f'Unknown session kind: {kind}')
+
+    start_trigger, end_trigger = triggers
+
+    base = DynamicForm.objects.filter(
+        is_active=True,
+        workstation=workstation,
+        workstation__user=tok.user,
+    )
+    if equipment_uuid:
+        base = base.filter(equipment_uuid=equipment_uuid)
+    else:
+        base = base.filter(equipment_uuid__isnull=True)
+
+    start_rows = list(
+        base.filter(trigger=start_trigger).order_by('sort_order', 'id')
+    )
+    end_rows = list(
+        base.filter(trigger=end_trigger).order_by('sort_order', 'id')
+    )
+    return {'start': start_rows, 'end': end_rows}
+
+
+def _resolve_session_forms_wire(*, kind, workstation, tok, worker, equipment_uuid):
+    """Load + audience-filter + serialise the two phase form lists
+    for a session start / get response. Returns a tuple:
+
+        (start_forms_wire, end_forms_wire, total_applicable)
+
+    where each ``*_wire`` is a list of ``{id, name, sort_order,
+    schema}`` dicts (the shape the kiosk FE walks). ``total_applicable``
+    lets the view reject the session-open when NO forms apply
+    (across both phases), matching the historical behaviour.
+    """
+    grouped = _load_session_forms_by_phase(
+        kind=kind,
+        workstation=workstation,
+        tok=tok,
+        equipment_uuid=equipment_uuid,
+    )
+
+    worker_uuid = getattr(worker, 'uuid', None)
+    worker_uuid_str = str(worker_uuid) if worker_uuid else None
+
+    def _flatten_schema(schema_raw):
+        if isinstance(schema_raw, dict):
+            return schema_raw.get('fields') or []
+        if isinstance(schema_raw, list):
+            return schema_raw
+        return []
+
+    def _keep(form):
+        allowlist = form.worker_uuids or []
+        if not allowlist:
+            return True
+        if worker_uuid_str is None:
+            return False
+        return worker_uuid_str in [str(u) for u in allowlist]
+
+    def _wire(forms):
+        return [
+            {
+                'id': f.id,
+                'name': f.name,
+                'sort_order': f.sort_order,
+                'schema': _flatten_schema(f.schema),
+            }
+            for f in forms
+            if _keep(f)
+        ]
+
+    start_wire = _wire(grouped['start'])
+    end_wire = _wire(grouped['end'])
+    return start_wire, end_wire, len(start_wire) + len(end_wire)
+
+
+# Legacy helper kept until every caller is on the phase-aware
+# variant above. Returns just the end-phase forms so the existing
+# single-list callers keep working. Delete once all views are
+# migrated to `_load_session_forms_by_phase`.
+def _load_session_forms_for_scope(*, trigger_ws, trigger_eq, workstation, tok, equipment_uuid):
     from dynamic_forms.models import DynamicForm
 
     qs = DynamicForm.objects.filter(
@@ -2503,17 +2705,14 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
         if err_resp is not None:
             return err_resp
 
-        from dynamic_forms.models import DynamicForm
-        form_rows = list(
-            _load_session_forms_for_scope(
-                trigger_ws=DynamicForm.TRIGGER_CLEANING,
-                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
-                workstation=ws,
-                tok=tok,
-                equipment_uuid=equipment_uuid,
-            )
+        start_forms, end_forms, total = _resolve_session_forms_wire(
+            kind='cleaning',
+            workstation=ws,
+            tok=tok,
+            worker=worker,
+            equipment_uuid=equipment_uuid,
         )
-        if not form_rows:
+        if total == 0:
             scope_label = (
                 'equipment on this workstation'
                 if equipment_uuid else 'this workstation'
@@ -2521,26 +2720,6 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
             return Response(
                 {'detail': f'No cleaning forms assigned to {scope_label}.'},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Audience filter per-form. Session opens only if at least
-        # one form applies to this worker.
-        worker_uuid = getattr(worker, 'uuid', None)
-        worker_uuid_str = str(worker_uuid) if worker_uuid else None
-        applicable = []
-        for form in form_rows:
-            allowlist = form.worker_uuids or []
-            if allowlist:
-                if worker_uuid_str is None:
-                    continue
-                if worker_uuid_str not in [str(u) for u in allowlist]:
-                    continue
-            applicable.append(form)
-
-        if not applicable:
-            return Response(
-                {'detail': 'No cleaning forms apply to you on this workstation.'},
-                status=status.HTTP_403_FORBIDDEN,
             )
 
         from work_sessions.models import WorkSession
@@ -2580,33 +2759,22 @@ class PublicPersonalKioskStartCleaningSessionView(APIView):
             )
             ws_session.workers.set([worker.id])
 
-        def _flatten_schema(schema_raw):
-            if isinstance(schema_raw, dict):
-                return schema_raw.get('fields') or []
-            if isinstance(schema_raw, list):
-                return schema_raw
-            return []
-
-        forms_out = [
-            {
-                'id': f.id,
-                'name': f.name,
-                'sort_order': f.sort_order,
-                'schema': _flatten_schema(f.schema),
-            }
-            for f in applicable
-        ]
-
         return Response(
             {
                 'session_id': ws_session.id,
                 'workstation_id': ws.id,
                 'workstation_name': ws.name,
+                'equipment_uuid': equipment_uuid,
+                'equipment_name': equipment_row.name if equipment_row else None,
                 'start_time': ws_session.start_time.isoformat(),
-                'forms': forms_out,
-                # Legacy single-form field — first form of the list so
-                # older kiosk builds don't break during a rolling update.
-                'form': forms_out[0] if forms_out else None,
+                'start_forms': start_forms,
+                'end_forms': end_forms,
+                # Legacy aliases for kiosk builds that pre-date the
+                # two-phase model. `forms` = end forms (matches the
+                # historical single-list-of-forms-after-Stop shape);
+                # `form` = first end form.
+                'forms': end_forms,
+                'form': end_forms[0] if end_forms else None,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -2666,53 +2834,35 @@ class PublicPersonalKioskGetCleaningSessionView(APIView):
             )
 
         ws = ws_session.workstation
-        from dynamic_forms.models import DynamicForm
-        form_rows = list(
-            _load_session_forms_for_scope(
-                trigger_ws=DynamicForm.TRIGGER_CLEANING,
-                trigger_eq=DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
-                workstation=ws,
-                tok=tok,
-                equipment_uuid=ws_session.equipment_uuid,
-            )
+        start_forms, end_forms, _total = _resolve_session_forms_wire(
+            kind='cleaning',
+            workstation=ws,
+            tok=tok,
+            worker=worker,
+            equipment_uuid=ws_session.equipment_uuid,
         )
-        # Audience filter per-form. Same rule as start-session.
-        worker_uuid = getattr(worker, 'uuid', None)
-        worker_uuid_str = str(worker_uuid) if worker_uuid else None
-        applicable = []
-        for form in form_rows:
-            allowlist = form.worker_uuids or []
-            if allowlist:
-                if worker_uuid_str is None:
-                    continue
-                if worker_uuid_str not in [str(u) for u in allowlist]:
-                    continue
-            applicable.append(form)
 
-        def _flatten_schema(schema_raw):
-            if isinstance(schema_raw, dict):
-                return schema_raw.get('fields') or []
-            if isinstance(schema_raw, list):
-                return schema_raw
-            return []
-
-        forms_out = [
-            {
-                'id': f.id,
-                'name': f.name,
-                'sort_order': f.sort_order,
-                'schema': _flatten_schema(f.schema),
-            }
-            for f in applicable
-        ]
+        equipment_name = None
+        if ws_session.equipment_uuid:
+            from workstations.models import WorkstationEquipment
+            row = (
+                WorkstationEquipment.objects
+                .filter(workstation=ws, equipment_uuid=ws_session.equipment_uuid)
+                .first()
+            )
+            equipment_name = row.name if row else None
 
         return Response({
             'session_id': ws_session.id,
             'workstation_id': ws.id,
             'workstation_name': ws.name,
+            'equipment_uuid': ws_session.equipment_uuid,
+            'equipment_name': equipment_name,
             'start_time': ws_session.start_time.isoformat(),
-            'forms': forms_out,
-            'form': forms_out[0] if forms_out else None,
+            'start_forms': start_forms,
+            'end_forms': end_forms,
+            'forms': end_forms,
+            'form': end_forms[0] if end_forms else None,
         })
 
 

@@ -13,6 +13,8 @@ import {
 import { personalKioskService } from "@/services/personal-kiosk.service";
 import { RndBadge } from "@/components/RndBadge";
 import { JobPreviewPayload, JobRow } from "@/types/worker";
+import type { FormField, KioskForm } from "@/types/dynamic-form";
+import FormRenderer from "@/components/shared/FormRenderer";
 import BomCard from "./BomCard";
 
 interface JobPreviewModalProps {
@@ -53,6 +55,17 @@ export default function JobPreviewModal({
     const [error, setError] = useState<string | null>(null);
     const [starting, setStarting] = useState(false);
 
+    // Pre-session form walk-through. When the operator taps Start,
+    // we probe the workstation_start slot; if any forms are attached,
+    // we swap the modal body for a FormRenderer walk. The last form's
+    // Submit calls `startStationSession` with the accumulated
+    // responses. Empty probe (or transport failure) falls through to
+    // an immediate start — matches pre-forms-integration behaviour.
+    const [pendingStartQueue, setPendingStartQueue] = useState<KioskForm[]>([]);
+    const [pendingStartResponses, setPendingStartResponses] = useState<
+        Array<{ formId: number; answers: Record<string, unknown> }>
+    >([]);
+
     const load = useCallback(async () => {
         setLoading(true);
         try {
@@ -90,32 +103,134 @@ export default function JobPreviewModal({
         };
     }, [onClose, starting]);
 
+    // Actually POST the session-start with (optionally) pre-collected
+    // form responses. Broken out so both the "no start forms" fall-
+    // through and the "last form submitted" branch can call it.
+    const commitStart = useCallback(
+        async (
+            responses: Array<{
+                formId: number;
+                answers: Record<string, unknown>;
+            }> = [],
+        ) => {
+            setStarting(true);
+            try {
+                await personalKioskService.startStationSession(
+                    token,
+                    job.workstation_id,
+                    sessionToken,
+                    {
+                        activityKind: "mo",
+                        moUuid: job.mo_uuid,
+                        moStepUuid: job.step_uuid,
+                        itemName: job.item_name,
+                        workstationGroupUuid: job.workstation_group_uuid,
+                        startFormResponses: responses,
+                    },
+                );
+                onStarted(job);
+            } catch (err) {
+                addToast({
+                    title: "Couldn't start",
+                    description: err instanceof Error ? err.message : "Unknown error",
+                    color: "danger",
+                });
+            } finally {
+                setStarting(false);
+            }
+        },
+        [job, sessionToken, token, onStarted],
+    );
+
     const handleStart = async () => {
         setStarting(true);
         try {
-            await personalKioskService.startStationSession(
+            const probe = await personalKioskService.getPendingSessionForm(
                 token,
                 job.workstation_id,
                 sessionToken,
-                {
-                    activityKind: "mo",
-                    moUuid: job.mo_uuid,
-                    moStepUuid: job.step_uuid,
-                    itemName: job.item_name,
-                    workstationGroupUuid: job.workstation_group_uuid,
-                },
+                "start",
             );
-            onStarted(job);
-        } catch (err) {
-            addToast({
-                title: "Couldn't start",
-                description: err instanceof Error ? err.message : "Unknown error",
-                color: "danger",
-            });
-        } finally {
-            setStarting(false);
+            if (probe.forms && probe.forms.length > 0) {
+                setPendingStartQueue(
+                    probe.forms.map((f) => ({
+                        id: f.id,
+                        name: f.name,
+                        schema: f.schema as FormField[],
+                    })),
+                );
+                setPendingStartResponses([]);
+                setStarting(false);
+                return;
+            }
+        } catch {
+            // Probe failure is non-blocking — proceed to start
+            // without a form gate.
         }
+        await commitStart([]);
     };
+
+    // Pre-session checklist takes over the modal body. Hiding the
+    // BOM / SOP cards during the walk-through so the operator can't
+    // tap around the checklist. Cancel button returns to the preview.
+    if (pendingStartQueue.length > 0) {
+        return (
+            <div className="fixed inset-0 z-50 flex flex-col bg-background sm:items-center sm:justify-center sm:bg-black/50 sm:p-4">
+                <div className="flex h-full w-full flex-col overflow-hidden bg-background shadow-2xl sm:h-[min(90dvh,900px)] sm:max-w-2xl sm:rounded-3xl sm:border sm:border-border">
+                    <ModalHeader
+                        job={job}
+                        onClose={() => {
+                            setPendingStartQueue([]);
+                            setPendingStartResponses([]);
+                        }}
+                        disabled={starting}
+                    />
+                    <div className="flex-1 overflow-y-auto px-4 py-5">
+                        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+                            <div className="rounded-2xl border border-primary/40 bg-primary/5 p-3">
+                                <p className="text-[11px] font-black uppercase tracking-widest text-primary">
+                                    Pre-session checklist
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted">
+                                    Complete this before {job.item_name}
+                                    &apos;s session opens.
+                                </p>
+                            </div>
+                            <FormRenderer
+                                form={{
+                                    ...pendingStartQueue[0],
+                                    name: `${pendingStartQueue[0].name} · ${pendingStartResponses.length + 1} of ${pendingStartResponses.length + pendingStartQueue.length}`,
+                                }}
+                                sessionId={0}
+                                token={token}
+                                isSubmitting={starting}
+                                onSubmit={async (answers) => {
+                                    const current = pendingStartQueue[0];
+                                    const rest = pendingStartQueue.slice(1);
+                                    const nextResponses = [
+                                        ...pendingStartResponses,
+                                        { formId: current.id, answers },
+                                    ];
+                                    if (rest.length === 0) {
+                                        setPendingStartQueue([]);
+                                        setPendingStartResponses([]);
+                                        await commitStart(nextResponses);
+                                    } else {
+                                        setPendingStartResponses(nextResponses);
+                                        setPendingStartQueue(rest);
+                                    }
+                                }}
+                                onClose={() => {
+                                    setPendingStartQueue([]);
+                                    setPendingStartResponses([]);
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-background sm:items-center sm:justify-center sm:bg-black/50 sm:p-4">

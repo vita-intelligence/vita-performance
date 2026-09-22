@@ -35,6 +35,11 @@ interface CleaningSessionViewProps {
      * produced" — nonsense on a cleaning run).
      */
     resumeSessionId?: number;
+    /** When set, the equipment scope picker on the confirm screen
+     *  pre-selects this equipment uuid. Used when the operator
+     *  jumped in from the Machine tab of the picker — the choice
+     *  is already made, they just tap Start. */
+    preselectedEquipmentUuid?: string;
     onFinished: () => void;
     onBack: () => void;
 }
@@ -42,8 +47,12 @@ interface CleaningSessionViewProps {
 type Phase =
     | "confirm"
     | "starting"
+    // Pre-session checklist walk — happens BEFORE the running phase
+    // when the workstation / category has cleaning_start forms
+    // attached. Skipped when no start forms are configured.
+    | "filling_start_forms"
     | "running"
-    | "filling_forms"
+    | "filling_end_forms"
     | "submitting"
     | "done";
 
@@ -86,6 +95,7 @@ export default function CleaningSessionView({
     sessionToken,
     target,
     resumeSessionId,
+    preselectedEquipmentUuid,
     onFinished,
     onBack,
 }: CleaningSessionViewProps) {
@@ -105,6 +115,13 @@ export default function CleaningSessionView({
     // as they submit each one. When the last submit lands we call
     // completeCleaningSession with the full array.
     const [currentIndex, setCurrentIndex] = useState(0);
+    // Two-phase response accumulator. Start-form responses are held
+    // client-side until the end-form walk completes; then both
+    // buckets are POSTed to /complete/ together so backend
+    // persistence + PSP audit callback carry the full set.
+    const [startResponses, setStartResponses] = useState<
+        Array<{ formId: number; answers: Record<string, unknown> }>
+    >([]);
     const [responses, setResponses] = useState<
         Array<{ formId: number; answers: Record<string, unknown> }>
     >([]);
@@ -119,7 +136,7 @@ export default function CleaningSessionView({
     );
     const [selectedEquipmentUuid, setSelectedEquipmentUuid] = useState<
         string | null
-    >(null);
+    >(preselectedEquipmentUuid ?? null);
 
     useEffect(() => {
         if (resumeSessionId != null) return;
@@ -186,39 +203,102 @@ export default function CleaningSessionView({
             });
             setSession(res);
             setCurrentIndex(0);
+            setStartResponses([]);
             setResponses([]);
-            // Land on the running panel — timer + Stop button.
-            // FormRenderer stays gated until the operator hits Stop
-            // so they can actually clean before answering questions.
-            setPhase("running");
+            // Two-phase branch: if the workstation / category has
+            // pre-session forms attached, walk them BEFORE the timer
+            // is visually running. Otherwise land straight on the
+            // running panel — Stop button primes the end-form walk
+            // as always.
+            const hasStart = (res.start_forms ?? []).length > 0;
+            setPhase(hasStart ? "filling_start_forms" : "running");
         } catch (err) {
             setError(getMsg(err));
             setPhase("confirm");
         }
     }, [token, sessionToken, target.workstation_id, selectedEquipmentUuid]);
 
-    // Stop tapped from the running panel. Transitions to the form
-    // walk-through; the timer keeps ticking underneath because the
-    // session stays ``active`` on the backend until the last form
-    // submits (that's what stamps ``end_time`` and defines the
-    // recorded duration).
-    const handleStop = useCallback(() => {
+    // Stop tapped from the running panel. Transitions to the end-
+    // form walk-through; the timer keeps ticking underneath because
+    // the session stays ``active`` on the backend until the last
+    // form submits (that's what stamps ``end_time`` and defines the
+    // recorded duration). If there are NO end forms configured we
+    // close the session immediately with only the start-form
+    // responses (or none).
+    const handleStop = useCallback(async () => {
         if (!session) return;
+        const endForms = session.end_forms ?? [];
+        if (endForms.length === 0) {
+            setPhase("submitting");
+            try {
+                const res = await personalKioskService.completeCleaningSession(
+                    token,
+                    session.session_id,
+                    {
+                        sessionToken,
+                        responses: startResponses,
+                    },
+                );
+                setDuration(res.duration_seconds);
+                setPhase("done");
+                addToast({
+                    title: "Cleaning logged",
+                    description: `${target.workstation_name} — ${formatDuration(res.duration_seconds)}.`,
+                    color: "success",
+                });
+            } catch (err) {
+                addToast({
+                    title: "Couldn't submit",
+                    description: getMsg(err),
+                    color: "danger",
+                });
+                setPhase("running");
+            }
+            return;
+        }
         setCurrentIndex(0);
         setResponses([]);
-        setPhase("filling_forms");
-    }, [session]);
+        setPhase("filling_end_forms");
+    }, [session, sessionToken, startResponses, target.workstation_name, token]);
 
     const handleSubmit = useCallback(
         async (answers: Record<string, unknown>) => {
             if (!session) return;
-            const current = session.forms[currentIndex];
+
+            // Route the submit based on which phase we're in — start
+            // forms accumulate client-side + gate the running panel;
+            // end forms accumulate + POST /complete/ on the last
+            // one with the full combined response set.
+            if (phase === "filling_start_forms") {
+                const list = session.start_forms ?? [];
+                const current = list[currentIndex];
+                if (!current) return;
+                const nextStart = [
+                    ...startResponses,
+                    { formId: current.id, answers },
+                ];
+                const isLast = currentIndex + 1 >= list.length;
+                if (!isLast) {
+                    setStartResponses(nextStart);
+                    setCurrentIndex(currentIndex + 1);
+                    return;
+                }
+                // Start phase complete — reset walk-through cursor
+                // and reveal the running panel (timer + Stop button).
+                setStartResponses(nextStart);
+                setCurrentIndex(0);
+                setPhase("running");
+                return;
+            }
+
+            const list = session.end_forms ?? [];
+            const current = list[currentIndex];
             if (!current) return;
             const nextResponses = [
                 ...responses,
                 { formId: current.id, answers },
             ];
-            const isLast = currentIndex + 1 >= session.forms.length;
+            const isLast = currentIndex + 1 >= list.length;
 
             if (!isLast) {
                 // Advance to the next form in the walk-through. The
@@ -236,7 +316,7 @@ export default function CleaningSessionView({
                     session.session_id,
                     {
                         sessionToken,
-                        responses: nextResponses,
+                        responses: [...startResponses, ...nextResponses],
                     },
                 );
                 setDuration(res.duration_seconds);
@@ -252,7 +332,7 @@ export default function CleaningSessionView({
                     description: getMsg(err),
                     color: "danger",
                 });
-                setPhase("filling_forms");
+                setPhase("filling_end_forms");
             }
         },
         [
@@ -260,7 +340,9 @@ export default function CleaningSessionView({
             sessionToken,
             session,
             currentIndex,
+            phase,
             responses,
+            startResponses,
             target.workstation_name,
         ],
     );
@@ -280,15 +362,24 @@ export default function CleaningSessionView({
         );
     }
 
-    // Full-screen FormRenderer takes over while the worker fills the
-    // checklist. We still render a lightweight backdrop underneath so
-    // "Cancel" from the FormRenderer lands the operator back here
-    // instead of on a blank page.
-    if (phase === "filling_forms" || phase === "submitting") {
+    // Full-screen FormRenderer takes over while the worker walks
+    // either the pre-session start-form list or the post-session
+    // end-form list. Same UX; the list source flips based on phase.
+    // Backdrop card carries a "Pre-session checklist" vs "Cleaning
+    // in progress" hint so the operator knows which phase they're in.
+    if (
+        phase === "filling_start_forms" ||
+        phase === "filling_end_forms" ||
+        phase === "submitting"
+    ) {
         if (!session) return null;
-        const current = session.forms[currentIndex];
+        const isStartPhase = phase === "filling_start_forms";
+        const list = isStartPhase
+            ? session.start_forms ?? []
+            : session.end_forms ?? [];
+        const current = list[currentIndex];
         if (!current) return null;
-        const total = session.forms.length;
+        const total = list.length;
         const kioskForm: KioskForm = {
             id: current.id,
             name:
@@ -305,7 +396,7 @@ export default function CleaningSessionView({
                     step={{ current: currentIndex + 1, total }}
                 />
                 <FormRenderer
-                    key={current.id}
+                    key={`${isStartPhase ? "start" : "end"}-${current.id}`}
                     form={kioskForm}
                     sessionId={session.session_id}
                     isSubmitting={phase === "submitting"}
@@ -322,9 +413,20 @@ export default function CleaningSessionView({
                         // done cleaning yet", so wiping the partial
                         // response prevents a stale answer sticking
                         // around into a later resume.
-                        setPhase("running");
-                        setCurrentIndex(0);
-                        setResponses([]);
+                        //
+                        // On the START phase, closing takes the
+                        // operator back to the Confirm screen — they
+                        // haven't opened the timer yet, so cancelling
+                        // is a real "back out" not a "resume".
+                        if (isStartPhase) {
+                            setPhase("confirm");
+                            setCurrentIndex(0);
+                            setStartResponses([]);
+                        } else {
+                            setPhase("running");
+                            setCurrentIndex(0);
+                            setResponses([]);
+                        }
                     }}
                     token={token}
                 />
@@ -342,6 +444,16 @@ export default function CleaningSessionView({
         );
     }
 
+    // Resolve the display name of the scoped equipment (when the
+    // operator came in from the Machine tab). We look it up in the
+    // pulled equipmentList — nulls out cleanly for workstation-scope.
+    const scopedEquipment =
+        selectedEquipmentUuid
+            ? equipmentList.find(
+                  (e) => e.uuid === selectedEquipmentUuid,
+              ) ?? null
+            : null;
+
     return (
         <ConfirmCard
             target={target}
@@ -349,9 +461,7 @@ export default function CleaningSessionView({
             error={error}
             onStart={handleStart}
             onBack={onBack}
-            equipmentList={equipmentList}
-            selectedEquipmentUuid={selectedEquipmentUuid}
-            onSelectEquipment={setSelectedEquipmentUuid}
+            scopedEquipment={scopedEquipment}
         />
     );
 }
@@ -364,19 +474,29 @@ function ConfirmCard({
     error,
     onStart,
     onBack,
-    equipmentList,
-    selectedEquipmentUuid,
-    onSelectEquipment,
+    scopedEquipment,
 }: {
     target: CleaningWorkstationTile;
     starting: boolean;
     error: string | null;
     onStart: () => void;
     onBack: () => void;
-    equipmentList: WorkstationEquipmentItem[];
-    selectedEquipmentUuid: string | null;
-    onSelectEquipment: (uuid: string | null) => void;
+    scopedEquipment: WorkstationEquipmentItem | null;
 }) {
+    // The picker (Workstation tab / Machine tab) already answered
+    // "what am I cleaning" — never re-ask on the confirm screen.
+    // We just display the confirmed scope here so the operator can
+    // eyeball it before tapping Start. If they picked wrong, Back
+    // returns to the picker.
+    const scopeLabel = scopedEquipment
+        ? scopedEquipment.name
+        : `${target.workstation_name} · the whole cell`;
+    const scopeSub = scopedEquipment
+        ? scopedEquipment.serial_number
+            ? `SN ${scopedEquipment.serial_number}`
+            : "specific machine"
+        : "workstation-scope cleaning";
+
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-6">
             <button
@@ -398,33 +518,26 @@ function ConfirmCard({
                             Cleaning session
                         </p>
                         <h1 className="text-lg font-black text-text sm:text-2xl">
-                            {target.workstation_name}
+                            {scopeLabel}
                         </h1>
+                        <p className="mt-0.5 text-xs text-muted">
+                            {scopeSub}
+                        </p>
                     </div>
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-text">
-                    <p>
-                        <span className="font-semibold">Checklist:</span>{" "}
-                        {target.form_name}
-                    </p>
                     {target.last_cleaning_at && (
                         <p className="text-xs text-muted">
                             Last cleaned:{" "}
                             {new Date(target.last_cleaning_at).toLocaleString()}
                         </p>
                     )}
+                    <p className="text-xs text-muted">
+                        Not right? Tap Back to change what you&apos;re
+                        cleaning.
+                    </p>
                 </div>
             </div>
-
-            {equipmentList.length > 0 && (
-                <ScopePicker
-                    workstationName={target.workstation_name}
-                    equipmentList={equipmentList}
-                    selectedEquipmentUuid={selectedEquipmentUuid}
-                    onSelect={onSelectEquipment}
-                    verb="cleaning"
-                />
-            )}
 
             {error && (
                 <div className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-2.5 text-sm text-danger">

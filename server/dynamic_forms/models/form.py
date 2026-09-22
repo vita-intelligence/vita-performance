@@ -7,19 +7,33 @@ class DynamicForm(models.Model):
     TRIGGER_START = 'start'
     TRIGGER_END = 'end'
     TRIGGER_BOTH = 'both'
-    TRIGGER_CLEANING = 'cleaning'
-    TRIGGER_MAINTENANCE = 'maintenance'
-    TRIGGER_EQUIPMENT_CLEANING = 'equipment_cleaning'
-    TRIGGER_EQUIPMENT_MAINTENANCE = 'equipment_maintenance'
+    # Cleaning + maintenance triggers are two-phase. `_start` fires
+    # BEFORE the kiosk timer opens (pre-session PPE / setup); `_end`
+    # fires AFTER Stop (post-session verification). Legacy names
+    # `cleaning` / `maintenance` / `equipment_cleaning` /
+    # `equipment_maintenance` were renamed to `_end` by migration
+    # 0007 — their old form-fill semantic was always end-of-session.
+    TRIGGER_CLEANING_START = 'cleaning_start'
+    TRIGGER_CLEANING_END = 'cleaning_end'
+    TRIGGER_MAINTENANCE_START = 'maintenance_start'
+    TRIGGER_MAINTENANCE_END = 'maintenance_end'
+    TRIGGER_EQUIPMENT_CLEANING_START = 'equipment_cleaning_start'
+    TRIGGER_EQUIPMENT_CLEANING_END = 'equipment_cleaning_end'
+    TRIGGER_EQUIPMENT_MAINTENANCE_START = 'equipment_maintenance_start'
+    TRIGGER_EQUIPMENT_MAINTENANCE_END = 'equipment_maintenance_end'
 
     TRIGGER_CHOICES = [
         (TRIGGER_START, 'Session Start'),
         (TRIGGER_END, 'Session End'),
         (TRIGGER_BOTH, 'Both'),
-        (TRIGGER_CLEANING, 'Cleaning'),
-        (TRIGGER_MAINTENANCE, 'Maintenance'),
-        (TRIGGER_EQUIPMENT_CLEANING, 'Equipment cleaning'),
-        (TRIGGER_EQUIPMENT_MAINTENANCE, 'Equipment maintenance'),
+        (TRIGGER_CLEANING_START, 'Cleaning · start'),
+        (TRIGGER_CLEANING_END, 'Cleaning · end'),
+        (TRIGGER_MAINTENANCE_START, 'Maintenance · start'),
+        (TRIGGER_MAINTENANCE_END, 'Maintenance · end'),
+        (TRIGGER_EQUIPMENT_CLEANING_START, 'Equipment cleaning · start'),
+        (TRIGGER_EQUIPMENT_CLEANING_END, 'Equipment cleaning · end'),
+        (TRIGGER_EQUIPMENT_MAINTENANCE_START, 'Equipment maintenance · start'),
+        (TRIGGER_EQUIPMENT_MAINTENANCE_END, 'Equipment maintenance · end'),
     ]
 
     SOURCE_LEGACY = 'legacy'

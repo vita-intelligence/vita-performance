@@ -1,10 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Sparkles, CalendarClock, CalendarCheck2 } from "lucide-react";
+import {
+    Loader2,
+    Sparkles,
+    CalendarClock,
+    CalendarCheck2,
+    Cog,
+    Settings2,
+} from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
-import { CleaningWorkstationTile } from "@/types/worker";
+import {
+    CleaningOrMaintenanceMachineTile,
+    CleaningWorkstationTile,
+} from "@/types/worker";
 import { ClockInGate } from "./JobsPage";
+
+type Tab = "workstation" | "machine";
 
 interface CleaningPickerPageProps {
     token: string;
@@ -12,14 +24,13 @@ interface CleaningPickerPageProps {
     workerName: string;
     isClockedIn: boolean;
     onOpenCleaning: (row: CleaningWorkstationTile) => void;
+    /** Machine-tab handler. Pre-scopes the session to a specific
+     *  equipment on the given workstation so the operator lands on
+     *  the confirm screen with the right equipment already picked. */
+    onOpenCleaningMachine: (row: CleaningOrMaintenanceMachineTile) => void;
 }
 
 type DueBucket = "overdue" | "due_today" | "due_soon" | "later" | "no_schedule";
-
-interface ChipProps {
-    bucket: DueBucket;
-    label: string;
-}
 
 const BUCKET_STYLES: Record<DueBucket, string> = {
     overdue: "bg-danger/15 text-danger",
@@ -29,7 +40,7 @@ const BUCKET_STYLES: Record<DueBucket, string> = {
     no_schedule: "bg-surface text-muted",
 };
 
-function Chip({ bucket, label }: ChipProps) {
+function Chip({ bucket, label }: { bucket: DueBucket; label: string }) {
     return (
         <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest ${BUCKET_STYLES[bucket]}`}
@@ -40,15 +51,18 @@ function Chip({ bucket, label }: ChipProps) {
 }
 
 /**
- * Cleaning entry-point picker on the personal kiosk. Shows every
- * workstation with an active cleaning form the worker can open,
- * sorted overdue-first. Chips make schedule pressure legible at a
- * glance — an operator with three overdue cells picks the top one.
+ * Cleaning entry-point picker on the personal kiosk. Two tabs:
  *
- * Data source is the backend's `cleaning-workstations` endpoint,
- * which reads from the local vita-perf mirror (populated by the PSP
- * publisher). No PSP round-trip at pick time — kiosk stays offline-
- * resilient.
+ *   - **Workstation** (default): every workstation with a cleaning
+ *     form the worker can open, sorted overdue-first. Picking one
+ *     starts a cleaning session against the whole cell.
+ *   - **Machine**: every specific machine (equipment) whose category
+ *     has a cleaning form attached on PSP. Picking one starts a
+ *     cleaning session with equipment_uuid pre-scoped so the audit
+ *     event lands against that machine.
+ *
+ *   Both feeds read the local vita-perf mirror (populated by the PSP
+ *   forms publisher), so the picker stays offline-resilient.
  */
 export default function CleaningPickerPage({
     token,
@@ -56,34 +70,57 @@ export default function CleaningPickerPage({
     workerName,
     isClockedIn,
     onOpenCleaning,
+    onOpenCleaningMachine,
 }: CleaningPickerPageProps) {
     if (!isClockedIn) {
         return <ClockInGate title="Cleaning" workerName={workerName} />;
     }
 
-    const [rows, setRows] = useState<CleaningWorkstationTile[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<Tab>("workstation");
+    const [wsRows, setWsRows] = useState<CleaningWorkstationTile[]>([]);
+    const [machineRows, setMachineRows] = useState<
+        CleaningOrMaintenanceMachineTile[]
+    >([]);
+    const [wsLoading, setWsLoading] = useState(true);
+    const [machineLoading, setMachineLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const loadWs = useCallback(async () => {
+        setWsLoading(true);
         try {
             const res = await personalKioskService.getCleaningWorkstations(
                 token,
                 workerId,
             );
-            setRows(res.items);
+            setWsRows(res.items);
             setError(null);
         } catch (err) {
             setError(getMsg(err));
         } finally {
-            setLoading(false);
+            setWsLoading(false);
+        }
+    }, [token, workerId]);
+
+    const loadMachines = useCallback(async () => {
+        setMachineLoading(true);
+        try {
+            const res = await personalKioskService.getCleaningMachines(
+                token,
+                workerId,
+            );
+            setMachineRows(res.items);
+            setError(null);
+        } catch (err) {
+            setError(getMsg(err));
+        } finally {
+            setMachineLoading(false);
         }
     }, [token, workerId]);
 
     useEffect(() => {
-        void load();
-    }, [load]);
+        void loadWs();
+        void loadMachines();
+    }, [loadWs, loadMachines]);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
@@ -92,21 +129,22 @@ export default function CleaningPickerPage({
                     Cleaning
                 </p>
                 <h1 className="text-2xl font-black text-text">
-                    Which station are you cleaning?
+                    What are you cleaning?
                 </h1>
                 <p className="text-xs text-muted">
-                    Pick a workstation to start a cleaning session — the
-                    checklist appears on the next screen and the timer
-                    records how long the clean takes.
+                    Pick the whole workstation, or a specific machine on
+                    it. The audit event goes against whatever you pick,
+                    and the checklist is the one attached at that level
+                    on PSP.
                 </p>
             </header>
 
-            {loading && rows.length === 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-6 text-sm text-muted">
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading workstations…
-                </div>
-            )}
+            <TabBar
+                tab={tab}
+                onChange={setTab}
+                workstationCount={wsRows.length}
+                machineCount={machineRows.length}
+            />
 
             {error && (
                 <div className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-3 text-sm text-danger">
@@ -114,29 +152,140 @@ export default function CleaningPickerPage({
                 </div>
             )}
 
-            {!loading && rows.length === 0 && !error && (
-                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface/20 px-4 py-10 text-center">
-                    <Sparkles className="size-6 text-muted" />
-                    <p className="text-sm font-semibold text-text">
-                        No cleaning forms configured
-                    </p>
-                    <p className="max-w-md text-xs text-muted">
-                        Ask a supervisor to author a cleaning form in PSP and
-                        assign it to a workstation. Once published, it will
-                        show up here.
-                    </p>
-                </div>
+            {tab === "workstation" ? (
+                <WorkstationList
+                    rows={wsRows}
+                    loading={wsLoading}
+                    onOpen={onOpenCleaning}
+                />
+            ) : (
+                <MachineList
+                    rows={machineRows}
+                    loading={machineLoading}
+                    onOpen={onOpenCleaningMachine}
+                    verb="cleaning"
+                />
             )}
+        </div>
+    );
+}
 
-            <div className="flex flex-col gap-2">
-                {rows.map((row) => (
-                    <CleaningWorkstationRow
-                        key={row.workstation_id}
-                        row={row}
-                        onOpen={() => onOpenCleaning(row)}
-                    />
-                ))}
+/* ------------------------------------------------------------------ */
+
+export function TabBar({
+    tab,
+    onChange,
+    workstationCount,
+    machineCount,
+}: {
+    tab: Tab;
+    onChange: (t: Tab) => void;
+    workstationCount: number;
+    machineCount: number;
+}) {
+    return (
+        <div className="flex w-full rounded-lg border border-border p-0.5">
+            <TabButton
+                active={tab === "workstation"}
+                onClick={() => onChange("workstation")}
+                icon={<Settings2 className="size-4" />}
+                label="Workstation"
+                count={workstationCount}
+            />
+            <TabButton
+                active={tab === "machine"}
+                onClick={() => onChange("machine")}
+                icon={<Cog className="size-4" />}
+                label="Machine"
+                count={machineCount}
+            />
+        </div>
+    );
+}
+
+function TabButton({
+    active,
+    onClick,
+    icon,
+    label,
+    count,
+}: {
+    active: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    label: string;
+    count: number;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={
+                "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors " +
+                (active
+                    ? "bg-text text-background"
+                    : "text-muted hover:text-text")
+            }
+        >
+            {icon}
+            {label}
+            <span
+                className={
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-black " +
+                    (active
+                        ? "bg-background/20 text-background"
+                        : "bg-surface text-muted")
+                }
+            >
+                {count}
+            </span>
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+
+function WorkstationList({
+    rows,
+    loading,
+    onOpen,
+}: {
+    rows: CleaningWorkstationTile[];
+    loading: boolean;
+    onOpen: (row: CleaningWorkstationTile) => void;
+}) {
+    if (loading && rows.length === 0) {
+        return (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-6 text-sm text-muted">
+                <Loader2 className="size-4 animate-spin" />
+                Loading workstations…
             </div>
+        );
+    }
+    if (rows.length === 0) {
+        return (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface/20 px-4 py-10 text-center">
+                <Sparkles className="size-6 text-muted" />
+                <p className="text-sm font-semibold text-text">
+                    No workstation cleaning forms configured
+                </p>
+                <p className="max-w-md text-xs text-muted">
+                    Ask a supervisor to author a workstation-scoped
+                    cleaning form in PSP and attach it. Once published
+                    it will show up here.
+                </p>
+            </div>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            {rows.map((row) => (
+                <CleaningWorkstationRow
+                    key={row.workstation_id}
+                    row={row}
+                    onOpen={() => onOpen(row)}
+                />
+            ))}
         </div>
     );
 }
@@ -152,12 +301,10 @@ function CleaningWorkstationRow({
         () => bucketFor(row.next_cleaning_due_at),
         [row.next_cleaning_due_at],
     );
-
     const chip = useMemo(() => chipLabelFor(row.next_cleaning_due_at, bucket), [
         row.next_cleaning_due_at,
         bucket,
     ]);
-
     return (
         <button
             type="button"
@@ -196,6 +343,99 @@ function CleaningWorkstationRow({
     );
 }
 
+/* ------------------------------------------------------------------ */
+
+export function MachineList({
+    rows,
+    loading,
+    onOpen,
+    verb,
+}: {
+    rows: CleaningOrMaintenanceMachineTile[];
+    loading: boolean;
+    onOpen: (row: CleaningOrMaintenanceMachineTile) => void;
+    verb: "cleaning" | "maintenance";
+}) {
+    if (loading && rows.length === 0) {
+        return (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-6 text-sm text-muted">
+                <Loader2 className="size-4 animate-spin" />
+                Loading machines…
+            </div>
+        );
+    }
+    if (rows.length === 0) {
+        return (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface/20 px-4 py-10 text-center">
+                <Cog className="size-6 text-muted" />
+                <p className="text-sm font-semibold text-text">
+                    No machine {verb} forms configured
+                </p>
+                <p className="max-w-md text-xs text-muted">
+                    Attach a {verb === "cleaning" ? "cleaning" : "maintenance"}
+                    {" "}form to an equipment category on PSP (Settings →
+                    Equipment categories → pick one → Kiosk forms). Every
+                    machine in that category will start showing up here.
+                </p>
+            </div>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            {rows.map((row) => (
+                <MachineRow
+                    key={`${row.workstation_id}-${row.equipment_uuid}`}
+                    row={row}
+                    onOpen={() => onOpen(row)}
+                />
+            ))}
+        </div>
+    );
+}
+
+function MachineRow({
+    row,
+    onOpen,
+}: {
+    row: CleaningOrMaintenanceMachineTile;
+    onOpen: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="group flex items-start gap-3 rounded-lg border border-border bg-background px-3 py-3 text-left transition-colors hover:border-text active:bg-surface/60"
+        >
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-surface text-muted group-hover:text-text">
+                <Cog className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-black text-text">
+                        {row.equipment_name}
+                    </p>
+                    {row.form_count > 1 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-muted">
+                            {row.form_count} forms
+                        </span>
+                    )}
+                </div>
+                <p className="mt-0.5 truncate text-xs text-muted">
+                    on {row.workstation_name}
+                    {row.serial_number && ` · SN ${row.serial_number}`}
+                </p>
+                {row.category_name && (
+                    <p className="mt-0.5 truncate text-[11px] text-muted">
+                        {row.category_name}
+                    </p>
+                )}
+            </div>
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+
 function bucketFor(nextDue: string | null): DueBucket {
     if (!nextDue) return "no_schedule";
     const due = new Date(nextDue).getTime();
@@ -216,9 +456,7 @@ function chipLabelFor(nextDue: string | null, bucket: DueBucket): string {
     const diffDays = Math.round((due.getTime() - now.getTime()) / oneDayMs);
     if (bucket === "overdue") {
         const overdueDays = Math.abs(diffDays);
-        return overdueDays === 0
-            ? "Overdue today"
-            : `Overdue ${overdueDays}d`;
+        return overdueDays === 0 ? "Overdue today" : `Overdue ${overdueDays}d`;
     }
     if (bucket === "due_today") return "Due today";
     if (bucket === "due_soon") return `Due in ${diffDays}d`;

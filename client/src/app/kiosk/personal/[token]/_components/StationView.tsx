@@ -272,6 +272,21 @@ function PspStartPanel({
     const [startingKey, setStartingKey] = useState<string | null>(null);
     const preselectedRowRef = useRef<HTMLDivElement | null>(null);
 
+    // Pre-session form walk-through for MO starts. When the operator
+    // taps an MO card, probe the workstation_start slot; if any forms
+    // are attached, queue them + stash the MO row here. When the last
+    // form submits, fire ``startPspMO`` with the full response set.
+    // Mirrors the pattern in ``StartPanel`` for generic sessions —
+    // without it, PSP-driven starts silently skip the form gate that
+    // supervisors authored.
+    const [pendingStartQueue, setPendingStartQueue] = useState<KioskForm[]>([]);
+    const [pendingStartResponses, setPendingStartResponses] = useState<
+        Array<{ formId: number; answers: Record<string, unknown> }>
+    >([]);
+    const [pendingStartMo, setPendingStartMo] = useState<StationMORow | null>(
+        null,
+    );
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -342,6 +357,108 @@ function PspStartPanel({
         );
     }
 
+    async function handleMoStart(row: StationMORow) {
+        const key = `${row.mo_uuid}:${row.step_uuid}`;
+        setStartingKey(key);
+        try {
+            const probe = await personalKioskService.getPendingSessionForm(
+                token,
+                workstationId,
+                sessionToken,
+                "start",
+            );
+            if (probe.forms && probe.forms.length > 0) {
+                setPendingStartQueue(
+                    probe.forms.map((f) => ({
+                        id: f.id,
+                        name: f.name,
+                        schema: f.schema as FormField[],
+                    })),
+                );
+                setPendingStartResponses([]);
+                setPendingStartMo(row);
+                setStartingKey(null);
+                return;
+            }
+        } catch {
+            // Probe failure is non-blocking — proceed to start without
+            // a form (matches pre-forms-integration behaviour).
+        }
+        await startPspMO({
+            token,
+            workstationId,
+            sessionToken,
+            row,
+            onStarted,
+            setBusy: (v) => setStartingKey(v ? key : null),
+        });
+    }
+
+    // Pre-session form gate takes over the whole panel — full-screen
+    // so the operator can't tap around it (and can't miss it). We
+    // intentionally DON'T render the MO list underneath: the choice
+    // has already been made (we've stashed the row in pendingStartMo);
+    // showing the list would let the operator second-guess mid-form.
+    if (pendingStartQueue.length > 0) {
+        return (
+            <div className="space-y-3">
+                <div className="rounded-2xl border border-primary/40 bg-primary/5 p-3">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-primary">
+                        Pre-session checklist
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                        {pendingStartMo?.item_name ?? "MO"} · complete
+                        this before the session opens.
+                    </p>
+                </div>
+                <FormRenderer
+                    form={{
+                        ...pendingStartQueue[0],
+                        name: `${pendingStartQueue[0].name} · ${pendingStartResponses.length + 1} of ${pendingStartResponses.length + pendingStartQueue.length}`,
+                    }}
+                    sessionId={0}
+                    token={token}
+                    isSubmitting={startingKey !== null}
+                    onSubmit={async (answers) => {
+                        const current = pendingStartQueue[0];
+                        const rest = pendingStartQueue.slice(1);
+                        const nextResponses = [
+                            ...pendingStartResponses,
+                            { formId: current.id, answers },
+                        ];
+                        if (rest.length === 0) {
+                            const row = pendingStartMo;
+                            setPendingStartQueue([]);
+                            setPendingStartResponses([]);
+                            setPendingStartMo(null);
+                            if (row) {
+                                const key = `${row.mo_uuid}:${row.step_uuid}`;
+                                await startPspMO({
+                                    token,
+                                    workstationId,
+                                    sessionToken,
+                                    row,
+                                    onStarted,
+                                    setBusy: (v) =>
+                                        setStartingKey(v ? key : null),
+                                    startFormResponses: nextResponses,
+                                });
+                            }
+                        } else {
+                            setPendingStartResponses(nextResponses);
+                            setPendingStartQueue(rest);
+                        }
+                    }}
+                    onClose={() => {
+                        setPendingStartQueue([]);
+                        setPendingStartResponses([]);
+                        setPendingStartMo(null);
+                    }}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-3">
             <div>
@@ -368,16 +485,7 @@ function PspStartPanel({
                         preselected={isPreselected}
                         rowRef={isPreselected ? preselectedRowRef : undefined}
                         disabled={!isClockedIn}
-                        onStart={() =>
-                            startPspMO({
-                                token,
-                                workstationId,
-                                sessionToken,
-                                row,
-                                onStarted,
-                                setBusy: (v) => setStartingKey(v ? key : null),
-                            })
-                        }
+                        onStart={() => void handleMoStart(row)}
                     />
                 );
             })}
@@ -407,6 +515,7 @@ async function startPspMO({
     row,
     onStarted,
     setBusy,
+    startFormResponses = [],
 }: {
     token: string;
     workstationId: number;
@@ -414,6 +523,10 @@ async function startPspMO({
     row: StationMORow;
     onStarted: () => void;
     setBusy: (v: boolean) => void;
+    startFormResponses?: Array<{
+        formId: number;
+        answers: Record<string, unknown>;
+    }>;
 }) {
     setBusy(true);
     try {
@@ -434,6 +547,11 @@ async function startPspMO({
                 // from PSP and stamp override_target_* on the session,
                 // so performance % can be scored on stop.
                 workstationGroupUuid: row.workstation_group_uuid,
+                // Pre-session form responses collected from the
+                // ``workstation_start`` FormRenderer walk before this
+                // fired. Backend persists them as SessionFormResponse
+                // rows against the new WorkSession.
+                startFormResponses,
             },
         );
         onStarted();

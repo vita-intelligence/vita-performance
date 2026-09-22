@@ -37,6 +37,8 @@ from workers.views import (
     PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
     PublicPersonalKioskMaintenanceWorkstationsView,
+    PublicPersonalKioskCleaningMachinesView,
+    PublicPersonalKioskMaintenanceMachinesView,
     PublicPersonalKioskWorkstationEquipmentView,
     PublicPersonalKioskStartMaintenanceSessionView,
     PublicPersonalKioskGetMaintenanceSessionView,
@@ -144,6 +146,14 @@ urlpatterns = [
     path(
         'personal/<uuid:token>/workers/<int:worker_id>/maintenance-workstations/',
         PublicPersonalKioskMaintenanceWorkstationsView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/workers/<int:worker_id>/cleaning-machines/',
+        PublicPersonalKioskCleaningMachinesView.as_view(),
+    ),
+    path(
+        'personal/<uuid:token>/workers/<int:worker_id>/maintenance-machines/',
+        PublicPersonalKioskMaintenanceMachinesView.as_view(),
     ),
     path(
         'personal/<uuid:token>/workstations/<int:ws_id>/equipment/',

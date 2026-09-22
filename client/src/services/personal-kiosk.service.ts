@@ -5,6 +5,7 @@ import {
     CleaningSessionStart,
     CleaningWorkstationsPayload,
     HistoryPayload,
+    MachinesPayload,
     MaintenanceSessionComplete,
     MaintenanceSessionStart,
     MaintenanceWorkstationsPayload,
@@ -252,6 +253,26 @@ export const personalKioskService = {
     ): Promise<MaintenanceWorkstationsPayload> => {
         const res = await fetch(
             `${base}${personalKiosk.maintenanceWorkstations(token, workerId)}`,
+        );
+        return unwrap(res);
+    },
+
+    getCleaningMachines: async (
+        token: string,
+        workerId: number,
+    ): Promise<MachinesPayload> => {
+        const res = await fetch(
+            `${base}${personalKiosk.cleaningMachines(token, workerId)}`,
+        );
+        return unwrap(res);
+    },
+
+    getMaintenanceMachines: async (
+        token: string,
+        workerId: number,
+    ): Promise<MachinesPayload> => {
+        const res = await fetch(
+            `${base}${personalKiosk.maintenanceMachines(token, workerId)}`,
         );
         return unwrap(res);
     },

@@ -165,30 +165,36 @@ export interface CleaningWorkstationsPayload {
   total: number;
 }
 
-/** Payload returned when a cleaning session opens. `forms` is the
- *  ordered list the kiosk walks through — one form at a time,
- *  starting from `forms[0]`. `form` is kept as a legacy alias for
- *  the first form so older kiosk builds don't break during a
- *  rolling deploy. */
+/** One form entry in the kiosk walk-through — flattened + PSP-
+ *  resolved (workstation-scoped templates already have their
+ *  per-equipment sections expanded). */
+export interface KioskWalkForm {
+  id: number;
+  name: string;
+  sort_order: number;
+  schema: unknown[];
+}
+
+/** Payload returned when a cleaning session opens. Two ordered
+ *  form lists — the kiosk walks ``start_forms`` BEFORE the timer
+ *  opens (pre-session PPE / setup) and ``end_forms`` AFTER Stop
+ *  (post-session verification / signoff). Either can be empty.
+ *
+ *  ``forms`` + ``form`` are legacy aliases that echo the old
+ *  single-list-at-end shape, kept so kiosk builds released before
+ *  the two-phase model don't break during a rolling deploy.
+ *  They mirror ``end_forms`` / ``end_forms[0]``. */
 export interface CleaningSessionStart {
   session_id: number;
   workstation_id: number;
   workstation_name: string;
+  equipment_uuid: string | null;
+  equipment_name: string | null;
   start_time: string;
-  forms: Array<{
-    id: number;
-    name: string;
-    sort_order: number;
-    /** Flattened `FormField[]` — PSP-resolved (cleaning templates
-     *  already have equipment sections expanded) or a passthrough of
-     *  the legacy authoring shape. */
-    schema: unknown[];
-  }>;
-  form: {
-    id: number;
-    name: string;
-    schema: unknown[];
-  } | null;
+  start_forms: KioskWalkForm[];
+  end_forms: KioskWalkForm[];
+  forms: KioskWalkForm[];
+  form: KioskWalkForm | null;
 }
 
 export interface CleaningSessionComplete {
@@ -215,6 +221,31 @@ export interface MaintenanceWorkstationsPayload {
   total: number;
 }
 
+/** One row on the Machine tab of the cleaning / maintenance picker.
+ *  A machine is a (workstation × equipment) pair — the workstation
+ *  is where the machine physically lives, the equipment is what
+ *  gets audit-logged when the operator picks this row.
+ *
+ *  Rendered when the machine's category has at least one active
+ *  equipment-scoped form for the trigger. Tapping the row jumps
+ *  straight into the session view with the equipment pre-scoped. */
+export interface CleaningOrMaintenanceMachineTile {
+  workstation_id: number;
+  workstation_name: string;
+  equipment_uuid: string;
+  equipment_name: string;
+  serial_number: string | null;
+  category_name: string | null;
+  form_id: number;
+  form_name: string;
+  form_count: number;
+}
+
+export interface MachinesPayload {
+  items: CleaningOrMaintenanceMachineTile[];
+  total: number;
+}
+
 /** One machine attached to a workstation. Rendered on the "scope
  *  this session" picker so the operator can tag a cleaning /
  *  maintenance session to a specific piece of equipment instead of
@@ -233,10 +264,8 @@ export interface WorkstationEquipmentPayload {
   total: number;
 }
 
-/** Payload returned when a maintenance session opens. Same envelope
- *  as :type:`CleaningSessionStart` + carries the resolved
- *  ``equipment_uuid`` / ``equipment_name`` when the session was
- *  scoped to a specific machine. */
+/** Payload returned when a maintenance session opens. Same
+ *  two-phase envelope as :type:`CleaningSessionStart`. */
 export interface MaintenanceSessionStart {
   session_id: number;
   workstation_id: number;
@@ -244,17 +273,10 @@ export interface MaintenanceSessionStart {
   equipment_uuid: string | null;
   equipment_name: string | null;
   start_time: string;
-  forms: Array<{
-    id: number;
-    name: string;
-    sort_order: number;
-    schema: unknown[];
-  }>;
-  form: {
-    id: number;
-    name: string;
-    schema: unknown[];
-  } | null;
+  start_forms: KioskWalkForm[];
+  end_forms: KioskWalkForm[];
+  forms: KioskWalkForm[];
+  form: KioskWalkForm | null;
 }
 
 export interface MaintenanceSessionComplete {

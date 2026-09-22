@@ -8,8 +8,14 @@ import {
     CalendarCheck2,
 } from "lucide-react";
 import { personalKioskService } from "@/services/personal-kiosk.service";
-import { MaintenanceWorkstationTile } from "@/types/worker";
+import {
+    CleaningOrMaintenanceMachineTile,
+    MaintenanceWorkstationTile,
+} from "@/types/worker";
 import { ClockInGate } from "./JobsPage";
+import { MachineList, TabBar } from "./CleaningPickerPage";
+
+type Tab = "workstation" | "machine";
 
 interface MaintenancePickerPageProps {
     token: string;
@@ -17,6 +23,7 @@ interface MaintenancePickerPageProps {
     workerName: string;
     isClockedIn: boolean;
     onOpenMaintenance: (row: MaintenanceWorkstationTile) => void;
+    onOpenMaintenanceMachine: (row: CleaningOrMaintenanceMachineTile) => void;
 }
 
 type DueBucket = "overdue" | "due_today" | "due_soon" | "later" | "no_schedule";
@@ -40,8 +47,10 @@ function Chip({ bucket, label }: { bucket: DueBucket; label: string }) {
 }
 
 /**
- * Maintenance entry-point picker. Parallel to :file:`CleaningPickerPage`
- * but reads the maintenance-schedule cadence mirrored from PSP.
+ * Maintenance entry-point picker. Two tabs (workstation + machine)
+ * — mirror of :file:`CleaningPickerPage.tsx`. Machine tab lists
+ * every machine whose category has an ``equipment_maintenance``
+ * form attached on PSP.
  */
 export default function MaintenancePickerPage({
     token,
@@ -49,34 +58,57 @@ export default function MaintenancePickerPage({
     workerName,
     isClockedIn,
     onOpenMaintenance,
+    onOpenMaintenanceMachine,
 }: MaintenancePickerPageProps) {
     if (!isClockedIn) {
         return <ClockInGate title="Maintenance" workerName={workerName} />;
     }
 
-    const [rows, setRows] = useState<MaintenanceWorkstationTile[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<Tab>("workstation");
+    const [wsRows, setWsRows] = useState<MaintenanceWorkstationTile[]>([]);
+    const [machineRows, setMachineRows] = useState<
+        CleaningOrMaintenanceMachineTile[]
+    >([]);
+    const [wsLoading, setWsLoading] = useState(true);
+    const [machineLoading, setMachineLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const loadWs = useCallback(async () => {
+        setWsLoading(true);
         try {
             const res = await personalKioskService.getMaintenanceWorkstations(
                 token,
                 workerId,
             );
-            setRows(res.items);
+            setWsRows(res.items);
             setError(null);
         } catch (err) {
             setError(getMsg(err));
         } finally {
-            setLoading(false);
+            setWsLoading(false);
+        }
+    }, [token, workerId]);
+
+    const loadMachines = useCallback(async () => {
+        setMachineLoading(true);
+        try {
+            const res = await personalKioskService.getMaintenanceMachines(
+                token,
+                workerId,
+            );
+            setMachineRows(res.items);
+            setError(null);
+        } catch (err) {
+            setError(getMsg(err));
+        } finally {
+            setMachineLoading(false);
         }
     }, [token, workerId]);
 
     useEffect(() => {
-        void load();
-    }, [load]);
+        void loadWs();
+        void loadMachines();
+    }, [loadWs, loadMachines]);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
@@ -85,21 +117,22 @@ export default function MaintenancePickerPage({
                     Maintenance
                 </p>
                 <h1 className="text-2xl font-black text-text">
-                    Which station are you maintaining?
+                    What are you maintaining?
                 </h1>
                 <p className="text-xs text-muted">
-                    Pick a workstation to start a maintenance session — the
-                    checklist appears on the next screen and the timer
-                    records how long the service takes.
+                    Pick the whole workstation, or a specific machine on
+                    it. The audit event goes against whatever you pick,
+                    and the checklist is the one attached at that level
+                    on PSP.
                 </p>
             </header>
 
-            {loading && rows.length === 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-6 text-sm text-muted">
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading workstations…
-                </div>
-            )}
+            <TabBar
+                tab={tab}
+                onChange={setTab}
+                workstationCount={wsRows.length}
+                machineCount={machineRows.length}
+            />
 
             {error && (
                 <div className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-3 text-sm text-danger">
@@ -107,29 +140,67 @@ export default function MaintenancePickerPage({
                 </div>
             )}
 
-            {!loading && rows.length === 0 && !error && (
-                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface/20 px-4 py-10 text-center">
-                    <Wrench className="size-6 text-muted" />
-                    <p className="text-sm font-semibold text-text">
-                        No maintenance forms configured
-                    </p>
-                    <p className="max-w-md text-xs text-muted">
-                        Ask a supervisor to author a maintenance form in PSP
-                        and assign it to a workstation. Once published, it
-                        will show up here.
-                    </p>
-                </div>
+            {tab === "workstation" ? (
+                <WorkstationList
+                    rows={wsRows}
+                    loading={wsLoading}
+                    onOpen={onOpenMaintenance}
+                />
+            ) : (
+                <MachineList
+                    rows={machineRows}
+                    loading={machineLoading}
+                    onOpen={onOpenMaintenanceMachine}
+                    verb="maintenance"
+                />
             )}
+        </div>
+    );
+}
 
-            <div className="flex flex-col gap-2">
-                {rows.map((row) => (
-                    <MaintenanceWorkstationRow
-                        key={row.workstation_id}
-                        row={row}
-                        onOpen={() => onOpenMaintenance(row)}
-                    />
-                ))}
+/* ------------------------------------------------------------------ */
+
+function WorkstationList({
+    rows,
+    loading,
+    onOpen,
+}: {
+    rows: MaintenanceWorkstationTile[];
+    loading: boolean;
+    onOpen: (row: MaintenanceWorkstationTile) => void;
+}) {
+    if (loading && rows.length === 0) {
+        return (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-6 text-sm text-muted">
+                <Loader2 className="size-4 animate-spin" />
+                Loading workstations…
             </div>
+        );
+    }
+    if (rows.length === 0) {
+        return (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface/20 px-4 py-10 text-center">
+                <Wrench className="size-6 text-muted" />
+                <p className="text-sm font-semibold text-text">
+                    No workstation maintenance forms configured
+                </p>
+                <p className="max-w-md text-xs text-muted">
+                    Ask a supervisor to author a workstation-scoped
+                    maintenance form in PSP and attach it. Once
+                    published it will show up here.
+                </p>
+            </div>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            {rows.map((row) => (
+                <MaintenanceWorkstationRow
+                    key={row.workstation_id}
+                    row={row}
+                    onOpen={() => onOpen(row)}
+                />
+            ))}
         </div>
     );
 }
@@ -145,12 +216,10 @@ function MaintenanceWorkstationRow({
         () => bucketFor(row.next_maintenance_due_at),
         [row.next_maintenance_due_at],
     );
-
     const chip = useMemo(
         () => chipLabelFor(row.next_maintenance_due_at, bucket),
         [row.next_maintenance_due_at, bucket],
     );
-
     return (
         <button
             type="button"
@@ -188,6 +257,8 @@ function MaintenanceWorkstationRow({
         </button>
     );
 }
+
+/* ------------------------------------------------------------------ */
 
 function bucketFor(nextDue: string | null): DueBucket {
     if (!nextDue) return "no_schedule";

@@ -49,23 +49,37 @@ from ..models import DynamicForm
 
 logger = logging.getLogger(__name__)
 
-# Map PSP triggers to vita-perf's legacy trigger enum. PSP uses
-# workstation-scoped names since they're honest about what fires;
-# vita-perf's local enum stays `start`/`end`/`cleaning`/`maintenance`
-# — the mapping happens on ingest. `cleaning` was added by migration
-# 0002; `maintenance` by migration 0005.
+# Map PSP triggers to vita-perf's local trigger enum. PSP always
+# uses honest names for what fires + when (workstation vs equipment,
+# start vs end phase); vp mirrors 1:1. Legacy single-phase names
+# (cleaning, maintenance, equipment_cleaning, equipment_maintenance)
+# were renamed to `_end` by migration 0007 — kept as accepted-alias
+# keys here so an in-flight publish from a stale PSP build doesn't
+# 400.
 _TRIGGER_MAP = {
     "workstation_start": DynamicForm.TRIGGER_START,
     "workstation_end": DynamicForm.TRIGGER_END,
-    "cleaning": DynamicForm.TRIGGER_CLEANING,
-    "maintenance": DynamicForm.TRIGGER_MAINTENANCE,
-    "equipment_cleaning": DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
-    "equipment_maintenance": DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
+    "cleaning_start": DynamicForm.TRIGGER_CLEANING_START,
+    "cleaning_end": DynamicForm.TRIGGER_CLEANING_END,
+    "maintenance_start": DynamicForm.TRIGGER_MAINTENANCE_START,
+    "maintenance_end": DynamicForm.TRIGGER_MAINTENANCE_END,
+    "equipment_cleaning_start": DynamicForm.TRIGGER_EQUIPMENT_CLEANING_START,
+    "equipment_cleaning_end": DynamicForm.TRIGGER_EQUIPMENT_CLEANING_END,
+    "equipment_maintenance_start": DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_START,
+    "equipment_maintenance_end": DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_END,
+    # Legacy aliases — old PSP builds emit these; treat as the _end
+    # phase since that's the semantic they always carried.
+    "cleaning": DynamicForm.TRIGGER_CLEANING_END,
+    "maintenance": DynamicForm.TRIGGER_MAINTENANCE_END,
+    "equipment_cleaning": DynamicForm.TRIGGER_EQUIPMENT_CLEANING_END,
+    "equipment_maintenance": DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_END,
 }
 
 _EQUIPMENT_SCOPED_TRIGGERS = {
-    DynamicForm.TRIGGER_EQUIPMENT_CLEANING,
-    DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE,
+    DynamicForm.TRIGGER_EQUIPMENT_CLEANING_START,
+    DynamicForm.TRIGGER_EQUIPMENT_CLEANING_END,
+    DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_START,
+    DynamicForm.TRIGGER_EQUIPMENT_MAINTENANCE_END,
 }
 
 
@@ -207,7 +221,7 @@ class DynamicFormPublishView(APIView):
         schedule_next_due: date | None = None
         schedule_present = False
         schedule = data.get("workstation_cleaning_schedule")
-        if trigger == DynamicForm.TRIGGER_CLEANING and isinstance(schedule, dict):
+        if trigger == DynamicForm.TRIGGER_CLEANING_END and isinstance(schedule, dict):
             schedule_present = True
             raw_last = schedule.get("last_cleaning_at")
             if raw_last is not None:
@@ -236,7 +250,7 @@ class DynamicFormPublishView(APIView):
         maint_next_due: date | None = None
         maint_schedule_present = False
         maint_schedule = data.get("workstation_maintenance_schedule")
-        if trigger == DynamicForm.TRIGGER_MAINTENANCE and isinstance(maint_schedule, dict):
+        if trigger == DynamicForm.TRIGGER_MAINTENANCE_END and isinstance(maint_schedule, dict):
             maint_schedule_present = True
             raw_last = maint_schedule.get("last_maintenance_at")
             if raw_last is not None:
@@ -279,10 +293,35 @@ class DynamicFormPublishView(APIView):
 
             if existing:
                 stored_version = existing.psp_version or 0
+
+                # Workstation cadence lives on the WORKSTATION row,
+                # not on the DynamicForm — it's independent state
+                # that piggybacks on every publish. Write it BEFORE
+                # the version-gate short-circuit so a stale
+                # template push (schema unchanged) still refreshes
+                # the "next due" chip when only the cadence moved.
+                if schedule_present and workstation is not None:
+                    workstation.last_cleaning_at = schedule_last_at
+                    workstation.next_cleaning_due_at = schedule_next_due
+                    workstation.save(
+                        update_fields=["last_cleaning_at", "next_cleaning_due_at"]
+                    )
+
+                if maint_schedule_present and workstation is not None:
+                    workstation.last_maintenance_at = maint_last_at
+                    workstation.next_maintenance_due_at = maint_next_due
+                    workstation.save(
+                        update_fields=[
+                            "last_maintenance_at",
+                            "next_maintenance_due_at",
+                        ]
+                    )
+
                 if psp_version <= stored_version:
                     logger.info(
-                        "Dropping stale publish: psp_uuid=%s ws=%s "
-                        "equipment=%s incoming=%d stored=%d",
+                        "Dropping stale template publish: psp_uuid=%s ws=%s "
+                        "equipment=%s incoming=%d stored=%d "
+                        "(cadence still applied)",
                         psp_uuid,
                         workstation.id if workstation else None,
                         equipment_uuid,
@@ -306,23 +345,6 @@ class DynamicFormPublishView(APIView):
                 existing.worker_uuids = worker_uuids
                 existing.sort_order = sort_order
                 existing.save()
-
-                if schedule_present and workstation is not None:
-                    workstation.last_cleaning_at = schedule_last_at
-                    workstation.next_cleaning_due_at = schedule_next_due
-                    workstation.save(
-                        update_fields=["last_cleaning_at", "next_cleaning_due_at"]
-                    )
-
-                if maint_schedule_present and workstation is not None:
-                    workstation.last_maintenance_at = maint_last_at
-                    workstation.next_maintenance_due_at = maint_next_due
-                    workstation.save(
-                        update_fields=[
-                            "last_maintenance_at",
-                            "next_maintenance_due_at",
-                        ]
-                    )
 
                 return Response(
                     {

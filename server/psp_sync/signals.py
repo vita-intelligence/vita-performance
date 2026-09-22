@@ -27,10 +27,11 @@ from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
 from work_sessions.models import WorkSession
+from dynamic_forms.models import FormResponse
 
 from .client import PspError, client_for_company
 from .models import PspOutboxEntry
-from .pushers import build_session_payload
+from .pushers import build_form_submission_payload, build_session_payload
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,43 @@ def on_work_session_workers_changed(sender, instance, action, **kwargs):
             'status': 'pending',
         },
     )
+    transaction.on_commit(lambda: _try_push_now(entry.pk))
+
+
+@receiver(post_save, sender=FormResponse)
+def on_form_response_saved(sender, instance: FormResponse, created: bool, **kwargs):
+    """Fan a filled form up to PSP so the /production/sessions
+    explorer sees it. Silent-skip when the form / session / station
+    isn't PSP-linked — legacy kiosks and locally-authored forms
+    stay local. Fires on every save so a later edit (rare — forms
+    are typically write-once) still keeps PSP in sync."""
+    if getattr(_enqueue_local, "busy", False):
+        return
+
+    payload = build_form_submission_payload(instance)
+    if payload is None:
+        return
+
+    session = instance.session
+    if not session or not session.company:
+        return
+
+    _enqueue_local.busy = True
+    try:
+        entry, _ = PspOutboxEntry.objects.update_or_create(
+            company=session.company,
+            external_id=f"form_response:{instance.pk}",
+            defaults={
+                'kind': PspOutboxEntry.KIND_FORM_SUBMISSION,
+                'endpoint_path': "/form-submissions",
+                'payload': payload,
+                'session': session,
+                'status': 'pending',
+            },
+        )
+    finally:
+        _enqueue_local.busy = False
+
     transaction.on_commit(lambda: _try_push_now(entry.pk))
 
 

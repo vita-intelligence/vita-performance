@@ -104,9 +104,19 @@ export default function PersonalKioskTokenPage() {
     // spawn a second session and 409 anyway).
     const [resumeCleaningSessionId, setResumeCleaningSessionId] =
         useState<number | null>(null);
+    // When the operator taps a row in the Machine tab of the
+    // cleaning / maintenance picker, we pre-scope the session to
+    // that specific equipment so the confirm screen already has the
+    // right radio picked. NULL = whole workstation scope (default).
+    const [preselectedCleaningEquipmentUuid, setPreselectedCleaningEquipmentUuid] =
+        useState<string | null>(null);
     // Maintenance parallel — same shape, different table.
     const [maintenanceTarget, setMaintenanceTarget] =
         useState<MaintenanceWorkstationTile | null>(null);
+    const [
+        preselectedMaintenanceEquipmentUuid,
+        setPreselectedMaintenanceEquipmentUuid,
+    ] = useState<string | null>(null);
     // Live QC — the MO the operator has opened for note-taking, plus
     // the workstation they'd already been standing at when they
     // tapped in (snapshotted on each note for the timeline context).
@@ -519,6 +529,26 @@ export default function PersonalKioskTokenPage() {
                             isClockedIn={!!activeShift}
                             onOpenCleaning={(row) => {
                                 setCleaningTarget(row);
+                                setPreselectedCleaningEquipmentUuid(null);
+                                setScreen("cleaning-session");
+                            }}
+                            onOpenCleaningMachine={(row) => {
+                                // Machine-tab tap: synthesize a
+                                // workstation tile (session view only
+                                // needs id + name for the header) and
+                                // pre-scope the equipment.
+                                setCleaningTarget({
+                                    workstation_id: row.workstation_id,
+                                    workstation_name: row.workstation_name,
+                                    kiosk_token: "",
+                                    form_id: row.form_id,
+                                    form_name: row.form_name,
+                                    last_cleaning_at: null,
+                                    next_cleaning_due_at: null,
+                                });
+                                setPreselectedCleaningEquipmentUuid(
+                                    row.equipment_uuid,
+                                );
                                 setScreen("cleaning-session");
                             }}
                         />
@@ -531,14 +561,19 @@ export default function PersonalKioskTokenPage() {
                             sessionToken={sessionToken}
                             target={cleaningTarget}
                             resumeSessionId={resumeCleaningSessionId ?? undefined}
+                            preselectedEquipmentUuid={
+                                preselectedCleaningEquipmentUuid ?? undefined
+                            }
                             onFinished={() => {
                                 setCleaningTarget(null);
                                 setResumeCleaningSessionId(null);
+                                setPreselectedCleaningEquipmentUuid(null);
                                 setScreen("home");
                             }}
                             onBack={() => {
                                 setCleaningTarget(null);
                                 setResumeCleaningSessionId(null);
+                                setPreselectedCleaningEquipmentUuid(null);
                                 // If the operator landed here via the
                                 // Home-menu live-activity banner
                                 // (resume path), Back returns Home,
@@ -560,6 +595,22 @@ export default function PersonalKioskTokenPage() {
                             isClockedIn={!!activeShift}
                             onOpenMaintenance={(row) => {
                                 setMaintenanceTarget(row);
+                                setPreselectedMaintenanceEquipmentUuid(null);
+                                setScreen("maintenance-session");
+                            }}
+                            onOpenMaintenanceMachine={(row) => {
+                                setMaintenanceTarget({
+                                    workstation_id: row.workstation_id,
+                                    workstation_name: row.workstation_name,
+                                    kiosk_token: "",
+                                    form_id: row.form_id,
+                                    form_name: row.form_name,
+                                    last_maintenance_at: null,
+                                    next_maintenance_due_at: null,
+                                });
+                                setPreselectedMaintenanceEquipmentUuid(
+                                    row.equipment_uuid,
+                                );
                                 setScreen("maintenance-session");
                             }}
                         />
@@ -571,12 +622,17 @@ export default function PersonalKioskTokenPage() {
                             token={token}
                             sessionToken={sessionToken}
                             target={maintenanceTarget}
+                            preselectedEquipmentUuid={
+                                preselectedMaintenanceEquipmentUuid ?? undefined
+                            }
                             onFinished={() => {
                                 setMaintenanceTarget(null);
+                                setPreselectedMaintenanceEquipmentUuid(null);
                                 setScreen("home");
                             }}
                             onBack={() => {
                                 setMaintenanceTarget(null);
+                                setPreselectedMaintenanceEquipmentUuid(null);
                                 setScreen("maintenance-picker");
                             }}
                         />

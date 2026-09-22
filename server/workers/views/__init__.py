@@ -36,6 +36,8 @@ from .personal_kiosk import (
     PublicPersonalKioskGetCleaningSessionView,
     PublicPersonalKioskCompleteCleaningSessionView,
     PublicPersonalKioskMaintenanceWorkstationsView,
+    PublicPersonalKioskCleaningMachinesView,
+    PublicPersonalKioskMaintenanceMachinesView,
     PublicPersonalKioskWorkstationEquipmentView,
     PublicPersonalKioskStartMaintenanceSessionView,
     PublicPersonalKioskGetMaintenanceSessionView,

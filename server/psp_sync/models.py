@@ -33,11 +33,13 @@ class PspOutboxEntry(models.Model):
     KIND_MO_SESSION = 'mo_session'
     KIND_WS_SESSION = 'workstation_session'
     KIND_REPUTATION = 'reputation_event'
+    KIND_FORM_SUBMISSION = 'form_submission'
 
     KIND_CHOICES = [
         (KIND_MO_SESSION, 'MO session'),
         (KIND_WS_SESSION, 'Workstation session (off-MO)'),
         (KIND_REPUTATION, 'Reputation event'),
+        (KIND_FORM_SUBMISSION, 'Form submission'),
     ]
 
     STATUS_CHOICES = [

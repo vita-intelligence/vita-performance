@@ -43,7 +43,7 @@ TRIGGER_MAP = {
     DynamicForm.TRIGGER_START: ["workstation_start"],
     DynamicForm.TRIGGER_END: ["workstation_end"],
     DynamicForm.TRIGGER_BOTH: ["workstation_start", "workstation_end"],
-    DynamicForm.TRIGGER_CLEANING: ["cleaning"],
+    DynamicForm.TRIGGER_CLEANING_END: ["cleaning"],
 }
 
 
