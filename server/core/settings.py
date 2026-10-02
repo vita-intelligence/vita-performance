@@ -287,7 +287,13 @@ JWT_AUTH_COOKIE = 'access_token'  # Name of access token cookie
 JWT_AUTH_REFRESH_COOKIE = 'refresh_token'  # Name of refresh token cookie
 JWT_AUTH_COOKIE_SECURE = not DEBUG  # Set to True in production
 JWT_AUTH_COOKIE_HTTP_ONLY = True  # Prevents JavaScript access
-JWT_AUTH_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+JWT_AUTH_COOKIE_SAMESITE = os.environ.get(
+    "JWT_AUTH_COOKIE_SAMESITE", "Lax"
+)  # 'Lax' | 'Strict' | 'None'. Use 'None' when the frontend and
+   # backend live on different origins (e.g. sandbox on split
+   # `*.azurewebsites.net` hosts) — browsers drop 'Lax' cookies on
+   # cross-site XHR, which breaks JWT auth. 'None' requires
+   # JWT_AUTH_COOKIE_SECURE=True (already the case in prod).
 JWT_AUTH_COOKIE_PATH = '/'
 # ==================================
 
