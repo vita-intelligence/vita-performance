@@ -160,18 +160,31 @@ def pull_employees(company: Company, client: "PspClient") -> PullResult:
             "hourly_rate": rate if rate is not None else 0,
             "reputation_score": row.get("reputation_score") or 650,
         }
-        # Mirror the kiosk PIN hash whenever PSP ships one. Both apps
-        # use Django's pbkdf2_sha256 format so the stored string is
-        # directly usable by ``Worker.check_pin`` -> ``check_password``
-        # with no re-hash. We only overwrite when PSP has a value;
-        # an empty / missing hash on PSP's side (operator hasn't set
-        # one yet, or deliberately cleared it) is left alone here so
-        # a half-rolled-out seed doesn't nuke a locally-set PIN. A
-        # dedicated "clear PIN" path on PSP would land explicitly via
-        # the integration write endpoint, not through the pull.
+        # Mirror the kiosk PIN hash whenever PSP ships one. PSP hashes
+        # with Comeonin bcrypt (``$2b$12$...``) so we prefix with
+        # ``bcrypt$`` to match Django's ``BCryptPasswordHasher`` encoded
+        # format — ``check_password`` splits on ``$`` and uses the first
+        # segment to pick a hasher; a raw bcrypt string's first segment
+        # is empty and ``identify_hasher`` raises. The prefix is the
+        # exact shape Django would emit if we re-hashed the same
+        # password with ``make_password(..., hasher="bcrypt")``.
+        #
+        # Only overwrite when PSP has a value; an empty / missing hash
+        # on PSP's side (operator hasn't set one yet, or deliberately
+        # cleared it) is left alone here so a half-rolled-out seed
+        # doesn't nuke a locally-set PIN. A dedicated "clear PIN" path
+        # on PSP would land explicitly via the integration write
+        # endpoint, not through the pull.
         remote_pin_hash = row.get("kiosk_pin_hash")
         if remote_pin_hash:
-            defaults["pin"] = remote_pin_hash
+            # Already-prefixed hashes (future-proofing against PSP
+            # starting to ship Django-flavoured strings directly) are
+            # taken verbatim; the common bare-bcrypt string gets the
+            # algorithm tag Django expects.
+            if remote_pin_hash.startswith("bcrypt$") or remote_pin_hash.startswith("pbkdf2_"):
+                defaults["pin"] = remote_pin_hash
+            else:
+                defaults["pin"] = "bcrypt$" + remote_pin_hash
         created = _upsert_with_adopt(
             Worker,
             company=company,
@@ -345,7 +358,15 @@ def _upsert_with_adopt(
 # command so all three paths keep the same "last synced 3m ago" clock.
 
 
-_STALE_TTL_SECONDS = 300  # 5 minutes — sane default for shopfloor churn
+# 30 s — shopfloor operators expect PIN rotations / name fixes / wage
+# edits made on PSP to show up on the kiosk within the time it takes to
+# walk from the admin screen to the tablet. 5 minutes was long enough
+# that operators thought the sync was broken (see the "no PIN installed"
+# report after a rotate). 30 s still lets the pull piggyback on multiple
+# consecutive kiosk reads without stampeding PSP: the first read fires
+# a pull, the lock cache absorbs the next few, and by the time the lock
+# expires the pull is almost certainly done.
+_STALE_TTL_SECONDS = 30
 _LOCK_TIMEOUT_SECONDS = 60  # long enough for the pull, short enough to self-heal on crash
 
 
