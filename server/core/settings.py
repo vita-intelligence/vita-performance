@@ -220,6 +220,26 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 # ========== AUTH ==========
 AUTH_USER_MODEL = 'accounts.User'
 
+# ---- Password hashers ----
+# Django 6.0 dropped ``BCryptPasswordHasher`` from the default list, so
+# a raw ``$2b$12$...`` string (what PSP's Comeonin ships, mirrored into
+# ``Worker.pin`` by the psp_sync puller) is UnusableHasher — the kiosk
+# PIN verify rejects every attempt. Reinstate the hasher at the end of
+# the default chain so new Django-issued passwords still default to
+# PBKDF2, and only kiosk PIN rotations landed from PSP go through the
+# bcrypt verify path. ``BCryptSHA256PasswordHasher`` (SHA256-wrapped
+# bcrypt) stays before the raw one so Django-encoded strings keep their
+# precedence.
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+    'django.contrib.auth.hashers.ScryptPasswordHasher',
+    'django.contrib.auth.hashers.BCryptPasswordHasher',
+]
+# ---- End password hashers ----
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
