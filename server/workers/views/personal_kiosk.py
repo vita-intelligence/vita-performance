@@ -2416,11 +2416,16 @@ class PublicPersonalKioskStartWorkstationSessionView(APIView):
 class PublicPersonalKioskStopWorkstationSessionView(APIView):
     """POST /api/kiosk/personal/<token>/work-sessions/<sess_id>/stop/
 
-    body: {session_token, quantity_produced?, notes?}
+    body: {session_token, quantity_produced, notes?}
 
-    Only the authenticated worker can stop their own session. Missing
-    quantity is allowed — the session closes with `quantity_produced=None`
-    and `performance_percentage` stays null (no target to compare)."""
+    Only the authenticated worker can stop their own session.
+    ``quantity_produced`` is MANDATORY — the manager wants every closed
+    run to carry a produced number so performance can be calculated and
+    the perf-vs-plan reports aren't full of silent nulls. ``0`` is a
+    legitimate value for failed-QC runs so we only reject blank / None /
+    non-numeric. The FE enforces the same gate (``StationView``'s Stop
+    button is disabled until the field is filled); this guard backstops
+    any direct-API bypass."""
 
     permission_classes = [AllowAny]
 
@@ -2461,17 +2466,32 @@ class PublicPersonalKioskStopWorkstationSessionView(APIView):
             else:
                 end_form_responses = []
 
+        # quantity_produced is REQUIRED. Blank / missing / non-numeric
+        # all reject here — zero is a legitimate value for failed-QC
+        # runs so operators can still close out a bad run honestly.
+        from decimal import Decimal, InvalidOperation
+        if qty_raw is None or str(qty_raw).strip() == '':
+            return Response(
+                {'detail': 'Enter the quantity produced before stopping. Zero is fine if the run didn\'t yield anything.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            qty_decimal = Decimal(str(qty_raw))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response(
+                {'detail': 'quantity_produced must be a number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if qty_decimal < 0:
+            return Response(
+                {'detail': 'quantity_produced must be a non-negative number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
             ws_session.end_time = _parse_iso(request.data.get('requested_at')) or timezone.now()
             ws_session.status = 'completed'
-            if qty_raw is not None and str(qty_raw).strip() != '':
-                try:
-                    ws_session.quantity_produced = qty_raw
-                except (TypeError, ValueError):
-                    return Response(
-                        {'detail': 'quantity_produced must be a number.'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            ws_session.quantity_produced = qty_decimal
             if notes:
                 ws_session.notes = notes
             ws_session.save()

@@ -1115,8 +1115,19 @@ function RunningPanel({
     ) => {
         setBusy(true);
         try {
-            const parsed = qty.trim() === "" ? null : Number(qty);
-            if (parsed !== null && (Number.isNaN(parsed) || parsed < 0)) {
+            // Output quantity is now MANDATORY — operators who left it
+            // blank were silently zeroing out the perf-vs-plan math on
+            // every run (manager rightly wanted "no run completes
+            // without a produced number"). ``0`` stays valid for bad
+            // runs / failed QC, so blank is the only reject.
+            const trimmed = qty.trim();
+            if (trimmed === "") {
+                throw new Error(
+                    "Enter the quantity produced before stopping. Zero is fine if the run didn't yield anything.",
+                );
+            }
+            const parsed = Number(trimmed);
+            if (Number.isNaN(parsed) || parsed < 0) {
                 throw new Error("Quantity must be a non-negative number.");
             }
             const done = await personalKioskService.stopStationSession(
@@ -1239,13 +1250,14 @@ function RunningPanel({
                         </h2>
                         <p className="mt-0.5 text-xs text-muted">
                             Enter how much you produced so performance
-                            can be calculated. Leave blank if not
-                            applicable.
+                            can be calculated. If nothing passed QC,
+                            enter 0.
                         </p>
                     </div>
 
                     <label className="mt-2 block text-[11px] font-semibold uppercase tracking-wider text-muted">
                         Quantity produced {uom ? `(${uom})` : ""}
+                        <span className="ml-1 text-danger">*</span>
                     </label>
                     <input
                         type="number"
@@ -1254,8 +1266,15 @@ function RunningPanel({
                         placeholder="0"
                         value={qty}
                         onChange={(e) => setQty(e.target.value)}
+                        required
+                        aria-required="true"
                         className="mt-1 w-full rounded-2xl border border-border bg-background px-4 py-3 text-lg font-black text-text tabular-nums focus:border-primary focus:outline-none"
                     />
+                    {qty.trim() === "" && (
+                        <p className="mt-1 text-[11px] text-muted">
+                            Required — enter 0 if the run yielded nothing.
+                        </p>
+                    )}
 
                     <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted">
                         Notes (optional)
@@ -1280,6 +1299,7 @@ function RunningPanel({
                         <Button
                             color="danger"
                             isLoading={busy}
+                            isDisabled={qty.trim() === ""}
                             onPress={handleStop}
                             startContent={
                                 !busy ? <Square className="size-4" /> : undefined
