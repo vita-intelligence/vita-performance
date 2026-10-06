@@ -160,6 +160,18 @@ def pull_employees(company: Company, client: "PspClient") -> PullResult:
             "hourly_rate": rate if rate is not None else 0,
             "reputation_score": row.get("reputation_score") or 650,
         }
+        # Mirror the kiosk PIN hash whenever PSP ships one. Both apps
+        # use Django's pbkdf2_sha256 format so the stored string is
+        # directly usable by ``Worker.check_pin`` -> ``check_password``
+        # with no re-hash. We only overwrite when PSP has a value;
+        # an empty / missing hash on PSP's side (operator hasn't set
+        # one yet, or deliberately cleared it) is left alone here so
+        # a half-rolled-out seed doesn't nuke a locally-set PIN. A
+        # dedicated "clear PIN" path on PSP would land explicitly via
+        # the integration write endpoint, not through the pull.
+        remote_pin_hash = row.get("kiosk_pin_hash")
+        if remote_pin_hash:
+            defaults["pin"] = remote_pin_hash
         created = _upsert_with_adopt(
             Worker,
             company=company,
