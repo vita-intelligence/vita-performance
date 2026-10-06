@@ -174,3 +174,7 @@ GitHub.sublime-settings
 *.pem
 .vscode/
 # ========================
+# Local Claude Code memory + scheduled-task state — operator-specific
+# notes, not shared code.
+.claude/
+MEMORY.md
